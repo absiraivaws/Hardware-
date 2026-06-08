@@ -71,6 +71,7 @@ export default function PurchaseOrderDetailPage({
   const [receiving, setReceiving] = useState(false)
   const [receivingQtys, setReceivingQtys] = useState<Record<string, number>>({})
   const [editMode, setEditMode] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [editingQtys, setEditingQtys] = useState<Record<string, number>>({})
   const [editingPrices, setEditingPrices] = useState<Record<string, number>>({})
 
@@ -119,10 +120,11 @@ export default function PurchaseOrderDetailPage({
   const handleSaveReceipt = async () => {
     if (!po || !canReceive) return
     setReceiving(true)
+    setError(null)
     const supabase = createClient()
 
     const { data: userData } = await supabase.auth.getUser()
-    if (!userData.user) { setReceiving(false); return }
+    if (!userData.user) { setError("Authentication required"); setReceiving(false); return }
 
     const activeItems = items.filter((item) => (receivingQtys[item.id] ?? 0) > 0)
     if (activeItems.length === 0) { setReceiving(false); return }
@@ -137,13 +139,12 @@ export default function PurchaseOrderDetailPage({
       user_id: userData.user.id,
       notes: `Stock received for ${po.po_no}`,
     }).select("id").single()
-    if (grnError) { setReceiving(false); return }
+    if (grnError) { setError("GRN creation failed: " + grnError.message); setReceiving(false); return }
+
     const grnId = (grnRecord as { id: string }).id
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const movementClient = supabase.from("stock_movements") as any
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const productClient = supabase.from("products") as any
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const itemClient = supabase.from("purchase_items") as any
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -153,25 +154,31 @@ export default function PurchaseOrderDetailPage({
       const qty = receivingQtys[item.id] ?? 0
       if (qty <= 0) continue
 
-      await movementClient.insert({
+      const { error: movErr } = await movementClient.insert({
         product_id: item.product_id,
         type: "in",
         quantity: qty,
-        unit_price: item.unit_price,
         reference_type: "goods_received_note",
         reference_id: grnId,
         notes: `${po.po_no}`,
         user_id: userData.user.id,
       })
+      if (movErr) { setError("Stock movement failed: " + movErr.message); setReceiving(false); return }
 
-      await supabase.rpc("increment_product_stock", {
-        p_product_id: item.product_id,
-        p_qty: qty,
-      })
+      const productClient = supabase.from("products") as any
+      const { data: currentProduct } = await productClient.select("current_stock").eq("id", item.product_id).single()
+      if (currentProduct) {
+        const newStock = Number(currentProduct.current_stock) + qty
+        const { error: updateErr } = await productClient.update({ current_stock: newStock }).eq("id", item.product_id)
+        if (updateErr) { setError("Stock update failed: " + updateErr.message); setReceiving(false); return }
+      } else {
+        setError("Product not found for stock update"); setReceiving(false); return
+      }
 
-      await itemClient
+      const { error: updateErr } = await itemClient
         .update({ received_qty: item.received_qty + qty })
         .eq("id", item.id)
+      if (updateErr) { setError("Purchase item update failed: " + updateErr.message); setReceiving(false); return }
     }
 
     const allReceived = items.every((item) => {
@@ -179,7 +186,8 @@ export default function PurchaseOrderDetailPage({
       return item.received_qty + qty >= item.quantity
     })
 
-    await poClient.update({ status: allReceived ? "completed" : "partial" }).eq("id", po.id)
+    const { error: statusErr } = await poClient.update({ status: allReceived ? "completed" : "partial" }).eq("id", po.id)
+    if (statusErr) { setError("Status update failed: " + statusErr.message); setReceiving(false); return }
 
     const { data: refreshed } = await poClient.select("*").eq("id", id).single()
     if (refreshed) setPo(refreshed as PurchaseOrder)
@@ -240,14 +248,14 @@ export default function PurchaseOrderDetailPage({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="animate-spin text-gray-700" size={32} />
+        <Loader2 className="animate-spin text-gray-900" size={32} />
       </div>
     )
   }
 
   if (!po) {
     return (
-      <div className="py-20 text-center text-sm text-gray-700">
+      <div className="py-20 text-center text-sm text-gray-900">
         {t("common.no_results")}
       </div>
     )
@@ -255,6 +263,10 @@ export default function PurchaseOrderDetailPage({
 
   return (
     <div>
+      {error && (
+        <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>
+      )}
+
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button
@@ -265,7 +277,7 @@ export default function PurchaseOrderDetailPage({
           </button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{po.po_no}</h1>
-            <p className="text-sm text-gray-700">
+            <p className="text-sm text-gray-900">
               {formatDate(po.created_at)}
             </p>
           </div>
@@ -311,7 +323,7 @@ export default function PurchaseOrderDetailPage({
                 }
               }}
               disabled={receiving}
-              className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50"
             >
               {editMode ? "Save Changes" : "Edit"}
             </button>
@@ -321,13 +333,13 @@ export default function PurchaseOrderDetailPage({
 
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="rounded-lg border bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-700">
+          <p className="text-xs font-medium uppercase tracking-wider text-gray-900">
             {t("purchases.supplier")}
           </p>
           <p className="mt-1 text-sm font-medium text-gray-900">{po.supplier_name}</p>
         </div>
         <div className="rounded-lg border bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-700">
+          <p className="text-xs font-medium uppercase tracking-wider text-gray-900">
             {t("purchases.expected_date")}
           </p>
           <p className="mt-1 text-sm font-medium text-gray-900">
@@ -337,7 +349,7 @@ export default function PurchaseOrderDetailPage({
           </p>
         </div>
         <div className="rounded-lg border bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-700">
+          <p className="text-xs font-medium uppercase tracking-wider text-gray-900">
             {t("common.grand_total")}
           </p>
           <p className="mt-1 text-sm font-medium text-gray-900">
@@ -350,22 +362,22 @@ export default function PurchaseOrderDetailPage({
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                 {t("inventory.product_name")}
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                 Ordered
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                 Received
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                 {editMode ? "New Qty" : canReceive ? "Receiving" : ""}
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                 {t("inventory.cost_price")}
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                 {t("sales.amount")}
               </th>
             </tr>
@@ -376,10 +388,10 @@ export default function PurchaseOrderDetailPage({
               const isFullReceive = item.received_qty >= item.quantity
               return (
                 <tr key={item.id}>
-                  <td className="px-4 py-3 text-sm text-gray-700">
+                  <td className="px-4 py-3 text-sm text-gray-900">
                     {item.product_name}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-700">
+                  <td className="px-4 py-3 text-sm text-gray-900">
                     {editMode ? (
                       <input
                         type="number"
@@ -392,7 +404,7 @@ export default function PurchaseOrderDetailPage({
                       item.quantity
                     )}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-700">
+                  <td className="px-4 py-3 text-sm text-gray-900">
                     {item.received_qty}{isFullReceive ? " ✓" : ""}
                   </td>
                   <td className="px-4 py-3 text-sm">
@@ -414,13 +426,13 @@ export default function PurchaseOrderDetailPage({
                         className="w-20 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
                       />
                     ) : (
-                      <span className="text-gray-500">—</span>
+                      <span className="text-gray-900">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-700">
+                  <td className="px-4 py-3 text-sm text-gray-900">
                     {formatCurrency(editMode ? (editingPrices[item.id] ?? item.unit_price) : item.unit_price, locale)}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-700">
+                  <td className="px-4 py-3 text-sm text-gray-900">
                     {formatCurrency(
                       editMode
                         ? (editingQtys[item.id] ?? item.quantity) * (editingPrices[item.id] ?? item.unit_price)
@@ -440,7 +452,7 @@ export default function PurchaseOrderDetailPage({
               return (
                 <>
                   <tr>
-                    <td colSpan={4} className="px-4 py-3 text-right text-sm font-medium text-gray-700">
+                    <td colSpan={4} className="px-4 py-3 text-right text-sm font-medium text-gray-900">
                       {t("common.subtotal")}
                     </td>
                     <td className="px-4 py-3 text-sm font-medium text-gray-900">
@@ -449,7 +461,7 @@ export default function PurchaseOrderDetailPage({
                     <td />
                   </tr>
                   <tr>
-                    <td colSpan={4} className="px-4 py-3 text-right text-sm font-medium text-gray-700">
+                    <td colSpan={4} className="px-4 py-3 text-right text-sm font-medium text-gray-900">
                       {t("common.grand_total")}
                     </td>
                     <td className="px-4 py-3 text-sm font-semibold text-gray-900">
@@ -466,10 +478,10 @@ export default function PurchaseOrderDetailPage({
 
       {po.notes && (
         <div className="mt-6 rounded-lg border bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-700">
+          <p className="text-xs font-medium uppercase tracking-wider text-gray-900">
             {t("common.notes")}
           </p>
-          <p className="mt-1 text-sm text-gray-700">{po.notes}</p>
+          <p className="mt-1 text-sm text-gray-900">{po.notes}</p>
         </div>
       )}
     </div>

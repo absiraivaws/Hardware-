@@ -200,7 +200,7 @@ export default function NewQuotationPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.back()}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
           >
             {t("common.cancel")}
           </button>
@@ -217,7 +217,7 @@ export default function NewQuotationPage() {
       <div className="space-y-6">
         {/* Customer */}
         <div className="rounded-lg border bg-white p-4">
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">
+          <label className="mb-1.5 block text-sm font-medium text-gray-900">
             {t("sales.customer")}
           </label>
           <select
@@ -238,7 +238,7 @@ export default function NewQuotationPage() {
         {/* Items */}
         <div className="rounded-lg border bg-white p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-medium text-gray-700">{t("sales.item")}s</h2>
+            <h2 className="text-sm font-medium text-gray-900">{t("sales.item")}s</h2>
             <button
               onClick={() => setShowProductSearch(true)}
               className="flex items-center gap-1.5 text-sm font-medium text-emerald-600 hover:text-emerald-700"
@@ -251,7 +251,7 @@ export default function NewQuotationPage() {
           {showProductSearch && (
             <div className="mb-4 rounded-lg border bg-gray-50 p-3">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-700" size={16} />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-900" size={16} />
                 <input
                   type="text"
                   placeholder={`${t("common.search")}...`}
@@ -270,34 +270,34 @@ export default function NewQuotationPage() {
                       className="flex cursor-pointer items-center justify-between px-3 py-2 text-sm hover:bg-gray-50"
                     >
                       <span className="font-medium">{p.name}</span>
-                      <span className="text-gray-700">{formatCurrency(Number(p.selling_price), locale)}</span>
+                      <span className="text-gray-900">{formatCurrency(Number(p.selling_price), locale)}</span>
                     </li>
                   ))}
                 </ul>
               )}
               {productSearch.length > 0 && productResults.length === 0 && (
-                <p className="mt-2 text-sm text-gray-700">{t("common.no_results")}</p>
+                <p className="mt-2 text-sm text-gray-900">{t("common.no_results")}</p>
               )}
             </div>
           )}
 
           {items.length === 0 ? (
-            <p className="py-6 text-center text-sm text-gray-700">{t("common.no_results")}</p>
+            <p className="py-6 text-center text-sm text-gray-900">{t("common.no_results")}</p>
           ) : (
             <div className="overflow-x-auto rounded-lg border">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+                    <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                       {t("sales.item")}
                     </th>
-                    <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+                    <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                       {t("sales.qty")}
                     </th>
-                    <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+                    <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                       {t("sales.price")}
                     </th>
-                    <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+                    <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                       {t("sales.amount")}
                     </th>
                     <th className="px-4 py-2.5" />
@@ -348,11 +348,11 @@ export default function NewQuotationPage() {
           {/* Totals */}
           <div className="mt-4 space-y-1.5 border-t pt-4 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-700">{t("common.subtotal")}</span>
+              <span className="text-gray-900">{t("common.subtotal")}</span>
               <span className="font-medium">{formatCurrency(subtotal, locale)}</span>
             </div>
             <div className="flex items-center justify-between gap-4">
-              <span className="text-gray-700">{t("common.discount")}</span>
+              <span className="text-gray-900">{t("common.discount")}</span>
               <input
                 type="number"
                 min={0}
@@ -372,7 +372,7 @@ export default function NewQuotationPage() {
         {/* Valid Until & Notes */}
         <div className="grid grid-cols-2 gap-4">
           <div className="rounded-lg border bg-white p-4">
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            <label className="mb-1.5 block text-sm font-medium text-gray-900">
               {t("quotations.valid_until")}
             </label>
             <input
@@ -383,7 +383,7 @@ export default function NewQuotationPage() {
             />
           </div>
           <div className="rounded-lg border bg-white p-4">
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            <label className="mb-1.5 block text-sm font-medium text-gray-900">
               {t("common.notes")}
             </label>
             <textarea

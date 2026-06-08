@@ -122,29 +122,45 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
             has_expiry: data.has_expiry,
             is_decimal_qty: data.is_decimal_qty,
           })
-          setProductCurrentStock(data.current_stock)
         }
       }
 
       setLoading(false)
     }
 
-    loadData()
-    if (isEdit && editId) {
-      fetchStockHistory(editId)
+    async function init() {
+      await loadData()
+      if (isEdit && editId) {
+        fetchStockHistory(editId)
+      }
     }
+    init()
   }, [editId, isEdit])
 
   const fetchStockHistory = async (productId: string) => {
     setLoadingHistory(true)
-    const { data } = await supabase
+    const { data: allMovements } = await supabase
       .from("stock_movements")
       .select("id, type, quantity, reference_type, reference_id, notes, created_at")
       .eq("product_id", productId)
       .order("created_at", { ascending: false })
       .limit(50)
-    if (data) {
-      setStockMovements(data as typeof stockMovements)
+
+    const { data: fullBalance } = await supabase
+      .from("stock_movements")
+      .select("type, quantity")
+      .eq("product_id", productId)
+
+    if (fullBalance) {
+      let balance = 0
+      for (const m of fullBalance) {
+        balance += m.type === "in" ? Math.abs(m.quantity) : -Math.abs(m.quantity)
+      }
+      setProductCurrentStock(balance)
+    }
+
+    if (allMovements) {
+      setStockMovements(allMovements as typeof stockMovements)
 
       try {
         const { data: inMovements } = await supabase
@@ -295,7 +311,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="animate-spin text-gray-700" size={32} />
+        <Loader2 className="animate-spin text-gray-900" size={32} />
       </div>
     )
   }
@@ -305,7 +321,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
       <PageHeader titleKey={isEdit ? "inventory.edit_product" : "inventory.add_product"}>
         <Link
           href={`/${locale}/inventory`}
-          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
         >
           <ArrowLeft size={18} />
           {t("common.cancel")}
@@ -316,12 +332,12 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-gray-900">
                 {t("inventory.product_code")} *
               </label>
               <input
                 {...register("code")}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
               {errors.code && (
                 <p className="mt-1 text-xs text-red-600">{errors.code.message}</p>
@@ -329,12 +345,12 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-gray-900">
                 {t("inventory.product_name")} *
               </label>
               <input
                 {...register("name")}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
               {errors.name && (
                 <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>
@@ -342,34 +358,34 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-gray-900">
                 {t("inventory.barcode")}
               </label>
               <input
                 {...register("barcode")}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
             </div>
 
             <div className="md:col-span-2 lg:col-span-3">
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-gray-900">
                 Description
               </label>
               <textarea
                 {...register("description")}
                 rows={2}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-gray-900">
                 {t("inventory.category")}
               </label>
               <div className="flex gap-2">
                 <select
                   {...register("category_id")}
-                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 >
                   <option value="">-- Select category --</option>
                   {categories.map((c) => (
@@ -385,19 +401,19 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
                       value={newCategoryName}
                       onChange={(e) => setNewCategoryName(e.target.value)}
                       onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddCategory() } }}
-                      className="w-32 rounded-lg border border-gray-300 px-2 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                      className="w-32 rounded-lg border border-gray-300 px-2 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none"
                       placeholder="New name"
                       autoFocus
                     />
                     <button type="button" onClick={handleAddCategory} className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50">
                       <Check size={16} />
                     </button>
-                    <button type="button" onClick={() => { setAddingCategory(false); setNewCategoryName("") }} className="rounded-lg p-1.5 text-gray-700 hover:bg-gray-100">
+                    <button type="button" onClick={() => { setAddingCategory(false); setNewCategoryName("") }} className="rounded-lg p-1.5 text-gray-900 hover:bg-gray-100">
                       <X size={16} />
                     </button>
                   </div>
                 ) : (
-                  <button type="button" onClick={() => setAddingCategory(true)} className="rounded-lg border border-dashed border-gray-300 p-2 text-gray-700 hover:bg-gray-50" title="Add new category">
+                  <button type="button" onClick={() => setAddingCategory(true)} className="rounded-lg border border-dashed border-gray-300 p-2 text-gray-900 hover:bg-gray-50" title="Add new category">
                     <Plus size={16} />
                   </button>
                 )}
@@ -405,13 +421,13 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-gray-900">
                 {t("inventory.brand")}
               </label>
               <div className="flex gap-2">
                 <select
                   {...register("brand_id")}
-                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 >
                   <option value="">-- Select brand --</option>
                   {brands.map((b) => (
@@ -427,19 +443,19 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
                       value={newBrandName}
                       onChange={(e) => setNewBrandName(e.target.value)}
                       onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddBrand() } }}
-                      className="w-32 rounded-lg border border-gray-300 px-2 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                      className="w-32 rounded-lg border border-gray-300 px-2 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none"
                       placeholder="New name"
                       autoFocus
                     />
                     <button type="button" onClick={handleAddBrand} className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50">
                       <Check size={16} />
                     </button>
-                    <button type="button" onClick={() => { setAddingBrand(false); setNewBrandName("") }} className="rounded-lg p-1.5 text-gray-700 hover:bg-gray-100">
+                    <button type="button" onClick={() => { setAddingBrand(false); setNewBrandName("") }} className="rounded-lg p-1.5 text-gray-900 hover:bg-gray-100">
                       <X size={16} />
                     </button>
                   </div>
                 ) : (
-                  <button type="button" onClick={() => setAddingBrand(true)} className="rounded-lg border border-dashed border-gray-300 p-2 text-gray-700 hover:bg-gray-50" title="Add new brand">
+                  <button type="button" onClick={() => setAddingBrand(true)} className="rounded-lg border border-dashed border-gray-300 p-2 text-gray-900 hover:bg-gray-50" title="Add new brand">
                     <Plus size={16} />
                   </button>
                 )}
@@ -447,12 +463,12 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-gray-900">
                 {t("inventory.unit")}
               </label>
               <select
                 {...register("unit_id")}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               >
                 <option value="">-- Select unit --</option>
                 {units.map((u) => (
@@ -464,14 +480,14 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-gray-900">
                 {t("inventory.cost_price")}
               </label>
               <input
                 type="number"
                 step="0.01"
                 {...register("cost_price", { setValueAs: (v) => (v === "" ? 0 : Number(v)) })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
               {errors.cost_price && (
                 <p className="mt-1 text-xs text-red-600">{errors.cost_price.message}</p>
@@ -479,14 +495,14 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-gray-900">
                 {t("inventory.selling_price")}
               </label>
               <input
                 type="number"
                 step="0.01"
                 {...register("selling_price", { setValueAs: (v) => (v === "" ? 0 : Number(v)) })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
               {errors.selling_price && (
                 <p className="mt-1 text-xs text-red-600">{errors.selling_price.message}</p>
@@ -494,7 +510,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-gray-900">
                 Wholesale Price
               </label>
               <input
@@ -503,7 +519,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
                 {...register("wholesale_price", {
                   setValueAs: (v) => (v === "" ? null : Number(v)),
                 })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
               {errors.wholesale_price && (
                 <p className="mt-1 text-xs text-red-600">{errors.wholesale_price.message}</p>
@@ -511,13 +527,13 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-gray-900">
                 {t("inventory.min_stock")}
               </label>
               <input
                 type="number"
                 {...register("min_stock", { setValueAs: (v) => (v === "" ? 0 : Number(v)) })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
               {errors.min_stock && (
                 <p className="mt-1 text-xs text-red-600">{errors.min_stock.message}</p>
@@ -525,7 +541,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
             </div>
             {isEdit ? (
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-gray-900">
                   Current Stock
                 </label>
                 <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-900">
@@ -534,13 +550,13 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
               </div>
             ) : (
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-gray-900">
                   Starting Stock
                 </label>
                 <input
                   type="number"
                   {...register("starting_stock", { setValueAs: (v) => (v === "" ? 0 : Number(v)) })}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 />
                 {errors.starting_stock && (
                   <p className="mt-1 text-xs text-red-600">{errors.starting_stock.message}</p>
@@ -550,7 +566,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
           </div>
 
           <div className="flex items-center gap-6">
-            <label className="flex items-center gap-2 text-sm text-gray-700">
+            <label className="flex items-center gap-2 text-sm text-gray-900">
               <input
                 type="checkbox"
                 {...register("has_expiry")}
@@ -558,7 +574,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
               />
               Has Expiry
             </label>
-            <label className="flex items-center gap-2 text-sm text-gray-700">
+            <label className="flex items-center gap-2 text-sm text-gray-900">
               <input
                 type="checkbox"
                 {...register("is_decimal_qty")}
@@ -579,7 +595,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
             </button>
             <Link
               href={`/${locale}/inventory`}
-              className="rounded-lg border border-gray-300 px-6 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="rounded-lg border border-gray-300 px-6 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
             >
               {t("common.cancel")}
             </Link>
@@ -590,7 +606,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
       {isEdit && (
         <div className="mt-8">
           <div className="mb-4 flex items-center gap-2">
-            <History size={18} className="text-gray-700" />
+            <History size={18} className="text-gray-900" />
             <h2 className="text-lg font-semibold text-gray-900">Stock History</h2>
           </div>
           <div className="overflow-x-auto rounded-lg border">
@@ -605,7 +621,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
                     { key: "reference", label: "Reference", align: "text-left" },
                   ].map((col) => {
                     if (!col.key) {
-                      return <th key="balance" className={`px-4 py-3 ${col.align} text-xs font-medium uppercase tracking-wider text-gray-700`}>{col.label}</th>
+                      return <th key="balance" className={`px-4 py-3 ${col.align} text-xs font-medium uppercase tracking-wider text-gray-900`}>{col.label}</th>
                     }
                     const active = historySortKey === col.key
                     const SortIcon = active ? (historySortDir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown
@@ -613,7 +629,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
                       <th
                         key={col.key}
                         onClick={() => handleHistorySort(col.key!)}
-                        className={`cursor-pointer select-none px-4 py-3 ${col.align} text-xs font-medium uppercase tracking-wider ${active ? "text-emerald-700" : "text-gray-700"}`}
+                        className={`cursor-pointer select-none px-4 py-3 ${col.align} text-xs font-medium uppercase tracking-wider ${active ? "text-emerald-700" : "text-gray-900"}`}
                       >
                         <span className="inline-flex items-center gap-1">
                           {col.label}
@@ -627,19 +643,28 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
               <tbody className="divide-y divide-gray-200 bg-white">
                 {loadingHistory ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-700">
+                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-900">
                       <Loader2 className="mx-auto animate-spin" size={20} />
                     </td>
                   </tr>
                 ) : stockMovements.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-700">No stock movements</td>
+                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-900">No stock movements</td>
                   </tr>
                 ) : (
                   (() => {
+                    const chrono = [...stockMovements].sort(
+                      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+                    )
+                    const balances: Record<string, number> = {}
                     let running = 0
+                    for (const m of chrono) {
+                      const adjQty = m.type === "in" ? Math.abs(m.quantity) : -Math.abs(m.quantity)
+                      running += adjQty
+                      balances[m.id] = running
+                    }
                     return sortedMovements.map((m) => {
-                      running += m.type === "in" ? m.quantity : -m.quantity
+                      const qty = Math.abs(m.quantity)
                       const typeLabel = m.reference_type === "starting_stock" ? "Opening" : m.type === "in" ? "Purchase" : "Sale"
                       const refNum = m.reference_type === "sale" ? m.notes || m.reference_id || "—"
                         : m.reference_type === "goods_received_note" ? m.notes || m.reference_id || "—"
@@ -647,7 +672,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
                         : m.notes || m.reference_id || "—"
                       return (
                         <tr key={m.id}>
-                          <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">
+                          <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
                             {formatDate(m.created_at)}
                           </td>
                           <td className="px-4 py-3">
@@ -658,12 +683,12 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
                             </span>
                           </td>
                           <td className="px-4 py-3 text-right text-sm font-medium text-gray-900">
-                            {m.type === "in" ? "+" : "-"}{m.quantity}
+                            {m.type === "in" ? "+" : "-"}{qty}
                           </td>
                           <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
-                            {running}
+                            {balances[m.id]}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-700">
+                          <td className="px-4 py-3 text-sm text-gray-900">
                             {refNum.length > 30 ? refNum.slice(0, 30) + "..." : refNum}
                           </td>
                         </tr>
@@ -680,7 +705,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
               <div className="mb-2 text-sm font-medium text-gray-900">
                 FIFO Stock Valuation
               </div>
-              <div className="space-y-1 text-sm text-gray-700">
+              <div className="space-y-1 text-sm text-gray-900">
                 <div className="flex justify-between">
                   <span>Current Stock (FIFO):</span>
                   <span className="font-semibold">{fifoResult.quantity} units</span>
@@ -691,9 +716,9 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
                 </div>
                 {fifoResult.layers.length > 0 && (
                   <div className="mt-3 border-t pt-2">
-                    <div className="mb-1 text-xs font-medium uppercase tracking-wider text-gray-600">Layers</div>
+                    <div className="mb-1 text-xs font-medium uppercase tracking-wider text-gray-900">Layers</div>
                     {fifoResult.layers.map((layer, i) => (
-                      <div key={i} className="flex justify-between text-xs text-gray-600">
+                      <div key={i} className="flex justify-between text-xs text-gray-900">
                         <span>{layer.qty} units @ {formatCurrency(layer.price, locale)}</span>
                         <span>{formatCurrency(layer.qty * layer.price, locale)}</span>
                       </div>

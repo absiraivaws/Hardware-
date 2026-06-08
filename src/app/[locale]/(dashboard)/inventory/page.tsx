@@ -1,6 +1,6 @@
 "use client"
 
-import { use, useEffect, useMemo, useState } from "react"
+import { use, useEffect, useState } from "react"
 import { useTranslations } from "next-intl"
 import Link from "next/link"
 import { Plus, Pencil, Trash2 } from "lucide-react"
@@ -39,20 +39,18 @@ export default function InventoryPage({ params }: { params: Promise<{ locale: st
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [fifoValues, setFifoValues] = useState<Record<string, { value: number; quantity: number }>>({})
-  const [stockBalances, setStockBalances] = useState<Record<string, number>>({})
 
   useEffect(() => {
     fetchProducts()
   }, [])
 
-  async function fetchFIFOValues(productIds: string[]) {
-    if (productIds.length === 0) return
+  async function fetchBalances(productIds: string[], productsData: ProductRow[]): Promise<ProductRow[]> {
+    if (productIds.length === 0) return productsData
     const [inRes, outRes] = await Promise.all([
       supabase
         .from("stock_movements")
-        .select("product_id, quantity, unit_price, created_at")
+        .select("product_id, quantity, created_at")
         .eq("type", "in")
-        .not("unit_price", "is", null)
         .in("product_id", productIds),
       supabase
         .from("stock_movements")
@@ -61,35 +59,72 @@ export default function InventoryPage({ params }: { params: Promise<{ locale: st
         .in("product_id", productIds),
     ])
 
-    const inMap: Record<string, { quantity: number; unit_price: number; created_at: string }[]> = {}
-    for (const m of (inRes.data || []) as { product_id: string; quantity: number; unit_price: number; created_at: string }[]) {
+    const inMap: Record<string, { quantity: number; created_at: string }[]> = {}
+    for (const m of (inRes.data || []) as { product_id: string; quantity: number; created_at: string }[]) {
       if (!inMap[m.product_id]) inMap[m.product_id] = []
-      inMap[m.product_id].push(m)
+      inMap[m.product_id].push({ ...m, quantity: Math.abs(m.quantity) })
     }
 
     const outMap: Record<string, { quantity: number; created_at: string }[]> = {}
     for (const m of (outRes.data || []) as { product_id: string; quantity: number; created_at: string }[]) {
       if (!outMap[m.product_id]) outMap[m.product_id] = []
-      outMap[m.product_id].push(m)
+      outMap[m.product_id].push({ ...m, quantity: Math.abs(m.quantity) })
+    }
+
+    const updatedProducts = productsData.map((p) => {
+      const allIns = inMap[p.id] || []
+      const outs = outMap[p.id] || []
+      const inQty = allIns.reduce((s, m) => s + m.quantity, 0)
+      const outQty = outs.reduce((s, m) => s + m.quantity, 0)
+      const netQty = inQty - outQty
+      return { ...p, current_stock: netQty }
+    })
+
+    return updatedProducts
+  }
+
+  async function calcFIFOValues(updatedProducts: ProductRow[]) {
+    const productIds = updatedProducts.map((p) => p.id)
+    if (productIds.length === 0) return
+    const [inRes, outRes] = await Promise.all([
+      supabase
+        .from("stock_movements")
+        .select("product_id, quantity, unit_price, created_at")
+        .eq("type", "in")
+        .in("product_id", productIds),
+      supabase
+        .from("stock_movements")
+        .select("product_id, quantity, created_at")
+        .eq("type", "out")
+        .in("product_id", productIds),
+    ])
+
+    const inMap: Record<string, { quantity: number; unit_price: number | null; created_at: string }[]> = {}
+    for (const m of (inRes.data || []) as { product_id: string; quantity: number; unit_price: number | null; created_at: string }[]) {
+      if (!inMap[m.product_id]) inMap[m.product_id] = []
+      inMap[m.product_id].push({ ...m, quantity: Math.abs(m.quantity) })
+    }
+
+    const outMap: Record<string, { quantity: number; created_at: string }[]> = {}
+    for (const m of (outRes.data || []) as { product_id: string; quantity: number; created_at: string }[]) {
+      if (!outMap[m.product_id]) outMap[m.product_id] = []
+      outMap[m.product_id].push({ ...m, quantity: Math.abs(m.quantity) })
     }
 
     const values: Record<string, { value: number; quantity: number }> = {}
-    const balances: Record<string, number> = {}
-    for (const id of productIds) {
-      const ins = inMap[id] || []
-      const outs = outMap[id] || []
-      const netQty = ins.reduce((s, m) => s + m.quantity, 0) - outs.reduce((s, m) => s + m.quantity, 0)
-      balances[id] = netQty
-      if (ins.length === 0) {
-        const product = products.find((p) => p.id === id)
-        values[id] = { value: (product?.current_stock || 0) * (product?.cost_price || 0), quantity: product?.current_stock || 0 }
+    for (const p of updatedProducts) {
+      const allIns = inMap[p.id] || []
+      const outs = outMap[p.id] || []
+      const netQty = p.current_stock
+      const insWithPrice = allIns.filter((m) => m.unit_price != null)
+      if (insWithPrice.length === 0) {
+        values[p.id] = { value: netQty * p.cost_price, quantity: netQty }
       } else {
-        const result = calculateFIFOValue(ins, outs)
-        values[id] = { value: result.value, quantity: result.quantity }
+        const result = calculateFIFOValue(insWithPrice as { quantity: number; unit_price: number; created_at: string }[], outs)
+        values[p.id] = { value: result.value, quantity: result.quantity }
       }
     }
     setFifoValues(values)
-    setStockBalances(balances)
   }
 
   async function fetchProducts() {
@@ -103,8 +138,9 @@ export default function InventoryPage({ params }: { params: Promise<{ locale: st
       setError(error.message)
     } else {
       const productData = data || []
-      setProducts(productData)
-      fetchFIFOValues(productData.map((p: ProductRow) => p.id))
+      const updated = await fetchBalances(productData.map((p: ProductRow) => p.id), productData)
+      setProducts(updated)
+      calcFIFOValues(updated)
     }
     setLoading(false)
   }
@@ -122,10 +158,7 @@ export default function InventoryPage({ params }: { params: Promise<{ locale: st
     maximumFractionDigits: 2,
   })
 
-  const isLowStock = (item: ProductRow) => {
-    const stock = stockBalances[item.id] ?? item.current_stock
-    return stock <= item.min_stock
-  }
+  const isLowStock = (item: ProductRow) => item.current_stock <= item.min_stock
 
   const columns = [
     {
@@ -151,14 +184,11 @@ export default function InventoryPage({ params }: { params: Promise<{ locale: st
     {
       key: "current_stock",
       label: t("inventory.current_stock"),
-      render: (item: ProductRow) => {
-        const stock = stockBalances[item.id] ?? item.current_stock
-        return (
-          <span className={stock <= item.min_stock ? "font-semibold text-red-600" : ""}>
-            {stock} {item.units?.symbol || ""}
-          </span>
-        )
-      },
+      render: (item: ProductRow) => (
+        <span className={item.current_stock <= item.min_stock ? "font-semibold text-red-600" : ""}>
+          {item.current_stock} {item.units?.symbol || ""}
+        </span>
+      ),
     },
     {
       key: "min_stock",
@@ -179,8 +209,7 @@ export default function InventoryPage({ params }: { params: Promise<{ locale: st
       label: "Stock Value",
       render: (item: ProductRow) => {
         const fifo = fifoValues[item.id]
-        const stock = stockBalances[item.id] ?? item.current_stock
-        const value = fifo ? fifo.value : stock * item.cost_price
+        const value = fifo ? fifo.value : item.current_stock * item.cost_price
         return <span className="font-medium">{formatCurrency(value, locale)}</span>
       },
     },
@@ -192,7 +221,7 @@ export default function InventoryPage({ params }: { params: Promise<{ locale: st
           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
             item.status === "active"
               ? "bg-green-100 text-green-800"
-              : "bg-gray-100 text-gray-800"
+              : "bg-gray-100 text-gray-900"
           }`}
         >
           {item.status === "active" ? "Active" : "Inactive"}
@@ -206,13 +235,13 @@ export default function InventoryPage({ params }: { params: Promise<{ locale: st
         <div className="flex items-center gap-2">
           <Link
             href={`/${locale}/inventory/new?id=${item.id}`}
-            className="rounded-lg p-1.5 text-gray-700 hover:bg-gray-100 hover:text-emerald-600"
+            className="rounded-lg p-1.5 text-gray-900 hover:bg-gray-100 hover:text-emerald-600"
           >
             <Pencil size={16} />
           </Link>
           <button
             onClick={() => handleDelete(item.id)}
-            className="rounded-lg p-1.5 text-gray-700 hover:bg-gray-100 hover:text-red-600"
+            className="rounded-lg p-1.5 text-gray-900 hover:bg-gray-100 hover:text-red-600"
           >
             <Trash2 size={16} />
           </button>

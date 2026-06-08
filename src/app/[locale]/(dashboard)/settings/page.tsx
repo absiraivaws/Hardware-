@@ -67,7 +67,7 @@ export default function SettingsPage({
               {section.fields.map((field) => (
                 <div key={field.key} className="flex items-center justify-between py-3">
                   <div>
-                    <label className="text-sm font-medium text-gray-700">
+                    <label className="text-sm font-medium text-gray-900">
                       {t(`settings.${field.key}`)}
                     </label>
                   </div>

@@ -102,14 +102,14 @@ export default function CustomersPage({
         <div className="flex items-center gap-2">
           <button
             onClick={() => toggleStatus(c)}
-            className="rounded p-1 text-gray-700 hover:bg-gray-100"
+            className="rounded p-1 text-gray-900 hover:bg-gray-100"
             title={c.status === "active" ? t("block") : t("unblock")}
           >
             {c.status === "active" ? <Ban size={16} /> : <CheckCircle size={16} />}
           </button>
           <a
             href={`/${locale}/customers/ledger?customer_id=${c.id}`}
-            className="rounded p-1 text-gray-700 hover:bg-gray-100"
+            className="rounded p-1 text-gray-900 hover:bg-gray-100"
             title={t("view_ledger")}
           >
             <Eye size={16} />

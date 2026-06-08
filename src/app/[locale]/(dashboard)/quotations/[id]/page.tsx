@@ -36,7 +36,7 @@ interface QuotationItem {
 }
 
 const statusStyles: Record<string, string> = {
-  draft: "bg-gray-100 text-gray-700",
+  draft: "bg-gray-100 text-gray-900",
   sent: "bg-blue-100 text-blue-700",
   accepted: "bg-green-100 text-green-700",
   expired: "bg-red-100 text-red-700",
@@ -242,7 +242,7 @@ export default function QuotationDetailPage() {
   if (!quotation) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
-        <p className="text-gray-700">{t("common.no_results")}</p>
+        <p className="text-gray-900">{t("common.no_results")}</p>
         <button
           onClick={() => router.push(`/${locale}/quotations`)}
           className="mt-4 text-sm text-emerald-600 hover:underline"
@@ -259,19 +259,19 @@ export default function QuotationDetailPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.push(`/${locale}/quotations`)}
-            className="rounded-lg p-1.5 text-gray-700 hover:bg-gray-100"
+            className="rounded-lg p-1.5 text-gray-900 hover:bg-gray-100"
           >
             <ArrowLeft size={20} />
           </button>
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">{quotation.q_no}</h1>
-            <p className="text-sm text-gray-700">
+            <p className="text-sm text-gray-900">
               {formatDate(quotation.created_at)}
             </p>
           </div>
         </div>
         <span
-          className={`rounded-full px-3 py-1 text-xs font-medium ${statusStyles[quotation.status] || "bg-gray-100 text-gray-700"}`}
+          className={`rounded-full px-3 py-1 text-xs font-medium ${statusStyles[quotation.status] || "bg-gray-100 text-gray-900"}`}
         >
           {statusLabels[quotation.status] || quotation.status}
         </span>
@@ -279,19 +279,19 @@ export default function QuotationDetailPage() {
 
       <div className="grid grid-cols-3 gap-4">
         <div className="rounded-lg border bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-700">{t("sales.customer")}</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-gray-900">{t("sales.customer")}</p>
           <p className="mt-1 text-sm font-medium text-gray-900">
             {quotation.customer_name || "—"}
           </p>
         </div>
         <div className="rounded-lg border bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-700">{t("common.date")}</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-gray-900">{t("common.date")}</p>
           <p className="mt-1 text-sm font-medium text-gray-900">
             {formatDate(quotation.created_at)}
           </p>
         </div>
         <div className="rounded-lg border bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-700">{t("quotations.valid_until")}</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-gray-900">{t("quotations.valid_until")}</p>
           <p className="mt-1 text-sm font-medium text-gray-900">
             {quotation.valid_until ? formatDate(quotation.valid_until) : "—"}
           </p>
@@ -303,16 +303,16 @@ export default function QuotationDetailPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                   {t("sales.item")}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                   {t("sales.qty")}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                   {t("sales.price")}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                   {t("sales.amount")}
                 </th>
               </tr>
@@ -321,8 +321,8 @@ export default function QuotationDetailPage() {
               {items.map((item) => (
                 <tr key={item.id}>
                   <td className="px-4 py-3 text-sm text-gray-900">{item.product_name}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{item.quantity}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{formatCurrency(Number(item.unit_price), locale)}</td>
+                  <td className="px-4 py-3 text-sm text-gray-900">{item.quantity}</td>
+                  <td className="px-4 py-3 text-sm text-gray-900">{formatCurrency(Number(item.unit_price), locale)}</td>
                   <td className="px-4 py-3 text-sm font-medium text-gray-900">
                     {formatCurrency(Number(item.total_price), locale)}
                   </td>
@@ -335,11 +335,11 @@ export default function QuotationDetailPage() {
         <div className="border-t px-4 py-4">
           <div className="ml-auto w-64 space-y-1.5 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-700">{t("common.subtotal")}</span>
+              <span className="text-gray-900">{t("common.subtotal")}</span>
               <span>{formatCurrency(Number(quotation.subtotal), locale)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-700">{t("common.discount")}</span>
+              <span className="text-gray-900">{t("common.discount")}</span>
               <span>{formatCurrency(Number(quotation.discount), locale)}</span>
             </div>
             <div className="flex justify-between border-t pt-1.5 text-base font-semibold">
@@ -352,8 +352,8 @@ export default function QuotationDetailPage() {
 
       {quotation.notes && (
         <div className="mt-4 rounded-lg border bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-700">{t("common.notes")}</p>
-          <p className="mt-1 text-sm text-gray-700">{quotation.notes}</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-gray-900">{t("common.notes")}</p>
+          <p className="mt-1 text-sm text-gray-900">{quotation.notes}</p>
         </div>
       )}
 
@@ -361,7 +361,7 @@ export default function QuotationDetailPage() {
       <div className="mt-6 flex items-center gap-3">
         <button
           onClick={downloadPdf}
-          className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
         >
           <FileText size={16} />
           {t("quotations.download_pdf")}

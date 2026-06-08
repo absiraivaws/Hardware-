@@ -61,6 +61,7 @@ export default function NewPurchaseOrderPage({
   const [products, setProducts] = useState<Product[]>([])
   const [showProductPicker, setShowProductPicker] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     params.then((p) => setLocale(p.locale))
@@ -158,9 +159,11 @@ export default function NewPurchaseOrderPage({
 
   const onSubmit = async (data: FormValues) => {
     setSaving(true)
+    setError(null)
     const supabase = createClient()
     const { data: userData } = await supabase.auth.getUser()
     if (!userData.user) {
+      setError("Authentication required")
       setSaving(false)
       return
     }
@@ -184,6 +187,7 @@ export default function NewPurchaseOrderPage({
       .single()
 
     if (poError || !po) {
+      setError(poError?.message || "Failed to create purchase order")
       setSaving(false)
       return
     }
@@ -200,10 +204,14 @@ export default function NewPurchaseOrderPage({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error: itemsError } = await (supabase.from("purchase_items") as any).insert(purchaseItems)
 
+    if (itemsError) {
+      await (supabase.from("purchase_orders") as any).delete().eq("id", po.id)
+      setError(itemsError.message)
+      setSaving(false)
+      return
+    }
+
     setSaving(false)
-
-    if (itemsError) return
-
     router.push(`/${locale}/purchases`)
   }
 
@@ -213,11 +221,15 @@ export default function NewPurchaseOrderPage({
         <h1 className="text-2xl font-bold text-gray-900">{t("purchases.new_po")}</h1>
       </div>
 
+      {error && (
+        <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>
+      )}
+
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="rounded-lg border bg-white p-6">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-gray-900">
                 {t("purchases.supplier")}
               </label>
               <select
@@ -236,7 +248,7 @@ export default function NewPurchaseOrderPage({
               )}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-gray-900">
                 {t("purchases.expected_date")}
               </label>
               <input
@@ -270,7 +282,7 @@ export default function NewPurchaseOrderPage({
           {showProductPicker && (
             <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-700" size={18} />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-900" size={18} />
                 <input
                   type="text"
                   placeholder={t("common.search")}
@@ -291,7 +303,7 @@ export default function NewPurchaseOrderPage({
                       className="flex cursor-pointer items-center justify-between px-3 py-2 text-sm text-gray-900 hover:bg-emerald-50"
                     >
                       <span>{p.name}</span>
-                      <span className="text-gray-700">{p.code}</span>
+                      <span className="text-gray-900">{p.code}</span>
                     </li>
                   ))}
                 </ul>
@@ -299,7 +311,7 @@ export default function NewPurchaseOrderPage({
               <button
                 type="button"
                 onClick={closePicker}
-                className="mt-2 text-xs text-gray-700 hover:text-gray-900"
+                className="mt-2 text-xs text-gray-900 hover:text-gray-900"
               >
                 {t("common.cancel")}
               </button>
@@ -311,16 +323,16 @@ export default function NewPurchaseOrderPage({
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                       {t("inventory.product_name")}
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                       {t("sales.qty")}
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                       {t("inventory.cost_price")}
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                       {t("sales.amount")}
                     </th>
                     <th className="px-4 py-3" />
@@ -329,7 +341,7 @@ export default function NewPurchaseOrderPage({
                 <tbody className="divide-y divide-gray-200 bg-white">
                   {fields.map((field, index) => (
                     <tr key={field.id}>
-                      <td className="px-4 py-2 text-sm text-gray-700">
+                      <td className="px-4 py-2 text-sm text-gray-900">
                         {field.product_name}
                         <input type="hidden" {...register(`items.${index}.product_id`)} />
                         <input type="hidden" {...register(`items.${index}.product_name`)} />
@@ -350,7 +362,7 @@ export default function NewPurchaseOrderPage({
                           className="w-28 rounded-lg border border-gray-300 px-2 py-1 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                         />
                       </td>
-                      <td className="px-4 py-2 text-sm text-gray-700">
+                      <td className="px-4 py-2 text-sm text-gray-900">
                         {(
                           (getValues(`items.${index}.quantity`) || 0) *
                           (getValues(`items.${index}.unit_price`) || 0)
@@ -374,7 +386,7 @@ export default function NewPurchaseOrderPage({
 
           <div className="mt-4 flex justify-end">
             <div className="w-64 space-y-2">
-              <div className="flex justify-between text-sm text-gray-700">
+              <div className="flex justify-between text-sm text-gray-900">
                 <span>{t("common.subtotal")}</span>
                 <span className="font-medium text-gray-900">
                   {formatCurrency(subtotal, locale)}
@@ -391,7 +403,7 @@ export default function NewPurchaseOrderPage({
         </div>
 
         <div className="rounded-lg border bg-white p-6">
-          <label className="mb-1 block text-sm font-medium text-gray-700">
+          <label className="mb-1 block text-sm font-medium text-gray-900">
             {t("common.notes")}
           </label>
           <textarea
@@ -405,7 +417,7 @@ export default function NewPurchaseOrderPage({
           <button
             type="button"
             onClick={() => router.back()}
-            className="rounded-lg border px-6 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="rounded-lg border px-6 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
           >
             {t("common.cancel")}
           </button>

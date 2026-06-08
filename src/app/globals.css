@@ -33,4 +33,9 @@ body {
   select:required:invalid {
     color: #111827;
   }
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    color: #111827;
+  }
 }

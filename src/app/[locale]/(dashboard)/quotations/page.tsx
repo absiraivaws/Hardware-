@@ -13,7 +13,7 @@ import type { Database } from "@/types/database"
 type Quotation = Database["public"]["Tables"]["quotations"]["Row"]
 
 const statusStyles: Record<string, string> = {
-  draft: "bg-gray-100 text-gray-700",
+  draft: "bg-gray-100 text-gray-900",
   sent: "bg-blue-100 text-blue-700",
   accepted: "bg-green-100 text-green-700",
   expired: "bg-red-100 text-red-700",
@@ -90,7 +90,7 @@ export default function QuotationsPage() {
       label: t("common.status"),
       render: (item: Quotation) => (
         <span
-          className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${statusStyles[item.status] || "bg-gray-100 text-gray-700"}`}
+          className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${statusStyles[item.status] || "bg-gray-100 text-gray-900"}`}
         >
           {statusLabels[item.status] || item.status}
         </span>
@@ -102,7 +102,7 @@ export default function QuotationsPage() {
       render: (item: Quotation) => (
         <button
           onClick={() => router.push(`/${locale}/quotations/${item.id}`)}
-          className="rounded-lg p-1.5 text-gray-700 hover:bg-gray-100 hover:text-gray-700"
+          className="rounded-lg p-1.5 text-gray-900 hover:bg-gray-100 hover:text-gray-900"
         >
           <Eye size={16} />
         </button>

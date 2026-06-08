@@ -194,7 +194,7 @@ export default function DashboardPage({
                   <Icon className="h-5 w-5 text-white" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-medium leading-tight text-gray-700">{t(`dashboard.${key}`)}</p>
+                  <p className="text-[10px] font-medium leading-tight text-gray-900">{t(`dashboard.${key}`)}</p>
                   <p className="mt-0.5 truncate text-base font-semibold text-gray-900">
                     {isCurrency ? formatCompactCurrency(value, locale) : value}
                   </p>
@@ -226,7 +226,7 @@ export default function DashboardPage({
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b text-xs font-medium uppercase text-gray-700">
+                <tr className="border-b text-xs font-medium uppercase text-gray-900">
                   <th className="w-[20%] pb-2 pr-3">{t("common.date")}</th>
                   <th className="w-[40%] pb-2 pr-3">{t("customers.customer_name")}</th>
                   <th className="w-[20%] pb-2 pr-3">{t("common.grand_total")}</th>
@@ -236,15 +236,15 @@ export default function DashboardPage({
               <tbody>
                 {data.recentSales.map((sale, i) => (
                   <tr key={i} className="border-b last:border-0">
-                    <td className="whitespace-nowrap py-2 pr-3 text-gray-700">{formatDate(sale.created_at)}</td>
+                    <td className="whitespace-nowrap py-2 pr-3 text-gray-900">{formatDate(sale.created_at)}</td>
                     <td className="py-2 pr-3 font-medium text-gray-900">{sale.customer_name ?? t("sales.walk_in")}</td>
-                    <td className="py-2 pr-3 text-gray-700">{formatCurrency(sale.grand_total, locale)}</td>
-                    <td className="py-2 text-gray-700">{t(`sales.${sale.payment_type}`)}</td>
+                    <td className="py-2 pr-3 text-gray-900">{formatCurrency(sale.grand_total, locale)}</td>
+                    <td className="py-2 text-gray-900">{t(`sales.${sale.payment_type}`)}</td>
                   </tr>
                 ))}
                 {data.recentSales.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="py-6 text-center text-gray-700">
+                    <td colSpan={4} className="py-6 text-center text-gray-900">
                       {t("common.no_results")}
                     </td>
                   </tr>

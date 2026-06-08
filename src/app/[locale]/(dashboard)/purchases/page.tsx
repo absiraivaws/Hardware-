@@ -114,7 +114,7 @@ export default function PurchasesPage({
       render: (item: PurchaseOrder) => (
         <button
           onClick={() => router.push(`/${locale}/purchases/${item.id}`)}
-          className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+          className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium text-gray-900 hover:bg-gray-50"
         >
           <Eye size={14} />
           {t("common.view")}

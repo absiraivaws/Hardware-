@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl"
 import { createClient } from "@/lib/supabase/client"
 import { usePOSStore } from "@/stores/pos-store"
 import { formatCurrency } from "@/lib/format"
-import { Search, Plus, Minus, Trash2, ShoppingCart, User, Printer, Smartphone, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
+import { Search, Trash2, ShoppingCart, User, Printer, Smartphone, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 import { use, useEffect, useMemo, useState, useRef } from "react"
 import type { Database } from "@/types/database"
 
@@ -263,10 +263,17 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       if (itemsError) throw itemsError
 
       for (const item of cart) {
-        await supabase.rpc("decrement_product_stock", {
-          p_product_id: item.product_id,
-          p_qty: item.quantity,
-        })
+        const { data: prod } = await supabase
+          .from("products")
+          .select("current_stock")
+          .eq("id", item.product_id)
+          .single()
+        if (prod) {
+          await supabase
+            .from("products")
+            .update({ current_stock: Number(prod.current_stock) - item.quantity } as never)
+            .eq("id", item.product_id)
+        }
 
         await supabase.from("stock_movements").insert({
           product_id: item.product_id,
@@ -341,7 +348,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       {/* ===== TOP ROW: Search + Barcode ===== */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-700" size={18} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-900" size={18} />
           <input
             type="text"
             value={searchQuery}
@@ -375,7 +382,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
           <h2 className="mb-3 text-sm font-semibold text-gray-900">
             {t("sales.item")}s
             {searchQuery && (
-              <span className="ml-2 font-normal text-gray-700">
+              <span className="ml-2 font-normal text-gray-900">
                 ({filteredProducts.length})
               </span>
             )}
@@ -383,7 +390,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
 
           {filteredProducts.length === 0 ? (
             <div className="flex items-center justify-center py-16">
-              <p className="text-sm text-gray-700">{t("common.no_results")}</p>
+              <p className="text-sm text-gray-900">{t("common.no_results")}</p>
             </div>
           ) : (
             <div className="max-h-[520px] overflow-y-auto">
@@ -405,7 +412,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                           key={key}
                           onClick={() => handleSort(key)}
                           className={`cursor-pointer select-none px-3 py-2 ${align} font-medium ${
-                            active ? "text-emerald-700" : "text-gray-700"
+                            active ? "text-emerald-700" : "text-gray-900"
                           }`}
                         >
                           <span className="inline-flex items-center gap-1">
@@ -425,7 +432,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                     const lowStock = !outOfStock && product.current_stock <= product.min_stock
 
                     let rowBg = ""
-                    let stockColor = "text-gray-700"
+                    let stockColor = "text-gray-900"
                     if (inCart) {
                       rowBg = "bg-emerald-50"
                     } else if (outOfStock) {
@@ -443,7 +450,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                         className={`cursor-pointer border-b transition hover:brightness-95 ${rowBg} ${outOfStock ? "opacity-50 cursor-not-allowed" : ""}`}
                       >
                         <td className="px-3 py-2.5 font-medium text-gray-900">{product.name}</td>
-                        <td className="px-3 py-2.5 text-gray-700">{product.code}</td>
+                        <td className="px-3 py-2.5 text-gray-900">{product.code}</td>
                         <td className="px-3 py-2.5 text-right font-semibold text-gray-900">
                           {formatCurrency(product.selling_price, locale)}
                         </td>
@@ -469,11 +476,11 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
         </div>
 
         {/* ===== RIGHT: Cart + Payment ===== */}
-        <div className="flex w-full flex-col lg:w-[420px]">
+        <div className="flex w-full flex-col lg:min-w-[420px] lg:max-w-[600px]">
           <div className="rounded-lg border bg-white">
             {/* Cart Header */}
             <div className="flex items-center gap-2 border-b px-4 py-3">
-              <ShoppingCart size={18} className="text-gray-700" />
+              <ShoppingCart size={18} className="text-gray-900" />
               <span className="font-semibold text-gray-900">{t("sales.cart")}</span>
               <span className="ml-auto rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
                 {cart.length}
@@ -484,7 +491,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b text-xs text-gray-700">
+                  <tr className="border-b text-xs text-gray-900">
                     <th className="px-3 py-2 text-left font-medium">{t("sales.item")}</th>
                     <th className="px-3 py-2 text-center font-medium">{t("sales.qty")}</th>
                     <th className="px-3 py-2 text-right font-medium">{t("sales.price")}</th>
@@ -495,47 +502,27 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                 <tbody>
                   {cart.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-12 text-center text-sm text-gray-700">
+                      <td colSpan={5} className="py-12 text-center text-sm text-gray-900">
                         {t("sales.add_item")}
                       </td>
                     </tr>
                   ) : (
                     cart.map((item) => (
                       <tr key={item.product_id} className="border-b last:border-0">
-                        <td className="max-w-[140px] truncate px-3 py-2 text-sm font-medium text-gray-900">
+                        <td className="break-words px-3 py-2 text-sm font-medium text-gray-900">
                           {item.product_name}
                         </td>
                         <td className="px-3 py-2">
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              onClick={() => {
-                                if (item.quantity <= 1) {
-                                  removeFromCart(item.product_id)
-                                } else {
-                                  updateQuantity(item.product_id, item.quantity - 1)
-                                }
-                              }}
-                              className="flex h-6 w-6 items-center justify-center rounded border text-gray-700 hover:bg-gray-100"
-                            >
-                              <Minus size={12} />
-                            </button>
-                            <input
-                              type="number"
-                              min={1}
-                              value={item.quantity}
-                              onChange={(e) => {
-                                const v = parseInt(e.target.value) || 1
-                                updateQuantity(item.product_id, v)
-                              }}
-                              className="w-10 rounded border px-1 py-0.5 text-center text-sm text-gray-900"
-                            />
-                            <button
-                              onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
-                              className="flex h-6 w-6 items-center justify-center rounded border text-gray-700 hover:bg-gray-100"
-                            >
-                              <Plus size={12} />
-                            </button>
-                          </div>
+                          <input
+                            type="number"
+                            min={1}
+                            value={item.quantity}
+                            onChange={(e) => {
+                              const v = parseInt(e.target.value) || 1
+                              updateQuantity(item.product_id, v)
+                            }}
+                            className="w-16 rounded border border-gray-300 px-2 py-1 text-center text-sm text-gray-900 focus:border-emerald-500 focus:outline-none"
+                          />
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-gray-900">
                           {formatCurrency(item.unit_price, locale)}
@@ -623,7 +610,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
               {/* Customer */}
               <div className="relative" ref={customerRef}>
                 <div className="flex items-center gap-2">
-                  <User size={16} className="text-gray-700" />
+                  <User size={16} className="text-gray-900" />
                   <input
                     type="text"
                     value={customerSearch || (selectedCustomer?.name ?? "")}
@@ -642,7 +629,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                         setSelectedCustomer(null)
                         setCustomerSearch("")
                       }}
-                      className="text-xs text-gray-700 hover:text-gray-900"
+                      className="text-xs text-gray-900 hover:text-gray-900"
                     >
                       &times;
                     </button>
@@ -671,7 +658,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                         className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
                       >
                         <span className="text-gray-900">{c.name}</span>
-                        {c.phone && <span className="ml-2 text-xs text-gray-700">{c.phone}</span>}
+                        {c.phone && <span className="ml-2 text-xs text-gray-900">{c.phone}</span>}
                       </button>
                     ))}
                   </div>
@@ -763,7 +750,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
             <div className="border-t pt-4">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b text-gray-700">
+                  <tr className="border-b text-gray-900">
                     <th className="pb-1 pr-2 text-left font-medium">{t("sales.item")}</th>
                     <th className="pb-1 pr-2 text-center font-medium">{t("sales.qty")}</th>
                     <th className="pb-1 pr-2 text-right font-medium">{t("sales.price")}</th>
@@ -790,11 +777,11 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-700">{t("common.total")} Paid</span>
+                <span className="text-gray-900">{t("common.total")} Paid</span>
                 <span className="text-gray-900">{formatCurrency(completedSale.amount_paid, locale)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-700">{t("sales.balance_due")}</span>
+                <span className="text-gray-900">{t("sales.balance_due")}</span>
                 <span className="font-medium text-amber-600">
                   {formatCurrency(completedSale.balance_due, locale)}
                 </span>
