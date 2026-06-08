@@ -44,6 +44,10 @@
     "email": "ඊමේල්",
     "password": "මුරපදය",
     "forgot_password": "මුරපදය අමතකද?",
+    "reset_password": "මුරපදය නැවත සකසන්න",
+    "send_reset_link": "නැවත සැකසීමේ සබැඳිය යවන්න",
+    "reset_link_sent": "ඔබගේ ඊමේල් ලිපිනයට නැවත සැකසීමේ සබැඳිය යවන ලදී",
+    "back_to_login": "පිවිසුමට ආපසු",
     "login_title": "HardPro ERP වෙත පිවිසෙන්න",
     "no_account": "ගිණුමක් නැද්ද?",
     "have_account": "දැනටමත් ගිණුමක් තිබේද?",
@@ -139,7 +143,10 @@
     "description": "විස්තරය",
     "debit": "හර",
     "credit": "ණය",
-    "balance": "ශේෂය"
+    "balance": "ශේෂය",
+    "total_debit": "මුළු හර",
+    "total_credit": "මුළු ණය",
+    "net_balance": "ශුද්ධ ශේෂය"
   },
   "suppliers": {
     "title": "සැපයුම්කරුවන්",
@@ -159,7 +166,10 @@
     "description": "විස්තරය",
     "debit": "හර",
     "credit": "ණය",
-    "balance": "ශේෂය"
+    "balance": "ශේෂය",
+    "total_debit": "මුළු හර",
+    "total_credit": "මුළු ණය",
+    "net_balance": "ශුද්ධ ශේෂය"
   },
   "purchases": {
     "title": "මිලදී ගැනීම් ඇණවුම්",

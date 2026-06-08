@@ -44,6 +44,10 @@
     "email": "மின்னஞ்சல்",
     "password": "கடவுச்சொல்",
     "forgot_password": "கடவுச்சொல் மறந்துவிட்டதா?",
+    "reset_password": "கடவுச்சொல்லை மீட்டமை",
+    "send_reset_link": "மீட்டமை இணைப்பை அனுப்பு",
+    "reset_link_sent": "மீட்டமை இணைப்பு உங்கள் மின்னஞ்சலுக்கு அனுப்பப்பட்டது",
+    "back_to_login": "உள்நுழைவுக்குத் திரும்பு",
     "login_title": "HardPro ERP இல் உள்நுழைக",
     "no_account": "கணக்கு இல்லையா?",
     "have_account": "ஏற்கனவே கணக்கு உள்ளதா?",
@@ -139,7 +143,10 @@
     "description": "விளக்கம்",
     "debit": "பற்று",
     "credit": "வரவு",
-    "balance": "இருப்பு"
+    "balance": "இருப்பு",
+    "total_debit": "மொத்த பற்று",
+    "total_credit": "மொத்த வரவு",
+    "net_balance": "நிகர இருப்பு"
   },
   "suppliers": {
     "title": "சப்ளையர்கள்",
@@ -159,7 +166,10 @@
     "description": "விளக்கம்",
     "debit": "பற்று",
     "credit": "வரவு",
-    "balance": "இருப்பு"
+    "balance": "இருப்பு",
+    "total_debit": "மொத்த பற்று",
+    "total_credit": "மொத்த வரவு",
+    "net_balance": "நிகர இருப்பு"
   },
   "purchases": {
     "title": "கொள்முதல் ஆர்டர்கள்",
