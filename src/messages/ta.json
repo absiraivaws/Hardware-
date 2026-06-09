@@ -24,6 +24,7 @@
     "grand_total": "இறுதி மொத்தம்",
     "date": "தேதி",
     "reference": "குறிப்பு",
+    "description": "விளக்கம்",
     "notes": "குறிப்புகள்"
   },
   "nav": {
@@ -35,6 +36,7 @@
     "suppliers": "சப்ளையர்கள்",
     "quotations": "மேற்கோள்கள்",
     "reports": "அறிக்கைகள்",
+    "ledgers": "லெட்ஜர்கள்",
     "settings": "அமைப்புகள்",
     "logout": "வெளியேறு"
   },
@@ -97,7 +99,10 @@
     "amount": "தொகை",
     "labour_charge": "கூலிக் கட்டணம்",
     "transport_charge": "போக்குவரத்துக் கட்டணம்",
-    "balance_due": "செலுத்த வேண்டிய மீதி"
+    "balance_due": "செலுத்த வேண்டிய மீதி",
+    "amount_paid": "செலுத்திய தொகை",
+    "record_payment": "கட்டணத்தை பதிவு செய்யவும்",
+    "confirm_payment": "கட்டணத்தை உறுதிப்படுத்தவும்"
   },
   "inventory": {
     "title": "கையிருப்பு மேலாண்மை",

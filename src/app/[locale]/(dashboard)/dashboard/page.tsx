@@ -111,6 +111,8 @@ export default function DashboardPage({
           { data: productsRaw },
           { data: recentRaw },
           { data: chartRaw },
+          { data: cashLedgerData },
+          { data: bankLedgerData },
         ] = await Promise.all([
           supabase.from("sales").select("grand_total").gte("created_at", todayStart).eq("status", "completed"),
           supabase.from("sales").select("grand_total").gte("created_at", monthStart).eq("status", "completed"),
@@ -120,11 +122,16 @@ export default function DashboardPage({
           supabase.from("products").select("current_stock, min_stock"),
           supabase.from("sales").select("customer_name, grand_total, payment_type, created_at").eq("status", "completed").order("created_at", { ascending: false }).limit(5),
           supabase.from("sales").select("grand_total, created_at").gte("created_at", sevenDaysAgo).eq("status", "completed"),
+          supabase.from("ledger_entries").select("entry_type, amount").eq("ledger_type", "cash"),
+          supabase.from("ledger_entries").select("entry_type, amount").eq("ledger_type", "bank"),
         ])
 
         const dailySales = (dailyRaw ?? []).reduce((s: number, r: Record<string, unknown>) => s + (r.grand_total as number ?? 0), 0)
         const monthlySales = (monthlyRaw ?? []).reduce((s: number, r: Record<string, unknown>) => s + (r.grand_total as number ?? 0), 0)
-        const cashInHand = (cashRaw ?? []).reduce((s: number, r: Record<string, unknown>) => s + (r.grand_total as number ?? 0), 0)
+        const cashInHand = (cashLedgerData ?? []).reduce((s: number, r: Record<string, unknown>) => {
+          const amt = r.amount as number ?? 0
+          return r.entry_type === "debit" ? s + amt : s - amt
+        }, 0)
         const creditSales = (creditRaw ?? []).reduce((s: number, r: Record<string, unknown>) => s + (r.grand_total as number ?? 0), 0)
         const outstanding = (outstandingRaw ?? []).reduce((s: number, r: Record<string, unknown>) => s + (r.balance_due as number ?? 0), 0)
         const lowStockCount = (productsRaw ?? []).filter((p: Record<string, unknown>) => (p.current_stock as number) <= (p.min_stock as number)).length

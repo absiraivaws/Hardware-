@@ -32,6 +32,7 @@ export default function NewQuotationPage() {
   const [validUntil, setValidUntil] = useState("")
   const [notes, setNotes] = useState("")
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const [productSearch, setProductSearch] = useState("")
   const [productResults, setProductResults] = useState<Product[]>([])
@@ -141,10 +142,27 @@ export default function NewQuotationPage() {
   async function handleSave() {
     if (items.length === 0) return
     setSaving(true)
+    setSaveError(null)
 
     const qNo = await generateQNo()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setSaving(false); return }
+
+    const { data: existingProfile } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", user.id)
+      .maybeSingle()
+    if (!existingProfile) {
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .insert({ id: user.id, email: user.email ?? "" })
+      if (profileError) {
+        setSaveError(profileError.message)
+        setSaving(false)
+        return
+      }
+    }
 
     const quotation = {
       q_no: qNo,
@@ -167,6 +185,7 @@ export default function NewQuotationPage() {
 
     const inserted = insertedRaw as { id: string } | null
     if (error || !inserted) {
+      setSaveError(error?.message || "Failed to create quotation")
       setSaving(false)
       return
     }
@@ -186,13 +205,20 @@ export default function NewQuotationPage() {
 
     setSaving(false)
 
-    if (itemsError) return
+    if (itemsError) {
+      setSaveError(itemsError.message)
+      return
+    }
 
     router.push(`/${locale}/quotations`)
   }
 
   return (
     <div>
+      {saveError && (
+        <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{saveError}</div>
+      )}
+
       <div className="mb-6 flex items-center justify-between border-b pb-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">{t("quotations.new_quotation")}</h1>

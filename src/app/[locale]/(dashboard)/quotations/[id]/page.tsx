@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl"
 import { useParams, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { ArrowLeft, FileText, Share2, Replace } from "lucide-react"
+import { ArrowLeft, FileText, Share2, Replace, X } from "lucide-react"
 import { formatCurrency, formatDate } from "@/lib/format"
 import { createClient } from "@/lib/supabase/client"
 import { jsPDF } from "jspdf"
@@ -28,6 +28,14 @@ interface Quotation {
 interface QuotationItem {
   id: string
   quotation_id: string
+  product_id: string
+  product_name: string
+  quantity: number
+  unit_price: number
+  total_price: number
+}
+
+interface EditableItem {
   product_id: string
   product_name: string
   quantity: number
@@ -62,6 +70,14 @@ export default function QuotationDetailPage() {
   const [items, setItems] = useState<QuotationItem[]>([])
   const [loading, setLoading] = useState(true)
   const [converting, setConverting] = useState(false)
+  const [showConvert, setShowConvert] = useState(false)
+
+  const [convertItems, setConvertItems] = useState<EditableItem[]>([])
+  const [convertDiscount, setConvertDiscount] = useState(0)
+  const [convertLabour, setConvertLabour] = useState(0)
+  const [convertTransport, setConvertTransport] = useState(0)
+  const [convertTaxType, setConvertTaxType] = useState<"svat" | "non_vat">("non_vat")
+  const [convertNotes, setConvertNotes] = useState("")
 
   const supabase = createClient()
 
@@ -82,10 +98,56 @@ export default function QuotationDetailPage() {
       .eq("quotation_id", id)
       .order("product_name")
       .then(({ data }) => {
-        if (data) setItems(data as QuotationItem[])
+        if (data) {
+          const fetched = data as QuotationItem[]
+          setItems(fetched)
+        }
         setLoading(false)
       })
   }, [id])
+
+  function openConvertModal() {
+    setConvertItems(
+      items.map((i) => ({
+        product_id: i.product_id,
+        product_name: i.product_name,
+        quantity: i.quantity,
+        unit_price: i.unit_price,
+        total_price: i.total_price,
+      }))
+    )
+    setConvertDiscount(quotation?.discount ?? 0)
+    setConvertLabour(0)
+    setConvertTransport(0)
+    setConvertTaxType("non_vat")
+    setConvertNotes(quotation?.notes ?? "")
+    setShowConvert(true)
+  }
+
+  const convertSubtotal = convertItems.reduce((s, i) => s + i.total_price, 0)
+  const taxAmount = convertTaxType === "svat" ? convertSubtotal * 0.15 : 0
+  const convertGrandTotal = convertSubtotal - convertDiscount + convertLabour + convertTransport + taxAmount
+
+  function updateConvertItem(index: number, field: keyof EditableItem, value: number | string) {
+    setConvertItems((prev) => {
+      const updated = [...prev]
+      const item = { ...updated[index] }
+      if (field === "product_name") {
+        item.product_name = String(value)
+      } else if (field === "quantity") {
+        item.quantity = Number(value)
+      } else if (field === "unit_price") {
+        item.unit_price = Number(value)
+      }
+      item.total_price = item.quantity * item.unit_price
+      updated[index] = item
+      return updated
+    })
+  }
+
+  function removeConvertItem(index: number) {
+    setConvertItems((prev) => prev.filter((_, i) => i !== index))
+  }
 
   function downloadPdf() {
     if (!quotation) return
@@ -160,8 +222,8 @@ export default function QuotationDetailPage() {
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank")
   }
 
-  async function convertToInvoice() {
-    if (!quotation || converting) return
+  async function handleConfirmConvert() {
+    if (!quotation || converting || convertItems.length === 0) return
     setConverting(true)
 
     const { data: { user } } = await supabase.auth.getUser()
@@ -186,17 +248,18 @@ export default function QuotationDetailPage() {
       customer_id: quotation.customer_id,
       customer_name: quotation.customer_name,
       user_id: user.id,
-      subtotal: quotation.subtotal,
-      discount: quotation.discount,
-      labour_charge: 0,
-      transport_charge: 0,
-      tax_type: "non_vat" as const,
-      tax_amount: 0,
-      grand_total: quotation.grand_total,
+      subtotal: convertSubtotal,
+      discount: convertDiscount,
+      labour_charge: convertLabour,
+      transport_charge: convertTransport,
+      tax_type: convertTaxType,
+      tax_amount: taxAmount,
+      grand_total: convertGrandTotal,
       payment_type: "credit" as const,
       amount_paid: 0,
-      balance_due: quotation.grand_total,
+      balance_due: convertGrandTotal,
       status: "pending" as const,
+      notes: convertNotes || null,
     }
 
     const { data: insertedSaleRaw, error: saleError } = await supabase
@@ -211,7 +274,7 @@ export default function QuotationDetailPage() {
       return
     }
 
-    const saleItems = items.map((i) => ({
+    const saleItems = convertItems.map((i) => ({
       sale_id: insertedSale.id,
       product_id: i.product_id,
       product_name: i.product_name,
@@ -220,7 +283,47 @@ export default function QuotationDetailPage() {
       total_price: i.total_price,
     }))
 
-    await supabase.from("sale_items").insert(saleItems as never)
+    const { error: itemsError } = await supabase
+      .from("sale_items")
+      .insert(saleItems as never)
+    if (itemsError) { setConverting(false); return }
+
+    for (const item of convertItems) {
+      const { data: prod } = await supabase
+        .from("products")
+        .select("current_stock")
+        .eq("id", item.product_id)
+        .single()
+      if (prod) {
+        await supabase
+          .from("products")
+          .update({ current_stock: Number(prod.current_stock) - item.quantity })
+          .eq("id", item.product_id)
+      }
+      await supabase.from("stock_movements").insert({
+        product_id: item.product_id,
+        type: "out",
+        quantity: item.quantity,
+        reference_type: "sale",
+        reference_id: insertedSale.id,
+        notes: invoiceNo,
+        user_id: user.id,
+      })
+    }
+
+    if (quotation.customer_id) {
+      const { data: cust } = await supabase
+        .from("customers")
+        .select("credit_balance")
+        .eq("id", quotation.customer_id)
+        .single()
+      if (cust) {
+        await supabase
+          .from("customers")
+          .update({ credit_balance: Number(cust.credit_balance) + convertGrandTotal })
+          .eq("id", quotation.customer_id)
+      }
+    }
 
     await supabase
       .from("quotations")
@@ -228,7 +331,8 @@ export default function QuotationDetailPage() {
       .eq("id", quotation.id)
 
     setConverting(false)
-    router.push(`/${locale}/sales`)
+    setShowConvert(false)
+    router.push(`/${locale}/sales/history`)
   }
 
   if (loading) {
@@ -375,15 +479,215 @@ export default function QuotationDetailPage() {
         </button>
         {quotation.status !== "converted" && (
           <button
-            onClick={convertToInvoice}
-            disabled={converting}
-            className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+            onClick={openConvertModal}
+            className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
           >
             <Replace size={16} />
-            {converting ? t("common.loading") : t("quotations.convert_to_invoice")}
+            {t("quotations.convert_to_invoice")}
           </button>
         )}
       </div>
+
+      {/* Convert Modal */}
+      {showConvert && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 pt-10 pb-10">
+          <div className="w-full max-w-4xl rounded-lg bg-white shadow-xl">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">{t("quotations.convert_to_invoice")}</h2>
+                <p className="text-sm text-gray-900">
+                  {quotation.q_no} — {quotation.customer_name || "—"}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowConvert(false)}
+                className="rounded-lg p-1.5 text-gray-900 hover:bg-gray-100"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="px-6 py-4 space-y-6">
+              {/* Editable Items Table */}
+              <div className="overflow-x-auto rounded-lg border">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-900">{t("sales.item")}</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-900">{t("sales.qty")}</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-900">{t("sales.price")}</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-900">{t("sales.amount")}</th>
+                      <th className="px-3 py-2.5" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {convertItems.map((item, i) => (
+                      <tr key={i}>
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            value={item.product_name}
+                            onChange={(e) => updateConvertItem(i, "product_name", e.target.value)}
+                            className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-emerald-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="number"
+                            min={0}
+                            step="any"
+                            value={item.quantity}
+                            onChange={(e) => updateConvertItem(i, "quantity", e.target.value)}
+                            className="w-20 rounded border border-gray-300 px-2 py-1 text-sm focus:border-emerald-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            value={item.unit_price}
+                            onChange={(e) => updateConvertItem(i, "unit_price", e.target.value)}
+                            className="w-24 rounded border border-gray-300 px-2 py-1 text-sm focus:border-emerald-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-sm font-medium text-gray-900">
+                          {formatCurrency(item.total_price, locale)}
+                        </td>
+                        <td className="px-3 py-2">
+                          <button
+                            onClick={() => removeConvertItem(i)}
+                            className="rounded p-1 text-red-500 hover:bg-red-50"
+                          >
+                            <X size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* Left: Extra charges */}
+                <div className="space-y-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-900">{t("common.discount")}</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={convertDiscount}
+                      onChange={(e) => setConvertDiscount(Number(e.target.value))}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-900">{t("sales.labour_charge")}</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={convertLabour}
+                      onChange={(e) => setConvertLabour(Number(e.target.value))}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-900">{t("sales.transport_charge")}</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={convertTransport}
+                      onChange={(e) => setConvertTransport(Number(e.target.value))}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-900">{t("common.tax")} Type</label>
+                    <select
+                      value={convertTaxType}
+                      onChange={(e) => setConvertTaxType(e.target.value as "svat" | "non_vat")}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                    >
+                      <option value="non_vat">Non-VAT</option>
+                      <option value="svat">SVAT (15%)</option>
+                    </select>
+                  </div>
+                  {convertTaxType === "svat" && (
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-900">{t("common.tax")} Amount (15%)</label>
+                      <p className="text-sm font-medium text-gray-900">{formatCurrency(taxAmount, locale)}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right: Totals */}
+                <div className="space-y-1.5 rounded-lg border bg-gray-50 p-4 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-900">{t("common.subtotal")}</span>
+                    <span>{formatCurrency(convertSubtotal, locale)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-900">{t("common.discount")}</span>
+                    <span>-{formatCurrency(convertDiscount, locale)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-900">{t("sales.labour_charge")}</span>
+                    <span>{formatCurrency(convertLabour, locale)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-900">{t("sales.transport_charge")}</span>
+                    <span>{formatCurrency(convertTransport, locale)}</span>
+                  </div>
+                  {convertTaxType === "svat" && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-900">{t("common.tax")} (15%)</span>
+                      <span>{formatCurrency(taxAmount, locale)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t pt-1.5 text-base font-semibold">
+                    <span>{t("common.grand_total")}</span>
+                    <span className="text-emerald-600">{formatCurrency(convertGrandTotal, locale)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-900">{t("common.notes")}</label>
+                <textarea
+                  value={convertNotes}
+                  onChange={(e) => setConvertNotes(e.target.value)}
+                  rows={2}
+                  className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 border-t px-6 py-4">
+              <button
+                onClick={() => setShowConvert(false)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                onClick={handleConfirmConvert}
+                disabled={converting || convertItems.length === 0}
+                className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                <Replace size={16} />
+                {converting ? t("common.loading") : t("quotations.convert_to_invoice")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

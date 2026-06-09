@@ -36,17 +36,34 @@ export default function QuotationsPage() {
 
   const [quotations, setQuotations] = useState<Quotation[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  async function fetchQuotations() {
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setError("Authentication required. Please log in again.")
+        setLoading(false)
+        return
+      }
+      const { data, error } = await supabase
+        .from("quotations")
+        .select("*")
+        .order("created_at", { ascending: false })
+      if (error) {
+        setError(error.message)
+      } else if (data) {
+        setQuotations(data)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load quotations")
+    }
+    setLoading(false)
+  }
 
   useEffect(() => {
-    const supabase = createClient()
-    supabase
-      .from("quotations")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .then(({ data }) => {
-        if (data) setQuotations(data)
-        setLoading(false)
-      })
+    fetchQuotations()
   }, [])
 
   const columns = [
@@ -121,6 +138,10 @@ export default function QuotationsPage() {
           {t("quotations.new_quotation")}
         </button>
       </PageHeader>
+
+      {error && (
+        <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>
+      )}
 
       <DataTable<Quotation>
         columns={columns}

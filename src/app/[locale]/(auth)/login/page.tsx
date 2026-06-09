@@ -22,6 +22,7 @@ type ResetForm = z.infer<typeof resetSchema>
 
 export default function LoginPage({ params }: { params: Promise<{ locale: string }> }) {
   const t = useTranslations("auth")
+  const tc = useTranslations("common")
   const router = useRouter()
   const supabase = createClient()
   const [error, setError] = useState<string | null>(null)
@@ -174,7 +175,7 @@ export default function LoginPage({ params }: { params: Promise<{ locale: string
             disabled={loading}
             className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
           >
-            {loading ? t("common.loading", {}) : t("sign_in")}
+            {loading ? tc("loading") : t("sign_in")}
           </button>
         </form>
       )}

@@ -16,19 +16,22 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  BookOpen,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
 
 const navItems = [
   { href: "dashboard", icon: LayoutDashboard, labelKey: "nav.dashboard" },
-  { href: "sales", icon: ShoppingCart, labelKey: "nav.sales" },
+  { href: "sales", icon: ShoppingCart, labelKey: "nav.pos" },
+  { href: "sales/history", icon: FileText, labelKey: "nav.sales" },
   { href: "purchases", icon: Package, labelKey: "nav.purchases" },
   { href: "inventory", icon: Warehouse, labelKey: "nav.inventory" },
   { href: "customers", icon: Users, labelKey: "nav.customers" },
   { href: "suppliers", icon: Truck, labelKey: "nav.suppliers" },
   { href: "quotations", icon: FileText, labelKey: "nav.quotations" },
   { href: "reports", icon: BarChart3, labelKey: "nav.reports" },
+  { href: "ledgers", icon: BookOpen, labelKey: "nav.ledgers" },
 ]
 
 export function Sidebar() {

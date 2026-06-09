@@ -24,17 +24,20 @@
     "grand_total": "Grand Total",
     "date": "Date",
     "reference": "Reference",
+    "description": "Description",
     "notes": "Notes"
   },
   "nav": {
     "dashboard": "Dashboard",
-    "sales": "Sales & POS",
+    "pos": "POS",
+    "sales": "Sales",
     "purchases": "Purchases",
     "inventory": "Inventory",
     "customers": "Customers",
     "suppliers": "Suppliers",
     "quotations": "Quotations",
     "reports": "Reports",
+    "ledgers": "Ledgers",
     "settings": "Settings",
     "logout": "Logout"
   },
@@ -97,7 +100,10 @@
     "amount": "Amount",
     "labour_charge": "Labour Charge",
     "transport_charge": "Transport Charge",
-    "balance_due": "Balance Due"
+    "balance_due": "Balance Due",
+    "amount_paid": "Amount Paid",
+    "record_payment": "Record Payment",
+    "confirm_payment": "Confirm Payment"
   },
   "inventory": {
     "title": "Inventory",

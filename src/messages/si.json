@@ -24,6 +24,7 @@
     "grand_total": "ශුද්ධ එකතුව",
     "date": "දිනය",
     "reference": "යොමුව",
+    "description": "විස්තරය",
     "notes": "සටහන්"
   },
   "nav": {
@@ -35,6 +36,7 @@
     "suppliers": "සැපයුම්කරුවන්",
     "quotations": "උපුටා දැක්වීම්",
     "reports": "වාර්තා",
+    "ledgers": "ලෙජර්",
     "settings": "සැකසුම්",
     "logout": "පිටවීම"
   },
@@ -97,7 +99,10 @@
     "amount": "මුදල",
     "labour_charge": "ශ්‍රම ගාස්තුව",
     "transport_charge": "ප්‍රවාහන ගාස්තුව",
-    "balance_due": "ඉතිරි ගෙවිය යුතු මුදල"
+    "balance_due": "ඉතිරි ගෙවිය යුතු මුදල",
+    "amount_paid": "ගෙවූ මුදල",
+    "record_payment": "ගෙවීම සටහන් කරන්න",
+    "confirm_payment": "ගෙවීම තහවුරු කරන්න"
   },
   "inventory": {
     "title": "තොග කළමනාකරණය",

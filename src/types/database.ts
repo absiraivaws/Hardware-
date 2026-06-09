@@ -305,6 +305,7 @@ export interface Database {
           notes: string | null
           created_at: string
           updated_at: string
+          payment_details: Json
         }
         Insert: {
           id?: string
@@ -327,6 +328,7 @@ export interface Database {
           notes?: string | null
           created_at?: string
           updated_at?: string
+          payment_details?: Json
         }
         Update: {
           id?: string
@@ -349,6 +351,7 @@ export interface Database {
           notes?: string | null
           created_at?: string
           updated_at?: string
+          payment_details?: Json
         }
       }
       sale_items: {

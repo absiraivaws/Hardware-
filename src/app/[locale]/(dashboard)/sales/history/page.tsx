@@ -6,7 +6,15 @@ import { DataTable } from "@/components/shared/data-table"
 import { PageHeader } from "@/components/shared/page-header"
 import { formatCurrency, formatDate } from "@/lib/format"
 import { use, useEffect, useState } from "react"
-import { Eye } from "lucide-react"
+import { Banknote, DollarSign, Eye, X } from "lucide-react"
+
+const paymentDetailLabels: Record<string, string> = {
+  cheque_number: "Cheque Number",
+  bank_code: "Bank Code",
+  account_number: "Account Number",
+  from_account: "From Account",
+  to_account: "To Account",
+}
 
 interface SaleRow {
   id: string
@@ -14,9 +22,46 @@ interface SaleRow {
   customer_name: string | null
   created_at: string
   grand_total: number
+  amount_paid: number
   status: string
   payment_type: string
   [key: string]: unknown
+}
+
+interface SaleDetail {
+  id: string
+  invoice_no: string
+  customer_id: string | null
+  customer_name: string | null
+  subtotal: number
+  discount: number
+  labour_charge: number
+  transport_charge: number
+  tax_type: string
+  tax_amount: number
+  grand_total: number
+  payment_type: string
+  amount_paid: number
+  balance_due: number
+  status: string
+  notes: string | null
+  created_at: string
+  payment_details: Record<string, string> | null
+}
+
+interface SaleItem {
+  id: string
+  product_name: string
+  quantity: number
+  unit_price: number
+  total_price: number
+}
+
+interface PaymentRecord {
+  id: string
+  amount: number
+  description: string | null
+  created_at: string
 }
 
 export default function SaleHistoryPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -24,22 +69,183 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
   const t = useTranslations()
   const [sales, setSales] = useState<SaleRow[]>([])
   const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    loadSales()
-  }, [])
+  const [viewId, setViewId] = useState<string | null>(null)
+  const [detail, setDetail] = useState<SaleDetail | null>(null)
+  const [detailItems, setDetailItems] = useState<SaleItem[]>([])
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [paymentHistory, setPaymentHistory] = useState<PaymentRecord[]>([])
+  const [showPaymentForm, setShowPaymentForm] = useState(false)
+  const [paymentAmount, setPaymentAmount] = useState(0)
+  const [paymentType, setPaymentType] = useState("cash")
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false)
+  const [chequeNumber, setChequeNumber] = useState("")
+  const [bankCode, setBankCode] = useState("")
+  const [accountNumber, setAccountNumber] = useState("")
+  const [fromAccount, setFromAccount] = useState("")
+  const [toAccount, setToAccount] = useState("")
 
   async function loadSales() {
     const supabase = createClient()
     setLoading(true)
     const { data } = await supabase
       .from("sales")
-      .select("id, invoice_no, customer_name, created_at, grand_total, status, payment_type")
+      .select("id, invoice_no, customer_name, created_at, grand_total, amount_paid, status, payment_type")
       .order("created_at", { ascending: false })
       .limit(200)
 
     if (data) setSales(data as SaleRow[])
     setLoading(false)
+  }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadSales()
+  }, [])
+
+  async function openDetail(id: string) {
+    setViewId(id)
+    setDetail(null)
+    setDetailItems([])
+    setPaymentHistory([])
+    setDetailLoading(true)
+
+    const supabase = createClient()
+    const [saleRes, itemsRes, ledgerRes] = await Promise.all([
+      supabase.from("sales").select("*").eq("id", id).single(),
+      supabase.from("sale_items").select("*").eq("sale_id", id).order("product_name"),
+      supabase
+        .from("ledger_entries")
+        .select("id, amount, description, created_at")
+        .eq("reference_type", "payment")
+        .ilike("description", `%Payment received%`)
+        .order("created_at", { ascending: true }),
+    ])
+
+    const saleData = saleRes.data
+    if (saleData) setDetail(saleData as SaleDetail)
+
+    if (itemsRes.data) setDetailItems(itemsRes.data as SaleItem[])
+
+    if (ledgerRes.data) {
+      const filtered = ledgerRes.data.filter(
+        (e) => e.description && e.description.includes((saleData as SaleDetail | null)?.invoice_no ?? ""),
+      )
+      setPaymentHistory(filtered as PaymentRecord[])
+    }
+
+    setDetailLoading(false)
+  }
+
+  async function handleRecordPayment() {
+    if (!detail || paymentAmount <= 0) return
+    const supabase = createClient()
+    setPaymentSubmitting(true)
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("Not authenticated")
+
+      const newAmountPaid = Number(detail.amount_paid) + paymentAmount
+      const newBalanceDue = Math.max(0, Number(detail.grand_total) - newAmountPaid)
+      const newStatus = newBalanceDue > 0 ? "pending" : "completed"
+
+      const updateFields: Record<string, unknown> = {
+        amount_paid: newAmountPaid,
+        balance_due: newBalanceDue,
+        status: newStatus,
+      }
+
+      if (paymentType === "cheque") {
+        updateFields.payment_details = {
+          cheque_number: chequeNumber,
+          bank_code: bankCode,
+          account_number: accountNumber,
+        }
+      } else if (paymentType === "bank_transfer") {
+        updateFields.payment_details = {
+          from_account: fromAccount,
+          to_account: toAccount,
+        }
+      } else if (paymentType === "cash") {
+        updateFields.payment_details = null
+      }
+
+      const { error: updateError } = await supabase
+        .from("sales")
+        .update(updateFields as never)
+        .eq("id", detail.id)
+
+      if (updateError) throw updateError
+
+      if (detail.customer_id) {
+        const { data: cust } = await supabase
+          .from("customers")
+          .select("credit_balance")
+          .eq("id", detail.customer_id)
+          .single()
+
+        if (cust) {
+          const currentBalance = Number(cust.credit_balance)
+          const newBalance = Math.max(0, currentBalance - paymentAmount)
+          await supabase
+            .from("customers")
+            .update({ credit_balance: newBalance } as never)
+            .eq("id", detail.customer_id)
+        }
+      }
+
+      await supabase.from("ledger_entries").insert({
+        ledger_type: "customer",
+        reference_id: detail.customer_id,
+        reference_type: "payment",
+        entry_type: "credit",
+        amount: paymentAmount,
+        description: `Payment received ${detail.invoice_no}`,
+        balance_after: 0,
+      } as never)
+
+      // Financial ledger entry
+      const financialType = paymentType === "cash" ? "cash" : "bank"
+      const { data: lastEntry } = await supabase
+        .from("ledger_entries")
+        .select("balance_after")
+        .eq("ledger_type", financialType)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      const prevBalance = (lastEntry as { balance_after: number } | null)?.balance_after ?? 0
+      await supabase.from("ledger_entries").insert({
+        ledger_type: financialType,
+        reference_id: detail.id,
+        reference_type: "payment",
+        entry_type: "debit",
+        amount: paymentAmount,
+        description: `Payment received ${detail.invoice_no}`,
+        balance_after: prevBalance + paymentAmount,
+      } as never)
+
+      setDetail({
+        ...detail,
+        amount_paid: newAmountPaid,
+        balance_due: newBalanceDue,
+        status: newStatus,
+      })
+      setShowPaymentForm(false)
+      setPaymentAmount(0)
+      setPaymentType("cash")
+      setChequeNumber("")
+      setBankCode("")
+      setAccountNumber("")
+      setFromAccount("")
+      setToAccount("")
+      loadSales()
+    } catch (err) {
+      console.error("Payment error:", err)
+      alert("Failed to record payment. Please try again.")
+    } finally {
+      setPaymentSubmitting(false)
+    }
   }
 
   const statusBadge = (status: string) => {
@@ -50,11 +256,26 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
     }
     return (
       <span
-        className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${colors[status] || "bg-gray-100 text-gray-800"}`}
+        className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${colors[status] || "bg-gray-100 text-black"}`}
       >
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </span>
     )
+  }
+
+  const paymentStatusLabel = (row: SaleRow & { amount_paid?: number; grand_total?: number }) => {
+    const fullyPaid = Number(row.amount_paid ?? 0) >= Number(row.grand_total ?? 0)
+    return fullyPaid ? "Complete" : "Partial"
+  }
+
+  const paymentLabels: Record<string, string> = {
+    cash: t("sales.cash"),
+    credit: t("sales.credit"),
+    bank_transfer: t("sales.bank_transfer"),
+    lanka_qr: t("sales.lanka_qr"),
+    card: t("sales.card"),
+    mixed: t("sales.mixed"),
+    cheque: t("sales.cheque"),
   }
 
   const columns = [
@@ -67,7 +288,7 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
       key: "invoice_no",
       label: t("sales.invoice_no"),
       render: (row: SaleRow) => (
-        <span className="font-medium text-gray-900">{row.invoice_no}</span>
+        <span className="font-medium text-black">{row.invoice_no}</span>
       ),
     },
     {
@@ -88,17 +309,21 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
     {
       key: "payment_type",
       label: t("sales.payment_type"),
+      render: (row: SaleRow) => paymentLabels[row.payment_type] || row.payment_type,
+    },
+    {
+      key: "payment_status",
+      label: "Payment Status",
       render: (row: SaleRow) => {
-        const labels: Record<string, string> = {
-          cash: t("sales.cash"),
-          credit: t("sales.credit"),
-          bank_transfer: t("sales.bank_transfer"),
-          lanka_qr: t("sales.lanka_qr"),
-          card: t("sales.card"),
-          mixed: t("sales.mixed"),
-          cheque: t("sales.cheque"),
-        }
-        return labels[row.payment_type] || row.payment_type
+        const isCredit = row.payment_type === "credit"
+        const complete = isCredit ? Number(row.amount_paid) >= Number(row.grand_total) : true
+        const label = complete ? "Complete" : "Partial"
+        const color = complete ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+        return (
+          <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${color}`}>
+            {label}
+          </span>
+        )
       },
     },
     {
@@ -106,8 +331,8 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
       label: t("common.actions"),
       render: (row: SaleRow) => (
         <button
-          onClick={() => (window.location.href = `?view=${row.id}`)}
-          className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium text-gray-800 transition hover:bg-gray-50 hover:text-gray-900"
+          onClick={() => openDetail(row.id)}
+          className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium text-black transition hover:bg-gray-50 hover:text-black"
         >
           <Eye size={14} />
           {t("common.view")}
@@ -120,12 +345,285 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
     <div>
       <PageHeader titleKey="sales.sale_history" />
       <DataTable
-        columns={columns as any}
+        columns={columns}
         data={sales}
         loading={loading}
         searchable
         searchKeys={["invoice_no", "customer_name"]}
       />
+
+      {/* Detail Modal */}
+      {viewId && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 pt-10 pb-10">
+          <div className="w-full max-w-3xl rounded-lg bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <div>
+                <h2 className="text-lg font-semibold text-black">
+                  {detail?.invoice_no || ""}
+                </h2>
+                <p className="text-sm text-black">{detail?.customer_name || "Walk-in Customer"}</p>
+              </div>
+              <button
+                onClick={() => setViewId(null)}
+                className="rounded-lg p-1.5 text-black hover:bg-gray-100"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {detailLoading ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="animate-spin h-8 w-8 rounded-full border-4 border-gray-200 border-t-emerald-600" />
+              </div>
+            ) : detail ? (
+              <div className="px-6 py-4 space-y-6">
+                {/* Info Cards */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="rounded-lg border bg-gray-50 p-3">
+                    <p className="text-xs font-medium uppercase tracking-wider text-black">{t("common.date")}</p>
+                    <p className="mt-1 text-sm font-medium text-black">{formatDate(detail.created_at)}</p>
+                  </div>
+                  <div className="rounded-lg border bg-gray-50 p-3">
+                    <p className="text-xs font-medium uppercase tracking-wider text-black">{t("common.status")}</p>
+                    <div className="mt-1">{statusBadge(detail.status)}</div>
+                  </div>
+                  <div className="rounded-lg border bg-gray-50 p-3">
+                    <p className="text-xs font-medium uppercase tracking-wider text-black">{t("sales.payment_type")}</p>
+                    <p className="mt-1 text-sm font-medium text-black">{paymentLabels[detail.payment_type] || detail.payment_type}</p>
+                  </div>
+                </div>
+
+                {/* Items Table */}
+                <div className="overflow-x-auto rounded-lg border">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-black">{t("sales.item")}</th>
+                        <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-black">{t("sales.qty")}</th>
+                        <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-black">{t("sales.price")}</th>
+                        <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-black">{t("sales.amount")}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {detailItems.map((item) => (
+                        <tr key={item.id}>
+                          <td className="px-4 py-2.5 text-sm text-black">{item.product_name}</td>
+                          <td className="px-4 py-2.5 text-sm text-black">{item.quantity}</td>
+                          <td className="px-4 py-2.5 text-sm text-black">{formatCurrency(Number(item.unit_price), locale)}</td>
+                          <td className="px-4 py-2.5 text-sm font-medium text-black">{formatCurrency(Number(item.total_price), locale)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Totals */}
+                <div className="ml-auto w-72 space-y-1.5 text-sm">
+
+                  {/* Payment Status Badge */}
+                  {Number(detail.amount_paid) > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-black font-medium">Payment Status</span>
+                      <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-bold ${
+                        detail.payment_type !== "credit" || Number(detail.balance_due) <= 0
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-amber-100 text-amber-700"
+                      }`}>
+                        {detail.payment_type !== "credit" || Number(detail.balance_due) <= 0 ? "Complete" : "Partial"}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between">
+                    <span className="text-black">{t("common.subtotal")}</span>
+                    <span className="text-black">{formatCurrency(detail.subtotal, locale)}</span>
+                  </div>
+                  {detail.discount > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-black">{t("common.discount")}</span>
+                      <span className="text-black">-{formatCurrency(detail.discount, locale)}</span>
+                    </div>
+                  )}
+                  {detail.labour_charge > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-black">{t("sales.labour_charge")}</span>
+                      <span className="text-black">{formatCurrency(detail.labour_charge, locale)}</span>
+                    </div>
+                  )}
+                  {detail.transport_charge > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-black">{t("sales.transport_charge")}</span>
+                      <span className="text-black">{formatCurrency(detail.transport_charge, locale)}</span>
+                    </div>
+                  )}
+                  {detail.tax_type === "svat" && (
+                    <div className="flex justify-between">
+                      <span className="text-black">{t("common.tax")}</span>
+                      <span className="text-black">{formatCurrency(detail.tax_amount, locale)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t pt-1.5 text-base font-semibold">
+                    <span className="text-black">{t("common.grand_total")}</span>
+                    <span className="text-emerald-600">{formatCurrency(detail.grand_total, locale)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-black">{t("sales.amount_paid")}</span>
+                    <span className="text-black">{formatCurrency(detail.amount_paid, locale)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm border-t border-dashed pt-1.5">
+                    <span className="font-semibold text-black">{t("sales.balance_due")}</span>
+                    <span className={`font-semibold ${Number(detail.balance_due) > 0 ? "text-black" : "text-black"}`}>
+                      {formatCurrency(detail.balance_due, locale)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Payment History */}
+                {paymentHistory.length > 0 && (
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-black mb-2">
+                      <Banknote size={14} className="inline mr-1" />
+                      Payment History
+                    </p>
+                    <div className="space-y-1">
+                      {paymentHistory.map((p) => (
+                        <div key={p.id} className="flex items-center justify-between text-sm">
+                          <span className="text-black">{formatDate(p.created_at)}</span>
+                          <span className="font-medium text-emerald-600">+{formatCurrency(p.amount, locale)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Payment Details */}
+                {detail.payment_details && Object.keys(detail.payment_details).length > 0 && (
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-black mb-2">Payment Details</p>
+                    <div className="space-y-1 text-sm">
+                      {Object.entries(detail.payment_details).map(([key, val]) => (
+                        <div key={key} className="flex justify-between">
+                          <span className="text-black">{paymentDetailLabels[key] || key}</span>
+                          <span className="font-medium text-black">{val}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {detail.notes && (
+                  <div className="rounded-lg border bg-gray-50 p-3">
+                    <p className="text-xs font-medium uppercase tracking-wider text-black">{t("common.notes")}</p>
+                    <p className="mt-1 text-sm text-black">{detail.notes}</p>
+                  </div>
+                )}
+
+                {/* Record Payment */}
+                {Number(detail.balance_due) > 0 && !showPaymentForm && (
+                  <button
+                    onClick={() => {
+                      setPaymentAmount(Number(detail.balance_due))
+                      setShowPaymentForm(true)
+                    }}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                  >
+                    <DollarSign size={16} />
+                    {t("sales.record_payment")}
+                  </button>
+                )}
+
+                {showPaymentForm && (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 space-y-3">
+                    <h4 className="text-sm font-semibold text-black">{t("sales.record_payment")}</h4>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-black">{t("common.total")}</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={detail.balance_due}
+                        value={paymentAmount}
+                        onChange={(e) => {
+                          const val = Number(e.target.value) || 0
+                          setPaymentAmount(Math.min(val, Number(detail.balance_due)))
+                        }}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      />
+                      <p className="mt-0.5 text-xs text-black">Max: {formatCurrency(detail.balance_due, locale)}</p>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-black">{t("sales.payment_type")}</label>
+                      <select
+                        value={paymentType}
+                        onChange={(e) => setPaymentType(e.target.value)}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      >
+                        {(["cash", "credit", "bank_transfer", "lanka_qr", "card", "mixed", "cheque"] as const).map(
+                          (pt) => (
+                            <option key={pt} value={pt}>
+                              {paymentLabels[pt] || pt}
+                            </option>
+                          ),
+                        )}
+                      </select>
+                    </div>
+
+                    {/* Cheque Details */}
+                    {paymentType === "cheque" && (
+                      <div className="space-y-2">
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-black">Cheque Number</label>
+                          <input type="text" value={chequeNumber} onChange={(e) => setChequeNumber(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none" />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-black">Bank Code</label>
+                          <input type="text" value={bankCode} onChange={(e) => setBankCode(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none" />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-black">Account Number</label>
+                          <input type="text" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none" />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Bank Transfer Details */}
+                    {paymentType === "bank_transfer" && (
+                      <div className="space-y-2">
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-black">From Account</label>
+                          <input type="text" value={fromAccount} onChange={(e) => setFromAccount(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none" />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-black">To Account</label>
+                          <input type="text" value={toAccount} onChange={(e) => setToAccount(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none" />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setShowPaymentForm(false)
+                          setPaymentAmount(0)
+                        }}
+                        className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-black hover:bg-gray-50"
+                      >
+                        {t("common.cancel")}
+                      </button>
+                      <button
+                        onClick={handleRecordPayment}
+                        disabled={paymentAmount <= 0 || paymentSubmitting || paymentAmount > Number(detail.balance_due)}
+                        className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {paymentSubmitting ? t("common.loading") : t("sales.confirm_payment")}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

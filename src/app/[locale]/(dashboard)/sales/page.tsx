@@ -6,6 +6,7 @@ import { usePOSStore } from "@/stores/pos-store"
 import { formatCurrency } from "@/lib/format"
 import { Search, Trash2, ShoppingCart, User, Printer, Smartphone, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 import { use, useEffect, useMemo, useState, useRef } from "react"
+import { useRouter } from "next/navigation"
 import type { Database } from "@/types/database"
 
 type Product = Database["public"]["Tables"]["products"]["Row"]
@@ -38,6 +39,7 @@ interface CustomerCreditRow {
 export default function SalesPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = use(params)
   const t = useTranslations()
+  const router = useRouter()
   const { cart, addToCart, removeFromCart, updateQuantity, clearCart } = usePOSStore()
 
   const [products, setProducts] = useState<Product[]>([])
@@ -58,6 +60,11 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
   const [taxType, setTaxType] = useState<TaxType>("non_vat")
   const [paymentType, setPaymentType] = useState<PaymentType>("cash")
   const [amountPaid, setAmountPaid] = useState(0)
+  const [chequeNumber, setChequeNumber] = useState("")
+  const [bankCode, setBankCode] = useState("")
+  const [accountNumber, setAccountNumber] = useState("")
+  const [fromAccount, setFromAccount] = useState("")
+  const [toAccount, setToAccount] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [completedSale, setCompletedSale] = useState<{
     invoice_no: string
@@ -165,8 +172,8 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
   const taxableAmount = subtotal - discount + labourCharge + transportCharge
   const taxAmount = taxType === "svat" ? taxableAmount * 0.15 : 0
   const grandTotal = taxableAmount + taxAmount
-  const changeDue = paymentType !== "credit" && amountPaid > grandTotal ? amountPaid - grandTotal : 0
-  const balanceDue = paymentType === "credit" ? grandTotal : Math.max(0, grandTotal - amountPaid)
+  const changeDue = amountPaid > grandTotal ? amountPaid - grandTotal : 0
+  const balanceDue = Math.max(0, grandTotal - amountPaid)
 
   const handleCompleteSale = async () => {
     if (cart.length === 0) return
@@ -240,9 +247,13 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
           tax_amount: taxAmount,
           grand_total: grandTotal,
           payment_type: paymentType,
-          amount_paid: paymentType === "credit" ? 0 : amountPaid,
+          amount_paid: amountPaid,
           balance_due: balanceDue,
-          status: paymentType === "credit" ? "pending" : "completed",
+          status: balanceDue > 0 && paymentType === "credit" ? "pending" : "completed",
+          payment_details: {
+            ...(paymentType === "cheque" && { cheque_number: chequeNumber, bank_code: bankCode, account_number: accountNumber }),
+            ...(paymentType === "bank_transfer" && { from_account: fromAccount, to_account: toAccount }),
+          },
         } as never)
         .select()
         .single()
@@ -287,7 +298,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
         } as never)
       }
 
-      if (paymentType === "credit" && customerId) {
+      if (customerId && balanceDue > 0) {
         const { data: cust } = await supabase
           .from("customers")
           .select("credit_balance")
@@ -298,9 +309,33 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
         if (custData) {
           await supabase
             .from("customers")
-            .update({ credit_balance: custData.credit_balance + grandTotal } as never)
+            .update({ credit_balance: custData.credit_balance + balanceDue } as never)
             .eq("id", customerId)
         }
+      }
+
+      // Financial ledger entry
+      if (amountPaid > 0) {
+        const financialType = paymentType === "cash" ? "cash" : "bank"
+        const { data: lastEntry } = await supabase
+          .from("ledger_entries")
+          .select("balance_after")
+          .eq("ledger_type", financialType)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        const prevBalance = (lastEntry as { balance_after: number } | null)?.balance_after ?? 0
+
+        await supabase.from("ledger_entries").insert({
+          ledger_type: financialType,
+          reference_id: saleData.id,
+          reference_type: "sale",
+          entry_type: "debit",
+          amount: amountPaid,
+          description: `Sale ${invoiceNo}`,
+          balance_after: prevBalance + amountPaid,
+        } as never)
       }
 
       const receiptItems = cart.map((i) => ({
@@ -313,7 +348,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       setCompletedSale({
         invoice_no: invoiceNo,
         grand_total: grandTotal,
-        amount_paid: paymentType === "credit" ? 0 : amountPaid,
+        amount_paid: amountPaid,
         balance_due: balanceDue,
         items: receiptItems,
       })
@@ -325,6 +360,11 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       setTaxType("non_vat")
       setPaymentType("cash")
       setAmountPaid(0)
+      setChequeNumber("")
+      setBankCode("")
+      setAccountNumber("")
+      setFromAccount("")
+      setToAccount("")
       setSelectedCustomer(null)
       setCustomerSearch("")
     } catch (err) {
@@ -373,6 +413,12 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
             className="w-52 rounded-lg border border-gray-300 py-2.5 pl-3 pr-4 text-sm text-gray-900 placeholder-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
           />
         </div>
+        <button
+          onClick={() => router.push(`/${locale}/sales/history`)}
+          className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-900 hover:bg-gray-50"
+        >
+          {t("sales.sale_history")}
+        </button>
       </div>
 
       {/* ===== MAIN CONTENT: Product Grid + Cart/Payment ===== */}
@@ -672,10 +718,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                 </label>
                 <select
                   value={paymentType}
-                  onChange={(e) => {
-                    setPaymentType(e.target.value as PaymentType)
-                    if (e.target.value === "credit") setAmountPaid(0)
-                  }}
+                  onChange={(e) => setPaymentType(e.target.value as PaymentType)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 >
                   {(["cash", "credit", "bank_transfer", "lanka_qr", "card", "mixed", "cheque"] as const).map(
@@ -689,28 +732,83 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
               </div>
 
               {/* Amount Paid + Change Due */}
-              {paymentType !== "credit" && (
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-900">
-                    {t("common.total")} Paid
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={amountPaid}
-                    onChange={(e) => setAmountPaid(Number(e.target.value) || 0)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  />
-                  {changeDue > 0 && (
-                    <p className="mt-1 text-sm font-medium text-emerald-600">
-                      Change Due: {formatCurrency(changeDue, locale)}
-                    </p>
-                  )}
-                  {amountPaid > 0 && amountPaid < grandTotal && (
-                    <p className="mt-1 text-sm text-amber-600">
-                      Balance Due: {formatCurrency(balanceDue, locale)}
-                    </p>
-                  )}
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-900">
+                  {t("common.total")} Paid
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={amountPaid}
+                  onChange={(e) => setAmountPaid(Number(e.target.value) || 0)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+                {changeDue > 0 && (
+                  <p className="mt-1 text-sm font-medium text-emerald-600">
+                    Change Due: {formatCurrency(changeDue, locale)}
+                  </p>
+                )}
+                {amountPaid > 0 && amountPaid < grandTotal && (
+                  <p className="mt-1 text-sm text-amber-600">
+                    Balance Due: {formatCurrency(balanceDue, locale)}
+                  </p>
+                )}
+              </div>
+
+              {/* Cheque Details */}
+              {paymentType === "cheque" && (
+                <div className="space-y-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-black">Cheque Number</label>
+                    <input
+                      type="text"
+                      value={chequeNumber}
+                      onChange={(e) => setChequeNumber(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-black">Bank Code</label>
+                    <input
+                      type="text"
+                      value={bankCode}
+                      onChange={(e) => setBankCode(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-black">Account Number</label>
+                    <input
+                      type="text"
+                      value={accountNumber}
+                      onChange={(e) => setAccountNumber(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Bank Transfer Details */}
+              {paymentType === "bank_transfer" && (
+                <div className="space-y-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-black">From Account</label>
+                    <input
+                      type="text"
+                      value={fromAccount}
+                      onChange={(e) => setFromAccount(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-black">To Account</label>
+                    <input
+                      type="text"
+                      value={toAccount}
+                      onChange={(e) => setToAccount(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
                 </div>
               )}
             </div>
