@@ -121,13 +121,13 @@ export default function CustomerLedgerPage({
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">
+        <h1 className="text-2xl font-bold text-black">
           {t("customer_ledger")}{selectedCustomer ? ` — ${selectedCustomer.name}` : ""}
         </h1>
       </div>
 
       <div className="mb-6 max-w-sm">
-        <label className="mb-1 block text-xs font-medium text-gray-800">{t("customer")}</label>
+        <label className="mb-1 block text-xs font-medium text-black">{t("customer")}</label>
         <select
           value={selectedId}
           onChange={(e) => setSelectedId(e.target.value)}
@@ -153,7 +153,7 @@ export default function CustomerLedgerPage({
                   <th
                     key={col.key}
                     onClick={() => handleSort(col.key)}
-                    className={`cursor-pointer select-none px-4 py-3 ${col.align} text-xs font-medium uppercase tracking-wider ${active ? "text-emerald-700" : "text-gray-900"}`}
+                    className={`cursor-pointer select-none px-4 py-3 ${col.align} text-xs font-medium uppercase tracking-wider ${active ? "text-emerald-700" : "text-black"}`}
                   >
                     <span className="inline-flex items-center gap-1">
                       {col.label}
@@ -162,7 +162,7 @@ export default function CustomerLedgerPage({
                   </th>
                 )
               })}
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-900">
+              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-black">
                 {t("balance")}
               </th>
             </tr>
@@ -170,11 +170,11 @@ export default function CustomerLedgerPage({
           <tbody className="divide-y divide-gray-200 bg-white">
             {loading ? (
               <tr>
-                <td colSpan={5} className="px-4 py-12 text-center text-sm text-gray-900">{tc("loading")}</td>
+                <td colSpan={5} className="px-4 py-12 text-center text-sm text-black">{tc("loading")}</td>
               </tr>
             ) : sortedEntries.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-12 text-center text-sm text-gray-900">{tc("no_results")}</td>
+                <td colSpan={5} className="px-4 py-12 text-center text-sm text-black">{tc("no_results")}</td>
               </tr>
             ) : (
               sortedEntries.map((e) => {
@@ -184,19 +184,19 @@ export default function CustomerLedgerPage({
                     : runningBalance - Number(e.amount)
                 return (
                   <tr key={e.id} className="hover:bg-gray-50">
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-black">
                       {formatDate(e.created_at)}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-black">
                       {e.description ?? "—"}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-gray-900">
+                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-black">
                       {e.entry_type === "debit" ? formatCurrency(Number(e.amount), locale) : "—"}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-gray-900">
+                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-black">
                       {e.entry_type === "credit" ? formatCurrency(Number(e.amount), locale) : "—"}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium text-gray-900">
+                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium text-black">
                       {formatCurrency(runningBalance, locale)}
                     </td>
                   </tr>

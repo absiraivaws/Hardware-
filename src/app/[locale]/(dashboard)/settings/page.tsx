@@ -151,14 +151,14 @@ export default function SettingsPage({
         <div className="rounded-lg border bg-white">
           <div className="flex items-center gap-3 border-b px-6 py-4">
             <Building2 className="h-5 w-5 text-emerald-600" />
-            <h2 className="text-base font-semibold text-gray-900">
+            <h2 className="text-base font-semibold text-black">
               {t("settings.company")}
             </h2>
           </div>
           <div className="divide-y px-6 py-4 space-y-4">
             {/* Logo Upload */}
             <div className="py-3">
-              <label className="mb-2 block text-sm font-medium text-gray-900">
+              <label className="mb-2 block text-sm font-medium text-black">
                 {t("settings.company_logo")}
               </label>
               <div className="flex items-center gap-4">
@@ -178,7 +178,7 @@ export default function SettingsPage({
                   </div>
                 ) : (
                   <label className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-gray-300 hover:border-emerald-500">
-                    <Upload size={20} className="text-gray-400" />
+                    <Upload size={20} className="text-black" />
                     <input
                       type="file"
                       accept="image/*"
@@ -188,7 +188,7 @@ export default function SettingsPage({
                   </label>
                 )}
                 {!logoUrl && (
-                  <label className="cursor-pointer rounded-lg border px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                  <label className="cursor-pointer rounded-lg border px-4 py-2 text-sm font-medium text-black hover:bg-gray-50">
                     {t("settings.upload_logo")}
                     <input
                       type="file"
@@ -198,13 +198,13 @@ export default function SettingsPage({
                     />
                   </label>
                 )}
-                {uploading && <span className="text-sm text-gray-500">Uploading...</span>}
+                {uploading && <span className="text-sm text-black">Uploading...</span>}
               </div>
             </div>
 
             {/* Company Name */}
             <div className="flex items-center justify-between py-3">
-              <label className="text-sm font-medium text-gray-900">
+              <label className="text-sm font-medium text-black">
                 {t("settings.company_name")}
               </label>
               <input
@@ -217,7 +217,7 @@ export default function SettingsPage({
 
             {/* Address */}
             <div className="flex items-start justify-between py-3">
-              <label className="pt-2 text-sm font-medium text-gray-900">
+              <label className="pt-2 text-sm font-medium text-black">
                 {t("settings.address")}
               </label>
               <textarea
@@ -230,7 +230,7 @@ export default function SettingsPage({
 
             {/* Contact Number */}
             <div className="flex items-center justify-between py-3">
-              <label className="text-sm font-medium text-gray-900">
+              <label className="text-sm font-medium text-black">
                 {t("settings.contact_number")}
               </label>
               <input
@@ -243,7 +243,7 @@ export default function SettingsPage({
 
             {/* VAT Number */}
             <div className="flex items-center justify-between py-3">
-              <label className="text-sm font-medium text-gray-900">
+              <label className="text-sm font-medium text-black">
                 {t("settings.vat_number")}
               </label>
               <input
@@ -260,13 +260,13 @@ export default function SettingsPage({
         <div className="rounded-lg border bg-white">
           <div className="flex items-center gap-3 border-b px-6 py-4">
             <Share2 className="h-5 w-5 text-emerald-600" />
-            <h2 className="text-base font-semibold text-gray-900">
+            <h2 className="text-base font-semibold text-black">
               {t("settings.social_media")}
             </h2>
           </div>
           <div className="divide-y px-6 py-4">
             <div className="flex items-center justify-between py-3">
-              <label className="text-sm font-medium text-gray-900">
+              <label className="text-sm font-medium text-black">
                 {t("settings.whatsapp_link")}
               </label>
               <input
@@ -278,7 +278,7 @@ export default function SettingsPage({
               />
             </div>
             <div className="flex items-center justify-between py-3">
-              <label className="text-sm font-medium text-gray-900">
+              <label className="text-sm font-medium text-black">
                 {t("settings.facebook_link")}
               </label>
               <input
@@ -290,7 +290,7 @@ export default function SettingsPage({
               />
             </div>
             <div className="flex items-center justify-between py-3">
-              <label className="text-sm font-medium text-gray-900">
+              <label className="text-sm font-medium text-black">
                 {t("settings.tiktok_link")}
               </label>
               <input
@@ -302,7 +302,7 @@ export default function SettingsPage({
               />
             </div>
             <div className="flex items-center justify-between py-3">
-              <label className="text-sm font-medium text-gray-900">
+              <label className="text-sm font-medium text-black">
                 {t("settings.youtube_link")}
               </label>
               <input
@@ -321,7 +321,7 @@ export default function SettingsPage({
           <div key={section.key} className="rounded-lg border bg-white">
             <div className="flex items-center gap-3 border-b px-6 py-4">
               <section.icon className="h-5 w-5 text-emerald-600" />
-              <h2 className="text-base font-semibold text-gray-900">
+              <h2 className="text-base font-semibold text-black">
                 {t(`settings.${section.key}`)}
               </h2>
             </div>
@@ -329,7 +329,7 @@ export default function SettingsPage({
               {section.fields.map((field) => (
                 <div key={field.key} className="flex items-center justify-between py-3">
                   <div>
-                    <label className="text-sm font-medium text-gray-900">
+                    <label className="text-sm font-medium text-black">
                       {t(`settings.${field.key}`)}
                     </label>
                   </div>

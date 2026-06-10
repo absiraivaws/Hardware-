@@ -47,7 +47,7 @@ interface EditableItem {
 }
 
 const statusStyles: Record<string, string> = {
-  draft: "bg-gray-100 text-gray-900",
+  draft: "bg-gray-100 text-black",
   sent: "bg-blue-100 text-blue-700",
   accepted: "bg-green-100 text-green-700",
   expired: "bg-red-100 text-red-700",
@@ -405,7 +405,7 @@ export default function QuotationDetailPage() {
   if (!quotation) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
-        <p className="text-gray-900">{t("common.no_results")}</p>
+        <p className="text-black">{t("common.no_results")}</p>
         <button
           onClick={() => router.push(`/${locale}/quotations`)}
           className="mt-4 text-sm text-emerald-600 hover:underline"
@@ -424,19 +424,19 @@ export default function QuotationDetailPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.push(`/${locale}/quotations`)}
-            className="rounded-lg p-1.5 text-gray-900 hover:bg-gray-100"
+            className="rounded-lg p-1.5 text-black hover:bg-gray-100"
           >
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">{quotation.q_no}</h1>
-            <p className="text-sm text-gray-900">
+            <h1 className="text-2xl font-semibold text-black">{quotation.q_no}</h1>
+            <p className="text-sm text-black">
               {formatDate(quotation.created_at)}
             </p>
           </div>
         </div>
         <span
-          className={`rounded-full px-3 py-1 text-xs font-medium ${statusStyles[quotation.status] || "bg-gray-100 text-gray-900"}`}
+          className={`rounded-full px-3 py-1 text-xs font-medium ${statusStyles[quotation.status] || "bg-gray-100 text-black"}`}
         >
           {statusLabels[quotation.status] || quotation.status}
         </span>
@@ -444,20 +444,20 @@ export default function QuotationDetailPage() {
 
       <div className="grid grid-cols-3 gap-4">
         <div className="rounded-lg border bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-900">{t("sales.customer")}</p>
-          <p className="mt-1 text-sm font-medium text-gray-900">
+          <p className="text-xs font-medium uppercase tracking-wider text-black">{t("sales.customer")}</p>
+          <p className="mt-1 text-sm font-medium text-black">
             {quotation.customer_name || "—"}
           </p>
         </div>
         <div className="rounded-lg border bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-900">{t("common.date")}</p>
-          <p className="mt-1 text-sm font-medium text-gray-900">
+          <p className="text-xs font-medium uppercase tracking-wider text-black">{t("common.date")}</p>
+          <p className="mt-1 text-sm font-medium text-black">
             {formatDate(quotation.created_at)}
           </p>
         </div>
         <div className="rounded-lg border bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-900">{t("quotations.valid_until")}</p>
-          <p className="mt-1 text-sm font-medium text-gray-900">
+          <p className="text-xs font-medium uppercase tracking-wider text-black">{t("quotations.valid_until")}</p>
+          <p className="mt-1 text-sm font-medium text-black">
             {quotation.valid_until ? formatDate(quotation.valid_until) : "—"}
           </p>
         </div>
@@ -468,16 +468,16 @@ export default function QuotationDetailPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">
                   {t("sales.item")}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">
                   {t("sales.qty")}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">
                   {t("sales.price")}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">
                   {t("sales.amount")}
                 </th>
               </tr>
@@ -485,10 +485,10 @@ export default function QuotationDetailPage() {
             <tbody className="divide-y divide-gray-200">
               {items.map((item) => (
                 <tr key={item.id}>
-                  <td className="px-4 py-3 text-sm text-gray-900">{item.product_name}</td>
-                  <td className="px-4 py-3 text-sm text-gray-900">{item.quantity}</td>
-                  <td className="px-4 py-3 text-sm text-gray-900">{formatCurrency(Number(item.unit_price), locale)}</td>
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                  <td className="px-4 py-3 text-sm text-black">{item.product_name}</td>
+                  <td className="px-4 py-3 text-sm text-black">{item.quantity}</td>
+                  <td className="px-4 py-3 text-sm text-black">{formatCurrency(Number(item.unit_price), locale)}</td>
+                  <td className="px-4 py-3 text-sm font-medium text-black">
                     {formatCurrency(Number(item.total_price), locale)}
                   </td>
                 </tr>
@@ -500,11 +500,11 @@ export default function QuotationDetailPage() {
         <div className="border-t px-4 py-4">
           <div className="ml-auto w-64 space-y-1.5 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-900">{t("common.subtotal")}</span>
+              <span className="text-black">{t("common.subtotal")}</span>
               <span>{formatCurrency(Number(quotation.subtotal), locale)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-900">{t("common.discount")}</span>
+              <span className="text-black">{t("common.discount")}</span>
               <span>{formatCurrency(Number(quotation.discount), locale)}</span>
             </div>
             <div className="flex justify-between border-t pt-1.5 text-base font-semibold">
@@ -517,8 +517,8 @@ export default function QuotationDetailPage() {
 
       {quotation.notes && (
         <div className="mt-4 rounded-lg border bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-900">{t("common.notes")}</p>
-          <p className="mt-1 text-sm text-gray-900">{quotation.notes}</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-black">{t("common.notes")}</p>
+          <p className="mt-1 text-sm text-black">{quotation.notes}</p>
         </div>
       )}
 
@@ -528,7 +528,7 @@ export default function QuotationDetailPage() {
       <div className="mt-6 flex items-center gap-3">
         <button
           onClick={downloadPdf}
-          className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
+          className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-black hover:bg-gray-50"
         >
           <FileText size={16} />
           {t("quotations.download_pdf")}
@@ -558,14 +558,14 @@ export default function QuotationDetailPage() {
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b px-6 py-4">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">{t("quotations.convert_to_invoice")}</h2>
-                <p className="text-sm text-gray-900">
+                <h2 className="text-lg font-semibold text-black">{t("quotations.convert_to_invoice")}</h2>
+                <p className="text-sm text-black">
                   {quotation.q_no} — {quotation.customer_name || "—"}
                 </p>
               </div>
               <button
                 onClick={() => setShowConvert(false)}
-                className="rounded-lg p-1.5 text-gray-900 hover:bg-gray-100"
+                className="rounded-lg p-1.5 text-black hover:bg-gray-100"
               >
                 <X size={20} />
               </button>
@@ -578,10 +578,10 @@ export default function QuotationDetailPage() {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-900">{t("sales.item")}</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-900">{t("sales.qty")}</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-900">{t("sales.price")}</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-900">{t("sales.amount")}</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-black">{t("sales.item")}</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-black">{t("sales.qty")}</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-black">{t("sales.price")}</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-black">{t("sales.amount")}</th>
                       <th className="px-3 py-2.5" />
                     </tr>
                   </thead>
@@ -616,7 +616,7 @@ export default function QuotationDetailPage() {
                             className="w-24 rounded border border-gray-300 px-2 py-1 text-sm focus:border-emerald-500 focus:outline-none"
                           />
                         </td>
-                        <td className="px-3 py-2 text-sm font-medium text-gray-900">
+                        <td className="px-3 py-2 text-sm font-medium text-black">
                           {formatCurrency(item.total_price, locale)}
                         </td>
                         <td className="px-3 py-2">
@@ -637,7 +637,7 @@ export default function QuotationDetailPage() {
                 {/* Left: Extra charges */}
                 <div className="space-y-3">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-900">{t("common.discount")}</label>
+                    <label className="mb-1 block text-xs font-medium text-black">{t("common.discount")}</label>
                     <input
                       type="number"
                       min={0}
@@ -648,7 +648,7 @@ export default function QuotationDetailPage() {
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-900">{t("sales.labour_charge")}</label>
+                    <label className="mb-1 block text-xs font-medium text-black">{t("sales.labour_charge")}</label>
                     <input
                       type="number"
                       min={0}
@@ -659,7 +659,7 @@ export default function QuotationDetailPage() {
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-900">{t("sales.transport_charge")}</label>
+                    <label className="mb-1 block text-xs font-medium text-black">{t("sales.transport_charge")}</label>
                     <input
                       type="number"
                       min={0}
@@ -670,7 +670,7 @@ export default function QuotationDetailPage() {
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-900">{t("common.tax")} Type</label>
+                    <label className="mb-1 block text-xs font-medium text-black">{t("common.tax")} Type</label>
                     <select
                       value={convertTaxType}
                       onChange={(e) => setConvertTaxType(e.target.value as "svat" | "non_vat")}
@@ -682,8 +682,8 @@ export default function QuotationDetailPage() {
                   </div>
                   {convertTaxType === "svat" && (
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-900">{t("common.tax")} Amount (15%)</label>
-                      <p className="text-sm font-medium text-gray-900">{formatCurrency(taxAmount, locale)}</p>
+                      <label className="mb-1 block text-xs font-medium text-black">{t("common.tax")} Amount (15%)</label>
+                      <p className="text-sm font-medium text-black">{formatCurrency(taxAmount, locale)}</p>
                     </div>
                   )}
                 </div>
@@ -691,24 +691,24 @@ export default function QuotationDetailPage() {
                 {/* Right: Totals */}
                 <div className="space-y-1.5 rounded-lg border bg-gray-50 p-4 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-900">{t("common.subtotal")}</span>
+                    <span className="text-black">{t("common.subtotal")}</span>
                     <span>{formatCurrency(convertSubtotal, locale)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-900">{t("common.discount")}</span>
+                    <span className="text-black">{t("common.discount")}</span>
                     <span>-{formatCurrency(convertDiscount, locale)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-900">{t("sales.labour_charge")}</span>
+                    <span className="text-black">{t("sales.labour_charge")}</span>
                     <span>{formatCurrency(convertLabour, locale)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-900">{t("sales.transport_charge")}</span>
+                    <span className="text-black">{t("sales.transport_charge")}</span>
                     <span>{formatCurrency(convertTransport, locale)}</span>
                   </div>
                   {convertTaxType === "svat" && (
                     <div className="flex justify-between">
-                      <span className="text-gray-900">{t("common.tax")} (15%)</span>
+                      <span className="text-black">{t("common.tax")} (15%)</span>
                       <span>{formatCurrency(taxAmount, locale)}</span>
                     </div>
                   )}
@@ -721,7 +721,7 @@ export default function QuotationDetailPage() {
 
               {/* Notes */}
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-900">{t("common.notes")}</label>
+                <label className="mb-1 block text-xs font-medium text-black">{t("common.notes")}</label>
                 <textarea
                   value={convertNotes}
                   onChange={(e) => setConvertNotes(e.target.value)}
@@ -735,7 +735,7 @@ export default function QuotationDetailPage() {
             <div className="flex items-center justify-end gap-3 border-t px-6 py-4">
               <button
                 onClick={() => setShowConvert(false)}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-black hover:bg-gray-50"
               >
                 {t("common.cancel")}
               </button>

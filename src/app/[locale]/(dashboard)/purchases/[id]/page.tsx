@@ -41,7 +41,7 @@ const statusStyles: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800",
   partial: "bg-blue-100 text-blue-800",
   completed: "bg-green-100 text-green-800",
-  cancelled: "bg-gray-100 text-gray-800",
+  cancelled: "bg-gray-100 text-black",
 }
 
 const statusKeys: Record<string, string> = {
@@ -409,7 +409,7 @@ export default function PurchaseOrderDetailPage({
 
   if (!po) {
     return (
-      <div className="py-20 text-center text-sm text-gray-900">
+      <div className="py-20 text-center text-sm text-black">
         {t("common.no_results")}
       </div>
     )
@@ -430,8 +430,8 @@ export default function PurchaseOrderDetailPage({
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{po.po_no}</h1>
-            <p className="text-sm text-gray-900">
+            <h1 className="text-2xl font-bold text-black">{po.po_no}</h1>
+            <p className="text-sm text-black">
               {formatDate(po.created_at)}
             </p>
           </div>
@@ -477,7 +477,7 @@ export default function PurchaseOrderDetailPage({
                 }
               }}
               disabled={receiving}
-              className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50"
+              className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-black hover:bg-gray-50 disabled:opacity-50"
             >
               {editMode ? "Save Changes" : "Edit"}
             </button>
@@ -487,34 +487,34 @@ export default function PurchaseOrderDetailPage({
 
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
         <div className="rounded-lg border bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-900">
+          <p className="text-xs font-medium uppercase tracking-wider text-black">
             {t("purchases.supplier")}
           </p>
-          <p className="mt-1 text-sm font-medium text-gray-900">{po.supplier_name}</p>
+          <p className="mt-1 text-sm font-medium text-black">{po.supplier_name}</p>
         </div>
         <div className="rounded-lg border bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-900">
+          <p className="text-xs font-medium uppercase tracking-wider text-black">
             {t("purchases.expected_date")}
           </p>
-          <p className="mt-1 text-sm font-medium text-gray-900">
+          <p className="mt-1 text-sm font-medium text-black">
             {po.expected_date
               ? formatDate(po.expected_date)
               : "-"}
           </p>
         </div>
         <div className="rounded-lg border bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-900">
+          <p className="text-xs font-medium uppercase tracking-wider text-black">
             {t("common.grand_total")}
           </p>
-          <p className="mt-1 text-sm font-medium text-gray-900">
+          <p className="mt-1 text-sm font-medium text-black">
             {formatCurrency(po.grand_total, locale)}
           </p>
         </div>
         <div className="rounded-lg border bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-900">
+          <p className="text-xs font-medium uppercase tracking-wider text-black">
             {t("sales.amount_paid")}
           </p>
-          <p className="mt-1 text-sm font-medium text-gray-900">
+          <p className="mt-1 text-sm font-medium text-black">
             {formatCurrency(Number(po.amount_paid ?? 0), locale)}
           </p>
         </div>
@@ -532,22 +532,22 @@ export default function PurchaseOrderDetailPage({
           </div>
           {po.payment_type != null && (
             <div className="rounded-lg border bg-white p-4">
-              <p className="text-xs font-medium uppercase tracking-wider text-gray-900">
+              <p className="text-xs font-medium uppercase tracking-wider text-black">
                 Payment Type
               </p>
-              <p className="mt-1 text-sm font-medium text-gray-900">
+              <p className="mt-1 text-sm font-medium text-black">
                 {paymentTypeLabels[po.payment_type] ?? po.payment_type}
               </p>
             </div>
           )}
           {po.payment_details && Object.keys(po.payment_details ?? {}).length > 0 && (
             <div className="rounded-lg border bg-white p-4">
-              <p className="text-xs font-medium uppercase tracking-wider text-gray-900">
+              <p className="text-xs font-medium uppercase tracking-wider text-black">
                 Payment Details
               </p>
               <div className="mt-1 space-y-0.5">
                 {Object.entries(po.payment_details).map(([key, val]) => (
-                  <p key={key} className="text-sm text-gray-900">
+                  <p key={key} className="text-sm text-black">
                     <span className="font-medium capitalize">{key.replace(/_/g, " ")}:</span> {val}
                   </p>
                 ))}
@@ -570,22 +570,22 @@ export default function PurchaseOrderDetailPage({
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">
                 {t("inventory.product_name")}
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">
                 Ordered
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">
                 Received
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">
                 {editMode ? "New Qty" : canReceive ? "Receiving" : ""}
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">
                 {t("inventory.cost_price")}
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">
                 {t("sales.amount")}
               </th>
             </tr>
@@ -596,23 +596,23 @@ export default function PurchaseOrderDetailPage({
               const isFullReceive = item.received_qty >= item.quantity
               return (
                 <tr key={item.id}>
-                  <td className="px-4 py-3 text-sm text-gray-900">
+                  <td className="px-4 py-3 text-sm text-black">
                     {item.product_name}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-900">
+                  <td className="px-4 py-3 text-sm text-black">
                     {editMode ? (
                       <input
                         type="number"
                         min={1}
                         value={editingQtys[item.id] ?? item.quantity}
                         onChange={(e) => setEditingQtys((prev) => ({ ...prev, [item.id]: Number(e.target.value) }))}
-                        className="w-20 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
+                        className="w-20 rounded border border-gray-300 px-2 py-1 text-sm text-black"
                       />
                     ) : (
                       item.quantity
                     )}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-900">
+                  <td className="px-4 py-3 text-sm text-black">
                     {item.received_qty}{isFullReceive ? " ✓" : ""}
                   </td>
                   <td className="px-4 py-3 text-sm">
@@ -622,7 +622,7 @@ export default function PurchaseOrderDetailPage({
                         step="0.01"
                         value={editingPrices[item.id] ?? item.unit_price}
                         onChange={(e) => setEditingPrices((prev) => ({ ...prev, [item.id]: Number(e.target.value) }))}
-                        className="w-24 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
+                        className="w-24 rounded border border-gray-300 px-2 py-1 text-sm text-black"
                       />
                     ) : canReceive && !isFullReceive ? (
                       <input
@@ -631,16 +631,16 @@ export default function PurchaseOrderDetailPage({
                         max={remaining}
                         value={receivingQtys[item.id] ?? 0}
                         onChange={(e) => setReceivingQtys((prev) => ({ ...prev, [item.id]: Math.min(Number(e.target.value), remaining) }))}
-                        className="w-20 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
+                        className="w-20 rounded border border-gray-300 px-2 py-1 text-sm text-black"
                       />
                     ) : (
-                      <span className="text-gray-900">—</span>
+                      <span className="text-black">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-900">
+                  <td className="px-4 py-3 text-sm text-black">
                     {formatCurrency(editMode ? (editingPrices[item.id] ?? item.unit_price) : item.unit_price, locale)}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-900">
+                  <td className="px-4 py-3 text-sm text-black">
                     {formatCurrency(
                       editMode
                         ? (editingQtys[item.id] ?? item.quantity) * (editingPrices[item.id] ?? item.unit_price)
@@ -660,19 +660,19 @@ export default function PurchaseOrderDetailPage({
               return (
                 <>
                   <tr>
-                    <td colSpan={4} className="px-4 py-3 text-right text-sm font-medium text-gray-900">
+                    <td colSpan={4} className="px-4 py-3 text-right text-sm font-medium text-black">
                       {t("common.subtotal")}
                     </td>
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                    <td className="px-4 py-3 text-sm font-medium text-black">
                       {formatCurrency(computedSubtotal, locale)}
                     </td>
                     <td />
                   </tr>
                   <tr>
-                    <td colSpan={4} className="px-4 py-3 text-right text-sm font-medium text-gray-900">
+                    <td colSpan={4} className="px-4 py-3 text-right text-sm font-medium text-black">
                       {t("common.grand_total")}
                     </td>
-                    <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                    <td className="px-4 py-3 text-sm font-semibold text-black">
                       {formatCurrency(computedSubtotal, locale)}
                     </td>
                     <td />
@@ -686,10 +686,10 @@ export default function PurchaseOrderDetailPage({
 
       {po.notes && (
         <div className="mt-6 rounded-lg border bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-900">
+          <p className="text-xs font-medium uppercase tracking-wider text-black">
             {t("common.notes")}
           </p>
-          <p className="mt-1 text-sm text-gray-900">{po.notes}</p>
+          <p className="mt-1 text-sm text-black">{po.notes}</p>
         </div>
       )}
 
@@ -698,19 +698,19 @@ export default function PurchaseOrderDetailPage({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">{t("sales.record_payment")}</h2>
+              <h2 className="text-lg font-semibold text-black">{t("sales.record_payment")}</h2>
               <button onClick={() => setShowPayment(false)} className="rounded-lg p-1 hover:bg-gray-100">
                 <X size={20} />
               </button>
             </div>
 
             <div className="mb-4 rounded-lg bg-gray-50 p-3">
-              <p className="text-xs text-gray-900">{t("sales.balance_due")}: <span className="font-semibold">{formatCurrency(po.balance_due ?? 0, locale)}</span></p>
+              <p className="text-xs text-black">{t("sales.balance_due")}: <span className="font-semibold">{formatCurrency(po.balance_due ?? 0, locale)}</span></p>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-900">
+                <label className="mb-1 block text-sm font-medium text-black">
                   {t("sales.amount_paid")}
                 </label>
                 <input
@@ -720,18 +720,18 @@ export default function PurchaseOrderDetailPage({
                   step="0.01"
                   value={paymentAmount}
                   onChange={(e) => setPaymentAmount(Math.min(Number(e.target.value), Number(po.balance_due ?? 0)))}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-900">
+                <label className="mb-1 block text-sm font-medium text-black">
                   {t("sales.payment_type")}
                 </label>
                 <select
                   value={paymentType}
                   onChange={(e) => setPaymentType(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 >
                   <option value="cash">{t("sales.cash")}</option>
                   <option value="credit">{t("sales.credit")}</option>
@@ -746,30 +746,30 @@ export default function PurchaseOrderDetailPage({
               {paymentType === "cheque" && (
                 <>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-900">Cheque Number</label>
+                    <label className="mb-1 block text-sm font-medium text-black">Cheque Number</label>
                     <input
                       type="text"
                       value={chequeNumber}
                       onChange={(e) => setChequeNumber(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-900">Bank Code</label>
+                    <label className="mb-1 block text-sm font-medium text-black">Bank Code</label>
                     <input
                       type="text"
                       value={bankCode}
                       onChange={(e) => setBankCode(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-900">Account Number</label>
+                    <label className="mb-1 block text-sm font-medium text-black">Account Number</label>
                     <input
                       type="text"
                       value={accountNumber}
                       onChange={(e) => setAccountNumber(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
                   </div>
                 </>
@@ -778,21 +778,21 @@ export default function PurchaseOrderDetailPage({
               {paymentType === "bank_transfer" && (
                 <>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-900">From Account</label>
+                    <label className="mb-1 block text-sm font-medium text-black">From Account</label>
                     <input
                       type="text"
                       value={fromAccount}
                       onChange={(e) => setFromAccount(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-900">To Account</label>
+                    <label className="mb-1 block text-sm font-medium text-black">To Account</label>
                     <input
                       type="text"
                       value={toAccount}
                       onChange={(e) => setToAccount(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
                   </div>
                 </>

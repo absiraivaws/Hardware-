@@ -236,8 +236,8 @@ export default function DashboardPage({
                   <Icon className="h-5 w-5 text-white" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-medium leading-tight text-gray-900">{t(`dashboard.${key}`)}</p>
-                  <p className="mt-0.5 truncate text-base font-semibold text-gray-900">
+                  <p className="text-[10px] font-medium leading-tight text-black">{t(`dashboard.${key}`)}</p>
+                  <p className="mt-0.5 truncate text-base font-semibold text-black">
                     {isCurrency ? formatCompactCurrency(value, locale) : value}
                   </p>
                 </div>
@@ -249,7 +249,7 @@ export default function DashboardPage({
 
       <div className="mt-6 grid grid-cols-1 gap-6 overflow-x-auto lg:grid-cols-3">
         <div className="min-w-[400px] rounded-lg border bg-white p-4 shadow-sm lg:col-span-2">
-          <h2 className="mb-4 text-base font-semibold text-gray-900">{t("dashboard.todays_overview")}</h2>
+          <h2 className="mb-4 text-base font-semibold text-black">{t("dashboard.todays_overview")}</h2>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={data.chartData} margin={{ top: 5, right: 20, bottom: 5, left: 60 }}>
               <XAxis dataKey="name" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
@@ -264,11 +264,11 @@ export default function DashboardPage({
         </div>
 
         <div className="min-w-[300px] rounded-lg border bg-white p-4 shadow-sm">
-          <h2 className="mb-4 text-base font-semibold text-gray-900">{t("sales.sale_history")}</h2>
+          <h2 className="mb-4 text-base font-semibold text-black">{t("sales.sale_history")}</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b text-xs font-medium uppercase text-gray-900">
+                <tr className="border-b text-xs font-medium uppercase text-black">
                   <th className="w-[20%] pb-2 pr-3">{t("common.date")}</th>
                   <th className="w-[40%] pb-2 pr-3">{t("customers.customer_name")}</th>
                   <th className="w-[20%] pb-2 pr-3">{t("common.grand_total")}</th>
@@ -278,15 +278,15 @@ export default function DashboardPage({
               <tbody>
                 {data.recentSales.map((sale, i) => (
                   <tr key={i} className="border-b last:border-0">
-                    <td className="whitespace-nowrap py-2 pr-3 text-gray-900">{formatDate(sale.created_at)}</td>
-                    <td className="py-2 pr-3 font-medium text-gray-900">{sale.customer_name ?? t("sales.walk_in")}</td>
-                    <td className="py-2 pr-3 text-gray-900">{formatCurrency(sale.grand_total, locale)}</td>
-                    <td className="py-2 text-gray-900">{t(`sales.${sale.payment_type}`)}</td>
+                    <td className="whitespace-nowrap py-2 pr-3 text-black">{formatDate(sale.created_at)}</td>
+                    <td className="py-2 pr-3 font-medium text-black">{sale.customer_name ?? t("sales.walk_in")}</td>
+                    <td className="py-2 pr-3 text-black">{formatCurrency(sale.grand_total, locale)}</td>
+                    <td className="py-2 text-black">{t(`sales.${sale.payment_type}`)}</td>
                   </tr>
                 ))}
                 {data.recentSales.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="py-6 text-center text-gray-900">
+                    <td colSpan={4} className="py-6 text-center text-black">
                       {t("common.no_results")}
                     </td>
                   </tr>

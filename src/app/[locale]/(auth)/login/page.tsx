@@ -78,8 +78,8 @@ export default function LoginPage({ params }: { params: Promise<{ locale: string
   return (
     <div className="w-full max-w-md space-y-6 rounded-xl bg-white p-8 shadow-lg">
       <div className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900">{t("login_title")}</h1>
-        <p className="mt-2 text-sm text-gray-700">{showReset ? t("reset_password") : t("sign_in")}</p>
+        <h1 className="text-2xl font-bold text-black">{t("login_title")}</h1>
+        <p className="mt-2 text-sm text-black">{showReset ? t("reset_password") : t("sign_in")}</p>
       </div>
 
       {showReset ? (
@@ -90,7 +90,7 @@ export default function LoginPage({ params }: { params: Promise<{ locale: string
             </div>
             <button
               onClick={() => { setShowReset(false); setResetSent(false) }}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-black hover:bg-gray-50"
             >
               {t("back_to_login")}
             </button>
@@ -98,7 +98,7 @@ export default function LoginPage({ params }: { params: Promise<{ locale: string
         ) : (
           <form onSubmit={resetForm.handleSubmit(handleReset)} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">{t("email")}</label>
+              <label className="block text-sm font-medium text-black">{t("email")}</label>
               <input
                 type="email"
                 {...resetForm.register("email")}
@@ -124,7 +124,7 @@ export default function LoginPage({ params }: { params: Promise<{ locale: string
             <button
               type="button"
               onClick={() => setShowReset(false)}
-              className="w-full text-center text-sm text-gray-700 hover:text-gray-900"
+              className="w-full text-center text-sm text-black hover:text-black"
             >
               {t("back_to_login")}
             </button>
@@ -133,7 +133,7 @@ export default function LoginPage({ params }: { params: Promise<{ locale: string
       ) : (
         <form onSubmit={loginForm.handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">{t("email")}</label>
+            <label className="block text-sm font-medium text-black">{t("email")}</label>
             <input
               type="email"
               {...loginForm.register("email")}
@@ -145,7 +145,7 @@ export default function LoginPage({ params }: { params: Promise<{ locale: string
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">{t("password")}</label>
+            <label className="block text-sm font-medium text-black">{t("password")}</label>
             <input
               type="password"
               {...loginForm.register("password")}

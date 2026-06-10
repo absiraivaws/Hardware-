@@ -225,7 +225,7 @@ export default function ReportsPage({ params }: PageProps) {
     if (totalPages <= 1) return null
     return (
       <div className="flex items-center justify-between border-t px-4 py-3">
-        <span className="text-sm text-gray-900">
+        <span className="text-sm text-black">
           Page {page} of {totalPages}
         </span>
         <div className="flex gap-2">
@@ -257,7 +257,7 @@ export default function ReportsPage({ params }: PageProps) {
               {headers.map((h, i) => (
                 <th
                   key={i}
-                  className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900"
+                  className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black"
                 >
                   {h}
                 </th>
@@ -267,7 +267,7 @@ export default function ReportsPage({ params }: PageProps) {
           <tbody className="divide-y divide-gray-200 bg-white">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={headers.length} className="px-4 py-12 text-center text-sm text-gray-900">
+                <td colSpan={headers.length} className="px-4 py-12 text-center text-sm text-black">
                   {empty}
                 </td>
               </tr>
@@ -275,7 +275,7 @@ export default function ReportsPage({ params }: PageProps) {
               rows.map((row, i) => (
                 <tr key={i} className="hover:bg-gray-50">
                   {row.map((cell, j) => (
-                    <td key={j} className="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
+                    <td key={j} className="whitespace-nowrap px-4 py-3 text-sm text-black">
                       {cell}
                     </td>
                   ))}
@@ -301,7 +301,7 @@ export default function ReportsPage({ params }: PageProps) {
     ]
     const rows = paged.map((s) => [
       formatDate(s.created_at),
-      <span className="font-medium text-gray-900">{s.invoice_no}</span>,
+      <span className="font-medium text-black">{s.invoice_no}</span>,
       s.customer_name ?? "-",
       <span className="text-right font-medium">{formatCurrency(s.grand_total, locale)}</span>,
       t(`sales.${s.payment_type}`),
@@ -312,7 +312,7 @@ export default function ReportsPage({ params }: PageProps) {
         {renderTable(headers, rows)}
         {renderPagination(totalPages)}
         <div className="mt-4 flex items-center justify-end gap-2 rounded-lg bg-emerald-50 px-4 py-3">
-          <span className="text-sm font-medium text-gray-900">{t("common.total")}:</span>
+          <span className="text-sm font-medium text-black">{t("common.total")}:</span>
           <span className="text-lg font-bold text-emerald-700">
             {formatCurrency(totalAmount, locale)}
           </span>
@@ -360,7 +360,7 @@ export default function ReportsPage({ params }: PageProps) {
     return (
       <div>
         <div className="relative mb-4 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-900" size={18} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-black" size={18} />
           <input
             type="text"
             placeholder={t("common.search")}
@@ -401,7 +401,7 @@ export default function ReportsPage({ params }: PageProps) {
         {renderTable(headers, rows)}
         {renderPagination(totalPages)}
         <div className="mt-4 flex items-center justify-end gap-2 rounded-lg bg-emerald-50 px-4 py-3">
-          <span className="text-sm font-medium text-gray-900">Total Profit:</span>
+          <span className="text-sm font-medium text-black">Total Profit:</span>
           <span className="text-lg font-bold text-emerald-700">
             {formatCurrency(grandProfit, locale)}
           </span>
@@ -434,7 +434,7 @@ export default function ReportsPage({ params }: PageProps) {
         {renderTable(headers, rows)}
         {renderPagination(totalPages)}
         <div className="mt-4 flex items-center justify-end gap-2 rounded-lg bg-amber-50 px-4 py-3">
-          <span className="text-sm font-medium text-gray-900">Total Outstanding:</span>
+          <span className="text-sm font-medium text-black">Total Outstanding:</span>
           <span className="text-lg font-bold text-amber-700">
             {formatCurrency(totalBalance, locale)}
           </span>
@@ -454,7 +454,7 @@ export default function ReportsPage({ params }: PageProps) {
       t("common.grand_total"),
     ]
     const rows = paged.map((s) => [
-      <span className="font-medium text-gray-900">{s.invoice_no}</span>,
+      <span className="font-medium text-black">{s.invoice_no}</span>,
       s.customer_name ?? "-",
       formatCurrency(s.subtotal, locale),
       <span className="font-medium">{formatCurrency(s.tax_amount, locale)}</span>,
@@ -465,7 +465,7 @@ export default function ReportsPage({ params }: PageProps) {
         {renderTable(headers, rows)}
         {renderPagination(totalPages)}
         <div className="mt-4 flex items-center justify-end gap-2 rounded-lg bg-blue-50 px-4 py-3">
-          <span className="text-sm font-medium text-gray-900">Total SVAT:</span>
+          <span className="text-sm font-medium text-black">Total SVAT:</span>
           <span className="text-lg font-bold text-blue-700">
             {formatCurrency(totalSvat, locale)}
           </span>
@@ -478,7 +478,7 @@ export default function ReportsPage({ params }: PageProps) {
     if (loading) {
       return (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="animate-spin text-gray-900" size={32} />
+          <Loader2 className="animate-spin text-black" size={32} />
         </div>
       )
     }
@@ -506,7 +506,7 @@ export default function ReportsPage({ params }: PageProps) {
         {showDateRange && (
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              <CalendarDays size={16} className="text-gray-900" />
+              <CalendarDays size={16} className="text-black" />
               <input
                 type="date"
                 value={fromDate}
@@ -514,9 +514,9 @@ export default function ReportsPage({ params }: PageProps) {
                 className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
             </div>
-            <span className="text-gray-900">&ndash;</span>
+            <span className="text-black">&ndash;</span>
             <div className="flex items-center gap-2">
-              <CalendarDays size={16} className="text-gray-900" />
+              <CalendarDays size={16} className="text-black" />
               <input
                 type="date"
                 value={toDate}
@@ -535,7 +535,7 @@ export default function ReportsPage({ params }: PageProps) {
               className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                 activeTab === tab.key
                   ? "bg-emerald-600 text-white"
-                  : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                  : "bg-gray-100 text-black hover:bg-gray-200"
               }`}
             >
               {t(tab.labelKey)}

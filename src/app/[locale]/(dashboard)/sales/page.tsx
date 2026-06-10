@@ -406,13 +406,13 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       {/* ===== TOP ROW: Search + Barcode ===== */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-900" size={18} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-black" size={18} />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t("common.search") + "..."}
-            className="w-full rounded-lg border border-gray-300 py-2.5 pl-10 pr-4 text-sm text-gray-900 placeholder-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            className="w-full rounded-lg border border-gray-300 py-2.5 pl-10 pr-4 text-sm text-black placeholder-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
           />
         </div>
         <div className="relative">
@@ -428,12 +428,12 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
               }
             }}
             placeholder={t("sales.scan_barcode")}
-            className="w-52 rounded-lg border border-gray-300 py-2.5 pl-3 pr-4 text-sm text-gray-900 placeholder-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            className="w-52 rounded-lg border border-gray-300 py-2.5 pl-3 pr-4 text-sm text-black placeholder-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
           />
         </div>
         <button
           onClick={() => router.push(`/${locale}/sales/history`)}
-          className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-900 hover:bg-gray-50"
+          className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-black hover:bg-gray-50"
         >
           {t("sales.sale_history")}
         </button>
@@ -443,10 +443,10 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       <div className="flex flex-col gap-4 lg:flex-row">
         {/* ===== LEFT: Product Grid ===== */}
         <div className="flex-1 rounded-lg border bg-white p-4">
-          <h2 className="mb-3 text-sm font-semibold text-gray-900">
+          <h2 className="mb-3 text-sm font-semibold text-black">
             {t("sales.item")}s
             {searchQuery && (
-              <span className="ml-2 font-normal text-gray-900">
+              <span className="ml-2 font-normal text-black">
                 ({filteredProducts.length})
               </span>
             )}
@@ -454,7 +454,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
 
           {filteredProducts.length === 0 ? (
             <div className="flex items-center justify-center py-16">
-              <p className="text-sm text-gray-900">{t("common.no_results")}</p>
+              <p className="text-sm text-black">{t("common.no_results")}</p>
             </div>
           ) : (
             <div className="max-h-[520px] overflow-y-auto">
@@ -476,7 +476,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                           key={key}
                           onClick={() => handleSort(key)}
                           className={`cursor-pointer select-none px-3 py-2 ${align} font-medium ${
-                            active ? "text-emerald-700" : "text-gray-900"
+                            active ? "text-emerald-700" : "text-black"
                           }`}
                         >
                           <span className="inline-flex items-center gap-1">
@@ -496,7 +496,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                     const lowStock = !outOfStock && product.current_stock <= product.min_stock
 
                     let rowBg = ""
-                    let stockColor = "text-gray-900"
+                    let stockColor = "text-black"
                     if (inCart) {
                       rowBg = "bg-emerald-50"
                     } else if (outOfStock) {
@@ -513,9 +513,9 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                         onClick={() => handleAddToCart(product)}
                         className={`cursor-pointer border-b transition hover:brightness-95 ${rowBg} ${outOfStock ? "opacity-50 cursor-not-allowed" : ""}`}
                       >
-                        <td className="px-3 py-2.5 font-medium text-gray-900">{product.name}</td>
-                        <td className="px-3 py-2.5 text-gray-900">{product.code}</td>
-                        <td className="px-3 py-2.5 text-right font-semibold text-gray-900">
+                        <td className="px-3 py-2.5 font-medium text-black">{product.name}</td>
+                        <td className="px-3 py-2.5 text-black">{product.code}</td>
+                        <td className="px-3 py-2.5 text-right font-semibold text-black">
                           {formatCurrency(product.selling_price, locale)}
                         </td>
                         <td className={`px-3 py-2.5 text-right font-medium ${stockColor}`}>
@@ -544,8 +544,8 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
           <div className="rounded-lg border bg-white">
             {/* Cart Header */}
             <div className="flex items-center gap-2 border-b px-4 py-3">
-              <ShoppingCart size={18} className="text-gray-900" />
-              <span className="font-semibold text-gray-900">{t("sales.cart")}</span>
+              <ShoppingCart size={18} className="text-black" />
+              <span className="font-semibold text-black">{t("sales.cart")}</span>
               <span className="ml-auto rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
                 {cart.length}
               </span>
@@ -555,7 +555,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b text-xs text-gray-900">
+                  <tr className="border-b text-xs text-black">
                     <th className="px-3 py-2 text-left font-medium">{t("sales.item")}</th>
                     <th className="px-3 py-2 text-center font-medium">{t("sales.qty")}</th>
                     <th className="px-3 py-2 text-right font-medium">{t("sales.price")}</th>
@@ -566,14 +566,14 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                 <tbody>
                   {cart.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-12 text-center text-sm text-gray-900">
+                      <td colSpan={5} className="py-12 text-center text-sm text-black">
                         {t("sales.add_item")}
                       </td>
                     </tr>
                   ) : (
                     cart.map((item) => (
                       <tr key={item.product_id} className="border-b last:border-0">
-                        <td className="break-words px-3 py-2 text-sm font-medium text-gray-900">
+                        <td className="break-words px-3 py-2 text-sm font-medium text-black">
                           {item.product_name}
                         </td>
                         <td className="px-3 py-2">
@@ -585,13 +585,13 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                               const v = parseInt(e.target.value) || 1
                               updateQuantity(item.product_id, v)
                             }}
-                            className="w-16 rounded border border-gray-300 px-2 py-1 text-center text-sm text-gray-900 focus:border-emerald-500 focus:outline-none"
+                            className="w-16 rounded border border-gray-300 px-2 py-1 text-center text-sm text-black focus:border-emerald-500 focus:outline-none"
                           />
                         </td>
-                        <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-gray-900">
+                        <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-black">
                           {formatCurrency(item.unit_price, locale)}
                         </td>
-                        <td className="whitespace-nowrap px-3 py-2 text-right text-sm font-semibold text-gray-900">
+                        <td className="whitespace-nowrap px-3 py-2 text-right text-sm font-semibold text-black">
                           {formatCurrency(item.total_price, locale)}
                         </td>
                         <td className="px-3 py-2">
@@ -612,43 +612,43 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
             {/* Totals */}
             <div className="space-y-2 border-t px-4 py-3">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-900">{t("common.subtotal")}</span>
-                <span className="font-medium text-gray-900">{formatCurrency(subtotal, locale)}</span>
+                <span className="text-black">{t("common.subtotal")}</span>
+                <span className="font-medium text-black">{formatCurrency(subtotal, locale)}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-900">{t("common.discount")}</span>
+                <span className="text-black">{t("common.discount")}</span>
                 <input
                   type="number"
                   min={0}
                   value={discount}
                   onChange={(e) => setDiscount(Number(e.target.value) || 0)}
-                  className="w-28 rounded border border-gray-300 px-2 py-1 text-right text-sm text-gray-900 placeholder-gray-700 focus:border-emerald-500 focus:outline-none"
+                  className="w-28 rounded border border-gray-300 px-2 py-1 text-right text-sm text-black placeholder-gray-700 focus:border-emerald-500 focus:outline-none"
                 />
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-900">{t("sales.labour_charge")}</span>
+                <span className="text-black">{t("sales.labour_charge")}</span>
                 <input
                   type="number"
                   min={0}
                   value={labourCharge}
                   onChange={(e) => setLabourCharge(Number(e.target.value) || 0)}
-                  className="w-28 rounded border border-gray-300 px-2 py-1 text-right text-sm text-gray-900 placeholder-gray-700 focus:border-emerald-500 focus:outline-none"
+                  className="w-28 rounded border border-gray-300 px-2 py-1 text-right text-sm text-black placeholder-gray-700 focus:border-emerald-500 focus:outline-none"
                 />
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-900">{t("sales.transport_charge")}</span>
+                <span className="text-black">{t("sales.transport_charge")}</span>
                 <input
                   type="number"
                   min={0}
                   value={transportCharge}
                   onChange={(e) => setTransportCharge(Number(e.target.value) || 0)}
-                  className="w-28 rounded border border-gray-300 px-2 py-1 text-right text-sm text-gray-900 placeholder-gray-700 focus:border-emerald-500 focus:outline-none"
+                  className="w-28 rounded border border-gray-300 px-2 py-1 text-right text-sm text-black placeholder-gray-700 focus:border-emerald-500 focus:outline-none"
                 />
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-900">{t("common.tax")}</span>
+                <span className="text-black">{t("common.tax")}</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-900">
+                  <span className="text-sm text-black">
                     {taxType === "svat" ? formatCurrency(taxAmount, locale) : "—"}
                   </span>
                   <button
@@ -656,7 +656,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                     className={`rounded-full px-3 py-0.5 text-xs font-medium transition ${
                       taxType === "svat"
                         ? "bg-emerald-100 text-emerald-700"
-                        : "bg-gray-200 text-gray-800"
+                        : "bg-gray-200 text-black"
                     }`}
                   >
                     {taxType === "svat" ? t("sales.sri_lanka_vat") : t("sales.non_vat")}
@@ -664,7 +664,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                 </div>
               </div>
               <div className="flex items-center justify-between border-t pt-2 text-base font-bold">
-                <span className="text-gray-900">{t("common.grand_total")}</span>
+                <span className="text-black">{t("common.grand_total")}</span>
                 <span className="text-emerald-600">{formatCurrency(grandTotal, locale)}</span>
               </div>
             </div>
@@ -674,7 +674,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
               {/* Customer */}
               <div className="relative" ref={customerRef}>
                 <div className="flex items-center gap-2">
-                  <User size={16} className="text-gray-900" />
+                  <User size={16} className="text-black" />
                   <input
                     type="text"
                     value={customerSearch || (selectedCustomer?.name ?? "")}
@@ -685,7 +685,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                     }}
                     onFocus={() => setShowCustomerDropdown(true)}
                     placeholder={t("sales.select_customer")}
-                    className="flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 placeholder-gray-700 focus:border-emerald-500 focus:outline-none"
+                    className="flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm text-black placeholder-gray-700 focus:border-emerald-500 focus:outline-none"
                   />
                   {selectedCustomer && (
                     <button
@@ -693,7 +693,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                         setSelectedCustomer(null)
                         setCustomerSearch("")
                       }}
-                      className="text-xs text-gray-900 hover:text-gray-900"
+                      className="text-xs text-black hover:text-black"
                     >
                       &times;
                     </button>
@@ -707,7 +707,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                         setCustomerSearch("")
                         setShowCustomerDropdown(false)
                       }}
-                      className="w-full px-3 py-2 text-left text-sm text-gray-900 hover:bg-gray-50"
+                      className="w-full px-3 py-2 text-left text-sm text-black hover:bg-gray-50"
                     >
                       {t("sales.walk_in")}
                     </button>
@@ -721,8 +721,8 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                         }}
                         className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
                       >
-                        <span className="text-gray-900">{c.name}</span>
-                        {c.phone && <span className="ml-2 text-xs text-gray-900">{c.phone}</span>}
+                        <span className="text-black">{c.name}</span>
+                        {c.phone && <span className="ml-2 text-xs text-black">{c.phone}</span>}
                       </button>
                     ))}
                   </div>
@@ -731,13 +731,13 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
 
               {/* Payment Type */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-900">
+                <label className="mb-1 block text-sm font-medium text-black">
                   {t("sales.payment_type")}
                 </label>
                 <select
                   value={paymentType}
                   onChange={(e) => setPaymentType(e.target.value as PaymentType)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 >
                   {(["cash", "credit", "bank_transfer", "lanka_qr", "card", "mixed", "cheque"] as const).map(
                     (pt) => (
@@ -751,7 +751,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
 
               {/* Amount Paid + Change Due */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-900">
+                <label className="mb-1 block text-sm font-medium text-black">
                   {t("common.total")} Paid
                 </label>
                 <input
@@ -759,7 +759,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                   min={0}
                   value={amountPaid}
                   onChange={(e) => setAmountPaid(Number(e.target.value) || 0)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black placeholder-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 />
                 {changeDue > 0 && (
                   <p className="mt-1 text-sm font-medium text-emerald-600">
@@ -861,13 +861,13 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
               <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
                 <Printer size={24} className="text-emerald-600" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900">{t("sales.complete_sale")}</h3>
-              <p className="mt-1 text-sm text-gray-900">{completedSale.invoice_no}</p>
+              <h3 className="text-lg font-semibold text-black">{t("sales.complete_sale")}</h3>
+              <p className="mt-1 text-sm text-black">{completedSale.invoice_no}</p>
             </div>
             <div className="pt-4">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b text-gray-900">
+                  <tr className="border-b text-black">
                     <th className="pb-1 pr-2 text-left font-medium">{t("sales.item")}</th>
                     <th className="pb-1 pr-2 text-center font-medium">{t("sales.qty")}</th>
                     <th className="pb-1 pr-2 text-right font-medium">{t("sales.price")}</th>
@@ -877,10 +877,10 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                 <tbody>
                   {completedSale.items.map((item, i) => (
                     <tr key={i} className="border-b last:border-0">
-                      <td className="py-1 pr-2 text-gray-900">{item.product_name}</td>
-                      <td className="py-1 pr-2 text-center text-gray-900">{item.quantity}</td>
-                      <td className="py-1 pr-2 text-right text-gray-900">{formatCurrency(item.unit_price, locale)}</td>
-                      <td className="py-1 text-right font-medium text-gray-900">{formatCurrency(item.total_price, locale)}</td>
+                      <td className="py-1 pr-2 text-black">{item.product_name}</td>
+                      <td className="py-1 pr-2 text-center text-black">{item.quantity}</td>
+                      <td className="py-1 pr-2 text-right text-black">{formatCurrency(item.unit_price, locale)}</td>
+                      <td className="py-1 text-right font-medium text-black">{formatCurrency(item.total_price, locale)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -888,17 +888,17 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
             </div>
             <div className="space-y-1 pt-3 border-t text-sm">
               <div className="flex justify-between font-semibold">
-                <span className="text-gray-900">{t("common.grand_total")}</span>
-                <span className="text-gray-900">
+                <span className="text-black">{t("common.grand_total")}</span>
+                <span className="text-black">
                   {formatCurrency(completedSale.grand_total, locale)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-900">{t("common.total")} Paid</span>
-                <span className="text-gray-900">{formatCurrency(completedSale.amount_paid, locale)}</span>
+                <span className="text-black">{t("common.total")} Paid</span>
+                <span className="text-black">{formatCurrency(completedSale.amount_paid, locale)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-900">{t("sales.balance_due")}</span>
+                <span className="text-black">{t("sales.balance_due")}</span>
                 <span className="font-medium text-amber-600">
                   {formatCurrency(completedSale.balance_due, locale)}
                 </span>
@@ -908,7 +908,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
             <div className="mt-4 flex gap-3">
               <button
                 onClick={() => setCompletedSale(null)}
-                className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
+                className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-black hover:bg-gray-50"
               >
                 {t("common.no")}
               </button>

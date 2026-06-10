@@ -72,7 +72,7 @@ export function Sidebar() {
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
                 isActive
                   ? "bg-emerald-50 text-emerald-700 font-medium"
-                  : "text-gray-800 hover:bg-gray-100 hover:text-gray-900",
+                  : "text-black hover:bg-gray-100 hover:text-black",
                 collapsed && "justify-center px-2",
               )}
             >
@@ -93,7 +93,7 @@ export function Sidebar() {
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
                 isSettingsActive
                   ? "bg-emerald-50 text-emerald-700 font-medium"
-                  : "text-gray-800 hover:bg-gray-100",
+                  : "text-black hover:bg-gray-100",
                 collapsed && "justify-center px-2",
               )}
             >

@@ -25,7 +25,7 @@ const statusStyles: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800",
   partial: "bg-blue-100 text-blue-800",
   completed: "bg-green-100 text-green-800",
-  cancelled: "bg-gray-100 text-gray-800",
+  cancelled: "bg-gray-100 text-black",
 }
 
 const statusKeys: Record<string, string> = {
@@ -125,7 +125,7 @@ export default function PurchasesPage({
       render: (item: PurchaseOrder) => (
         <button
           onClick={() => router.push(`/${locale}/purchases/${item.id}`)}
-          className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium text-gray-900 hover:bg-gray-50"
+          className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium text-black hover:bg-gray-50"
         >
           <Eye size={14} />
           {t("common.view")}
@@ -137,7 +137,7 @@ export default function PurchasesPage({
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">{t("purchases.title")}</h1>
+        <h1 className="text-2xl font-bold text-black">{t("purchases.title")}</h1>
         <button
           onClick={() => router.push(`/${locale}/purchases/new`)}
           className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"

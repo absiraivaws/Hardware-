@@ -38,7 +38,7 @@ export function Header() {
       <div className="relative">
         <button
           onClick={() => setLocaleMenu(!localeMenu)}
-          className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-800 hover:bg-gray-100"
+          className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-black hover:bg-gray-100"
         >
           <Languages size={18} />
           <span>{localeLabels[currentLocale]}</span>
@@ -53,7 +53,7 @@ export function Header() {
                   key={key}
                   onClick={() => switchLocale(key)}
                   className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 ${
-                    key === currentLocale ? "font-medium text-emerald-700" : "text-gray-800"
+                    key === currentLocale ? "font-medium text-emerald-700" : "text-black"
                   }`}
                 >
                   {label}
@@ -66,7 +66,7 @@ export function Header() {
 
       <button
         onClick={handleLogout}
-        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-800 hover:bg-gray-100"
+        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-black hover:bg-gray-100"
       >
         <LogOut size={18} />
         <span>{t("nav.logout")}</span>

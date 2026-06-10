@@ -110,14 +110,14 @@ export default function SuppliersPage({
         <div className="flex items-center gap-2">
           <button
             onClick={() => toggleStatus(s)}
-            className="rounded p-1 text-gray-900 hover:bg-gray-100"
+            className="rounded p-1 text-black hover:bg-gray-100"
             title={s.status === "active" ? t("deactivate") : t("activate")}
           >
             {s.status === "active" ? <Ban size={16} /> : <CheckCircle size={16} />}
           </button>
           <a
             href={`/${locale}/suppliers/ledger?supplier_id=${s.id}`}
-            className="rounded p-1 text-gray-900 hover:bg-gray-100"
+            className="rounded p-1 text-black hover:bg-gray-100"
             title={t("view_ledger")}
           >
             <Eye size={16} />
@@ -130,7 +130,7 @@ export default function SuppliersPage({
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800">{t("title")}</h1>
+        <h1 className="text-2xl font-bold text-black">{t("title")}</h1>
         <button
           onClick={() => setShowForm(!showForm)}
           className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
@@ -144,7 +144,7 @@ export default function SuppliersPage({
         <div className="mb-6 rounded-lg border bg-white p-4 shadow-sm">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-800">{t("name")}</label>
+              <label className="mb-1 block text-xs font-medium text-black">{t("name")}</label>
               <input
                 type="text"
                 value={form.name}
@@ -154,7 +154,7 @@ export default function SuppliersPage({
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-800">{t("contact_person")}</label>
+              <label className="mb-1 block text-xs font-medium text-black">{t("contact_person")}</label>
               <input
                 type="text"
                 value={form.contact_person}
@@ -164,7 +164,7 @@ export default function SuppliersPage({
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-800">{t("phone")}</label>
+              <label className="mb-1 block text-xs font-medium text-black">{t("phone")}</label>
               <input
                 type="text"
                 value={form.phone}
@@ -183,7 +183,7 @@ export default function SuppliersPage({
             </button>
             <button
               onClick={() => setShowForm(false)}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-black hover:bg-gray-50"
             >
               {t("cancel")}
             </button>

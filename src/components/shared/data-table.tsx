@@ -72,7 +72,7 @@ export function DataTable<T>({
       <div>
         {searchable && (
           <div className="relative mb-4 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-700" size={18} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-black" size={18} />
             <div className="h-10 w-full animate-pulse rounded-lg bg-gray-100" />
           </div>
         )}
@@ -81,7 +81,7 @@ export function DataTable<T>({
             <thead className="bg-gray-50">
               <tr>
                 {columns.map((col) => (
-                  <th key={col.key} className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+                  <th key={col.key} className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">
                     {col.label}
                   </th>
                 ))}
@@ -101,8 +101,8 @@ export function DataTable<T>({
           </table>
         </div>
         <div className="mt-2 flex items-center justify-center">
-          <Loader2 className="animate-spin text-gray-400" size={16} />
-          <span className="ml-2 text-xs text-gray-400">Loading...</span>
+          <Loader2 className="animate-spin text-black" size={16} />
+          <span className="ml-2 text-xs text-black">Loading...</span>
         </div>
       </div>
     )
@@ -112,13 +112,13 @@ export function DataTable<T>({
     <div>
       {searchable && (
         <div className="relative mb-4 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-700" size={18} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-black" size={18} />
           <input
             type="text"
             placeholder={t("common.search")}
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-            className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
           />
         </div>
       )}
@@ -135,7 +135,7 @@ export function DataTable<T>({
                     key={col.key}
                     onClick={() => handleSort(col.key)}
                     className={`cursor-pointer select-none px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                      active ? "text-emerald-700" : "text-gray-700"
+                      active ? "text-emerald-700" : "text-black"
                     }`}
                   >
                     <span className="inline-flex items-center gap-1.5">
@@ -150,7 +150,7 @@ export function DataTable<T>({
           <tbody className="divide-y divide-gray-200 bg-white">
             {paged.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="px-4 py-12 text-center text-sm text-gray-700">
+                <td colSpan={columns.length} className="px-4 py-12 text-center text-sm text-black">
                   {t("common.no_results")}
                 </td>
               </tr>
@@ -158,7 +158,7 @@ export function DataTable<T>({
               paged.map((item, i) => (
                 <tr key={i} className="hover:bg-gray-50">
                   {columns.map((col) => (
-                    <td key={col.key} className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">
+                    <td key={col.key} className="whitespace-nowrap px-4 py-3 text-sm text-black">
                       {col.render(item)}
                     </td>
                   ))}
@@ -171,7 +171,7 @@ export function DataTable<T>({
 
       {totalPages > 1 && (
         <div className="flex items-center justify-between border-t px-4 py-3">
-          <span className="text-sm text-gray-700">
+          <span className="text-sm text-black">
             Page {page} of {totalPages}
           </span>
           <div className="flex gap-2">

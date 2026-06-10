@@ -230,7 +230,7 @@ export default function InventoryPage({ params }: { params: Promise<{ locale: st
           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
             item.status === "active"
               ? "bg-green-100 text-green-800"
-              : "bg-gray-100 text-gray-900"
+              : "bg-gray-100 text-black"
           }`}
         >
           {item.status === "active" ? "Active" : "Inactive"}
@@ -244,13 +244,13 @@ export default function InventoryPage({ params }: { params: Promise<{ locale: st
         <div className="flex items-center gap-2">
           <Link
             href={`/${locale}/inventory/new?id=${item.id}`}
-            className="rounded-lg p-1.5 text-gray-900 hover:bg-gray-100 hover:text-emerald-600"
+            className="rounded-lg p-1.5 text-black hover:bg-gray-100 hover:text-emerald-600"
           >
             <Pencil size={16} />
           </Link>
           <button
             onClick={() => handleDelete(item.id)}
-            className="rounded-lg p-1.5 text-gray-900 hover:bg-gray-100 hover:text-red-600"
+            className="rounded-lg p-1.5 text-black hover:bg-gray-100 hover:text-red-600"
           >
             <Trash2 size={16} />
           </button>

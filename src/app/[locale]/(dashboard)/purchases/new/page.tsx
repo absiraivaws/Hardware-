@@ -218,7 +218,7 @@ export default function NewPurchaseOrderPage({
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">{t("purchases.new_po")}</h1>
+        <h1 className="text-2xl font-bold text-black">{t("purchases.new_po")}</h1>
       </div>
 
       {error && (
@@ -229,12 +229,12 @@ export default function NewPurchaseOrderPage({
         <div className="rounded-lg border bg-white p-6">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-900">
+              <label className="mb-1 block text-sm font-medium text-black">
                 {t("purchases.supplier")}
               </label>
               <select
                 {...register("supplier_id")}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               >
                 <option value="">Select supplier</option>
                 {suppliers.map((s) => (
@@ -248,13 +248,13 @@ export default function NewPurchaseOrderPage({
               )}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-900">
+              <label className="mb-1 block text-sm font-medium text-black">
                 {t("purchases.expected_date")}
               </label>
               <input
                 type="date"
                 {...register("expected_date")}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
             </div>
           </div>
@@ -262,7 +262,7 @@ export default function NewPurchaseOrderPage({
 
         <div className="rounded-lg border bg-white p-6">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">{t("sales.item")}s</h2>
+            <h2 className="text-lg font-semibold text-black">{t("sales.item")}s</h2>
             <button
               type="button"
               onClick={() => {
@@ -282,7 +282,7 @@ export default function NewPurchaseOrderPage({
           {showProductPicker && (
             <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-900" size={18} />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-black" size={18} />
                 <input
                   type="text"
                   placeholder={t("common.search")}
@@ -291,7 +291,7 @@ export default function NewPurchaseOrderPage({
                     setProductSearch(e.target.value)
                     searchProducts(e.target.value)
                   }}
-                  className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
               {products.length > 0 && (
@@ -300,10 +300,10 @@ export default function NewPurchaseOrderPage({
                     <li
                       key={p.id}
                       onClick={() => addItem(p)}
-                      className="flex cursor-pointer items-center justify-between px-3 py-2 text-sm text-gray-900 hover:bg-emerald-50"
+                      className="flex cursor-pointer items-center justify-between px-3 py-2 text-sm text-black hover:bg-emerald-50"
                     >
                       <span>{p.name}</span>
-                      <span className="text-gray-900">{p.code}</span>
+                      <span className="text-black">{p.code}</span>
                     </li>
                   ))}
                 </ul>
@@ -311,7 +311,7 @@ export default function NewPurchaseOrderPage({
               <button
                 type="button"
                 onClick={closePicker}
-                className="mt-2 text-xs text-gray-900 hover:text-gray-900"
+                className="mt-2 text-xs text-black hover:text-black"
               >
                 {t("common.cancel")}
               </button>
@@ -323,16 +323,16 @@ export default function NewPurchaseOrderPage({
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">
                       {t("inventory.product_name")}
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">
                       {t("sales.qty")}
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">
                       {t("inventory.cost_price")}
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">
                       {t("sales.amount")}
                     </th>
                     <th className="px-4 py-3" />
@@ -341,7 +341,7 @@ export default function NewPurchaseOrderPage({
                 <tbody className="divide-y divide-gray-200 bg-white">
                   {fields.map((field, index) => (
                     <tr key={field.id}>
-                      <td className="px-4 py-2 text-sm text-gray-900">
+                      <td className="px-4 py-2 text-sm text-black">
                         {field.product_name}
                         <input type="hidden" {...register(`items.${index}.product_id`)} />
                         <input type="hidden" {...register(`items.${index}.product_name`)} />
@@ -351,7 +351,7 @@ export default function NewPurchaseOrderPage({
                           type="number"
                           step="any"
                           {...register(`items.${index}.quantity`)}
-                          className="w-20 rounded-lg border border-gray-300 px-2 py-1 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                          className="w-20 rounded-lg border border-gray-300 px-2 py-1 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                         />
                       </td>
                       <td className="px-4 py-2">
@@ -359,10 +359,10 @@ export default function NewPurchaseOrderPage({
                           type="number"
                           step="0.01"
                           {...register(`items.${index}.unit_price`)}
-                          className="w-28 rounded-lg border border-gray-300 px-2 py-1 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                          className="w-28 rounded-lg border border-gray-300 px-2 py-1 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                         />
                       </td>
-                      <td className="px-4 py-2 text-sm text-gray-900">
+                      <td className="px-4 py-2 text-sm text-black">
                         {(
                           (getValues(`items.${index}.quantity`) || 0) *
                           (getValues(`items.${index}.unit_price`) || 0)
@@ -386,13 +386,13 @@ export default function NewPurchaseOrderPage({
 
           <div className="mt-4 flex justify-end">
             <div className="w-64 space-y-2">
-              <div className="flex justify-between text-sm text-gray-900">
+              <div className="flex justify-between text-sm text-black">
                 <span>{t("common.subtotal")}</span>
-                <span className="font-medium text-gray-900">
+                <span className="font-medium text-black">
                   {formatCurrency(subtotal, locale)}
                 </span>
               </div>
-              <div className="flex justify-between border-t pt-2 text-sm font-semibold text-gray-900">
+              <div className="flex justify-between border-t pt-2 text-sm font-semibold text-black">
                 <span>{t("common.grand_total")}</span>
                 <span>
                   {formatCurrency(subtotal, locale)}
@@ -403,13 +403,13 @@ export default function NewPurchaseOrderPage({
         </div>
 
         <div className="rounded-lg border bg-white p-6">
-          <label className="mb-1 block text-sm font-medium text-gray-900">
+          <label className="mb-1 block text-sm font-medium text-black">
             {t("common.notes")}
           </label>
           <textarea
             rows={3}
             {...register("notes")}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
           />
         </div>
 
@@ -417,7 +417,7 @@ export default function NewPurchaseOrderPage({
           <button
             type="button"
             onClick={() => router.back()}
-            className="rounded-lg border px-6 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
+            className="rounded-lg border px-6 py-2 text-sm font-medium text-black hover:bg-gray-50"
           >
             {t("common.cancel")}
           </button>
