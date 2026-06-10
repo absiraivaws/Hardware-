@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl"
 import { Plus, Eye, Ban, CheckCircle } from "lucide-react"
 import { DataTable } from "@/components/shared/data-table"
 import { createClient } from "@/lib/supabase/client"
+import { getCached, setCache } from "@/lib/query-cache"
 interface Supplier {
   id: string
   name: string
@@ -31,9 +32,18 @@ export default function SuppliersPage({
   const [form, setForm] = useState({ name: "", contact_person: "", phone: "", email: "", address: "", credit_period: 0 })
 
   const fetchSuppliers = async () => {
+    const cached = getCached<Supplier[]>("suppliers:all")
+    if (cached) {
+      setSuppliers(cached)
+      setLoading(false)
+      return
+    }
     const supabase = createClient()
     const { data } = await supabase.from("suppliers").select("*").order("name")
-    if (data) setSuppliers(data as Supplier[])
+    if (data) {
+      setSuppliers(data as Supplier[])
+      setCache("suppliers:all", data)
+    }
     setLoading(false)
   }
 
@@ -89,7 +99,7 @@ export default function SuppliersPage({
               : "bg-red-100 text-red-700"
           }`}
         >
-          {t(s.status)}
+          {s.status === "active" ? "Active" : "Inactive"}
         </span>
       ),
     },

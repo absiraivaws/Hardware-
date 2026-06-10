@@ -400,6 +400,10 @@ export interface Database {
           status: "pending" | "partial" | "completed" | "cancelled"
           expected_date: string | null
           notes: string | null
+          amount_paid: number
+          balance_due: number
+          payment_type: string | null
+          payment_details: Record<string, string> | null
           created_at: string
           updated_at: string
         }
@@ -416,6 +420,10 @@ export interface Database {
           status?: "pending" | "partial" | "completed" | "cancelled"
           expected_date?: string | null
           notes?: string | null
+          amount_paid?: number
+          balance_due?: number
+          payment_type?: string | null
+          payment_details?: Record<string, string> | null
           created_at?: string
           updated_at?: string
         }
@@ -432,6 +440,10 @@ export interface Database {
           status?: "pending" | "partial" | "completed" | "cancelled"
           expected_date?: string | null
           notes?: string | null
+          amount_paid?: number
+          balance_due?: number
+          payment_type?: string | null
+          payment_details?: Record<string, string> | null
           created_at?: string
           updated_at?: string
         }
@@ -656,6 +668,47 @@ export interface Database {
           description?: string | null
           balance_after?: number
           created_at?: string
+        }
+      }
+      company_settings: {
+        Row: {
+          id: string
+          company_name: string
+          logo_url: string
+          address: string
+          contact_number: string
+          vat_number: string
+          whatsapp_link: string
+          facebook_link: string
+          tiktok_link: string
+          youtube_link: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_name?: string
+          logo_url?: string
+          address?: string
+          contact_number?: string
+          vat_number?: string
+          whatsapp_link?: string
+          facebook_link?: string
+          tiktok_link?: string
+          youtube_link?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_name?: string
+          logo_url?: string
+          address?: string
+          contact_number?: string
+          vat_number?: string
+          whatsapp_link?: string
+          facebook_link?: string
+          tiktok_link?: string
+          youtube_link?: string
+          updated_at?: string
         }
       }
     }

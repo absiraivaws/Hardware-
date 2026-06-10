@@ -7,6 +7,9 @@ import { ArrowLeft, FileText, Share2, Replace, X } from "lucide-react"
 import { formatCurrency, formatDate } from "@/lib/format"
 import { createClient } from "@/lib/supabase/client"
 import { jsPDF } from "jspdf"
+import { CompanyHeader, CompanyFooter } from "@/components/shared/company-info"
+import type { CompanySettings } from "@/components/shared/company-info"
+import { useData } from "@/providers/data-provider"
 
 interface Quotation {
   id: string
@@ -69,6 +72,7 @@ export default function QuotationDetailPage() {
   const [quotation, setQuotation] = useState<Quotation | null>(null)
   const [items, setItems] = useState<QuotationItem[]>([])
   const [loading, setLoading] = useState(true)
+  const { companySettings } = useData()
   const [converting, setConverting] = useState(false)
   const [showConvert, setShowConvert] = useState(false)
 
@@ -154,18 +158,49 @@ export default function QuotationDetailPage() {
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
 
-    doc.setFontSize(18)
-    doc.text("Quotation", pageWidth / 2, 20, { align: "center" })
+    let y = 20
 
-    doc.setFontSize(10)
-    doc.text(`Q No: ${quotation.q_no}`, 14, 35)
-    doc.text(`Date: ${new Date(quotation.created_at).toLocaleDateString()}`, 14, 42)
-    doc.text(`Customer: ${quotation.customer_name || "N/A"}`, 14, 49)
-    if (quotation.valid_until) {
-      doc.text(`Valid Until: ${new Date(quotation.valid_until).toLocaleDateString()}`, 14, 56)
+    // Company header
+    if (companySettings) {
+      if (companySettings.company_name) {
+        doc.setFontSize(16)
+        doc.setFont("helvetica", "bold")
+        doc.text(companySettings.company_name, pageWidth / 2, y, { align: "center" })
+        y += 7
+      }
+      if (companySettings.address) {
+        doc.setFontSize(9)
+        doc.setFont("helvetica", "normal")
+        doc.text(companySettings.address, pageWidth / 2, y, { align: "center" })
+        y += 5
+      }
+      if (companySettings.contact_number || companySettings.vat_number) {
+        doc.setFontSize(9)
+        const info = [companySettings.contact_number && `Tel: ${companySettings.contact_number}`, companySettings.vat_number && `VAT: ${companySettings.vat_number}`].filter(Boolean).join("  |  ")
+        doc.text(info, pageWidth / 2, y, { align: "center" })
+        y += 5
+      }
+      y += 3
+      doc.setDrawColor(200)
+      doc.line(14, y, pageWidth - 14, y)
+      y += 8
     }
 
-    const tableTop = quotation.valid_until ? 65 : 60
+    doc.setFontSize(18)
+    doc.setFont("helvetica", "bold")
+    doc.text("Quotation", pageWidth / 2, y, { align: "center" })
+    y += 7
+
+    doc.setFontSize(10)
+    doc.setFont("helvetica", "normal")
+    doc.text(`Q No: ${quotation.q_no}`, 14, y + 8)
+    doc.text(`Date: ${new Date(quotation.created_at).toLocaleDateString()}`, 14, y + 15)
+    doc.text(`Customer: ${quotation.customer_name || "N/A"}`, 14, y + 22)
+    if (quotation.valid_until) {
+      doc.text(`Valid Until: ${new Date(quotation.valid_until).toLocaleDateString()}`, 14, y + 29)
+    }
+
+    const tableTop = quotation.valid_until ? y + 37 : y + 30
     const colX = [14, 60, 110, 140, 170]
     const headers = ["Item", "Qty", "Unit Price", "Total"]
 
@@ -174,7 +209,7 @@ export default function QuotationDetailPage() {
     headers.forEach((h, i) => doc.text(h, colX[i], tableTop))
     doc.setFont("helvetica", "normal")
 
-    let y = tableTop + 8
+    y = tableTop + 8
     items.forEach((item) => {
       doc.text(item.product_name, colX[0], y)
       doc.text(String(item.quantity), colX[1], y)
@@ -199,13 +234,37 @@ export default function QuotationDetailPage() {
       doc.text(`Notes: ${quotation.notes}`, colX[0], y)
     }
 
+    // Social links footer
+    if (companySettings) {
+      const socialLinks = [
+        companySettings.whatsapp_link && "WhatsApp",
+        companySettings.facebook_link && "Facebook",
+        companySettings.tiktok_link && "TikTok",
+        companySettings.youtube_link && "YouTube",
+      ].filter(Boolean)
+
+      if (socialLinks.length > 0) {
+        y += 12
+        doc.setDrawColor(200)
+        doc.line(14, y, pageWidth - 14, y)
+        y += 5
+        doc.setFontSize(8)
+        doc.setFont("helvetica", "normal")
+        doc.text(socialLinks.join("  |  "), pageWidth / 2, y, { align: "center" })
+      }
+    }
+
     doc.save(`${quotation.q_no}.pdf`)
   }
 
   function shareWhatsApp() {
     if (!quotation) return
 
-    let text = `*Quotation ${quotation.q_no}*\n`
+    let text = ""
+    if (companySettings?.company_name) {
+      text += `*${companySettings.company_name}*\n`
+    }
+    text += `*Quotation ${quotation.q_no}*\n`
     text += `Customer: ${quotation.customer_name || "N/A"}\n`
     text += `Date: ${new Date(quotation.created_at).toLocaleDateString()}\n`
     if (quotation.valid_until) {
@@ -359,6 +418,8 @@ export default function QuotationDetailPage() {
 
   return (
     <div>
+      <CompanyHeader settings={companySettings} />
+
       <div className="mb-6 flex items-center justify-between border-b pb-4">
         <div className="flex items-center gap-3">
           <button
@@ -460,6 +521,8 @@ export default function QuotationDetailPage() {
           <p className="mt-1 text-sm text-gray-900">{quotation.notes}</p>
         </div>
       )}
+
+      <CompanyFooter settings={companySettings} />
 
       {/* Actions */}
       <div className="mt-6 flex items-center gap-3">

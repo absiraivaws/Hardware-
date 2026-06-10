@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react"
 import { useTranslations } from "next-intl"
 import { PageHeader } from "@/components/shared/page-header"
 import { createClient } from "@/lib/supabase/client"
+import { getCached, setCache } from "@/lib/query-cache"
 import { formatCurrency, formatCompactCurrency, formatDate } from "@/lib/format"
 import {
   DollarSign,
@@ -101,37 +102,36 @@ export default function DashboardPage({
       const monthStart = getMonthStart()
       const sevenDaysAgo = getDaysAgo(6)
 
+      const cacheKey = `dashboard:${todayStart}`
+      const cached = getCached<DashboardData>(cacheKey)
+      if (cached) {
+        setData({ ...cached, loading: false })
+        return
+      }
+
       try {
         const [
           { data: dailyRaw },
           { data: monthlyRaw },
-          { data: cashRaw },
           { data: creditRaw },
           { data: outstandingRaw },
           { data: productsRaw },
           { data: recentRaw },
           { data: chartRaw },
-          { data: cashLedgerData },
-          { data: bankLedgerData },
+          { data: ledgerData },
         ] = await Promise.all([
           supabase.from("sales").select("grand_total").gte("created_at", todayStart).eq("status", "completed"),
           supabase.from("sales").select("grand_total").gte("created_at", monthStart).eq("status", "completed"),
-          supabase.from("sales").select("grand_total").eq("payment_type", "cash").eq("status", "completed"),
           supabase.from("sales").select("grand_total").eq("payment_type", "credit").eq("status", "completed"),
           supabase.from("sales").select("balance_due").eq("status", "completed").gt("balance_due", 0),
           supabase.from("products").select("current_stock, min_stock"),
           supabase.from("sales").select("customer_name, grand_total, payment_type, created_at").eq("status", "completed").order("created_at", { ascending: false }).limit(5),
           supabase.from("sales").select("grand_total, created_at").gte("created_at", sevenDaysAgo).eq("status", "completed"),
-          supabase.from("ledger_entries").select("entry_type, amount").eq("ledger_type", "cash"),
-          supabase.from("ledger_entries").select("entry_type, amount").eq("ledger_type", "bank"),
+          supabase.from("ledger_entries").select("entry_type, amount, ledger_type").in("ledger_type", ["cash", "bank"]),
         ])
 
         const dailySales = (dailyRaw ?? []).reduce((s: number, r: Record<string, unknown>) => s + (r.grand_total as number ?? 0), 0)
         const monthlySales = (monthlyRaw ?? []).reduce((s: number, r: Record<string, unknown>) => s + (r.grand_total as number ?? 0), 0)
-        const cashInHand = (cashLedgerData ?? []).reduce((s: number, r: Record<string, unknown>) => {
-          const amt = r.amount as number ?? 0
-          return r.entry_type === "debit" ? s + amt : s - amt
-        }, 0)
         const creditSales = (creditRaw ?? []).reduce((s: number, r: Record<string, unknown>) => s + (r.grand_total as number ?? 0), 0)
         const outstanding = (outstandingRaw ?? []).reduce((s: number, r: Record<string, unknown>) => s + (r.balance_due as number ?? 0), 0)
         const lowStockCount = (productsRaw ?? []).filter((p: Record<string, unknown>) => (p.current_stock as number) <= (p.min_stock as number)).length
@@ -141,6 +141,12 @@ export default function DashboardPage({
           payment_type: r.payment_type as string,
           created_at: r.created_at as string,
         }))
+
+        const cashLedger = (ledgerData ?? []).filter((r: Record<string, unknown>) => r.ledger_type === "cash")
+        const cashInHand = cashLedger.reduce((s: number, r: Record<string, unknown>) => {
+          const amt = r.amount as number ?? 0
+          return r.entry_type === "debit" ? s + amt : s - amt
+        }, 0)
 
         const dayLabels: string[] = []
         const dayTotals: Record<string, number> = {}
@@ -165,7 +171,9 @@ export default function DashboardPage({
           return { name, total: dayTotals[key] }
         })
 
-        setData({ dailySales, monthlySales, cashInHand, creditSales, outstanding, lowStockCount, recentSales, chartData, loading: false })
+        const result = { dailySales, monthlySales, cashInHand, creditSales, outstanding, lowStockCount, recentSales, chartData, loading: false }
+        setCache(cacheKey, result)
+        setData(result)
       } catch (error) {
         console.error("Failed to fetch dashboard data", error)
         setData((prev) => ({ ...prev, loading: false }))
@@ -178,8 +186,35 @@ export default function DashboardPage({
   if (data.loading) {
     return (
       <div>
-        <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
+        <PageHeader titleKey="dashboard.title" />
+        <div className="flex gap-4 overflow-x-auto pb-2">
+          {cards.map(({ key, icon: Icon, color }) => (
+            <div key={key} className="min-w-[180px] shrink-0 rounded-lg border bg-white p-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${color}`}>
+                  <Icon className="h-5 w-5 text-white" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="h-3 w-20 animate-pulse rounded bg-gray-100" />
+                  <div className="mt-1.5 h-5 w-16 animate-pulse rounded bg-gray-100" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="min-w-[400px] rounded-lg border bg-white p-4 shadow-sm lg:col-span-2">
+            <div className="mb-4 h-5 w-32 animate-pulse rounded bg-gray-100" />
+            <div className="h-[300px] animate-pulse rounded bg-gray-50" />
+          </div>
+          <div className="min-w-[300px] rounded-lg border bg-white p-4 shadow-sm">
+            <div className="mb-4 h-5 w-24 animate-pulse rounded bg-gray-100" />
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-8 animate-pulse rounded bg-gray-50" />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     )

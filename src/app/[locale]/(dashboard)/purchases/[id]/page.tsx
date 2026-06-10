@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Package, Loader2 } from "lucide-react"
+import { ArrowLeft, Package, Loader2, DollarSign, X } from "lucide-react"
 import { useEffect, useState } from "react"
 import { formatCurrency, formatDate } from "@/lib/format"
 import { createClient } from "@/lib/supabase/client"
@@ -29,6 +29,10 @@ interface PurchaseOrder {
   status: "pending" | "partial" | "completed" | "cancelled"
   expected_date: string | null
   notes: string | null
+  amount_paid?: number
+  balance_due?: number
+  payment_type?: string | null
+  payment_details?: Record<string, string> | null
   created_at: string
   updated_at: string
 }
@@ -45,6 +49,16 @@ const statusKeys: Record<string, string> = {
   partial: "status_partial",
   completed: "status_completed",
   cancelled: "status_cancelled",
+}
+
+const paymentTypeLabels: Record<string, string> = {
+  cash: "Cash",
+  credit: "Credit",
+  bank_transfer: "Bank Transfer",
+  lanka_qr: "Lanka QR",
+  card: "Card",
+  mixed: "Mixed",
+  cheque: "Cheque",
 }
 
 function generateGRNNo(): string {
@@ -74,6 +88,15 @@ export default function PurchaseOrderDetailPage({
   const [error, setError] = useState<string | null>(null)
   const [editingQtys, setEditingQtys] = useState<Record<string, number>>({})
   const [editingPrices, setEditingPrices] = useState<Record<string, number>>({})
+  const [showPayment, setShowPayment] = useState(false)
+  const [paymentAmount, setPaymentAmount] = useState(0)
+  const [paymentType, setPaymentType] = useState("cash")
+  const [submittingPayment, setSubmittingPayment] = useState(false)
+  const [chequeNumber, setChequeNumber] = useState("")
+  const [bankCode, setBankCode] = useState("")
+  const [accountNumber, setAccountNumber] = useState("")
+  const [fromAccount, setFromAccount] = useState("")
+  const [toAccount, setToAccount] = useState("")
 
   useEffect(() => {
     params.then((p) => {
@@ -89,7 +112,7 @@ export default function PurchaseOrderDetailPage({
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: poData } = await (supabase.from("purchase_orders") as any)
-        .select("*")
+        .select("id, po_no, supplier_id, supplier_name, subtotal, discount, grand_total, status, expected_date, notes, amount_paid, balance_due, payment_type, payment_details, created_at, updated_at")
         .eq("id", id)
         .single()
 
@@ -97,7 +120,7 @@ export default function PurchaseOrderDetailPage({
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: itemsData } = await (supabase.from("purchase_items") as any)
-        .select("*")
+        .select("id, product_id, product_name, quantity, received_qty, unit_price, total_price")
         .eq("po_id", id)
         .order("product_name")
 
@@ -186,8 +209,40 @@ export default function PurchaseOrderDetailPage({
       return item.received_qty + qty >= item.quantity
     })
 
+    // Update status
     const { error: statusErr } = await poClient.update({ status: allReceived ? "completed" : "partial" }).eq("id", po.id)
     if (statusErr) { setError("Status update failed: " + statusErr.message); setReceiving(false); return }
+
+    // Create supplier ledger debit entry (liability)
+    // Only create if this is the first receipt for this PO (balance_due is 0 or null)
+    if (Number(po.balance_due ?? 0) === 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ledgerClient = supabase.from("ledger_entries") as any
+      const { data: lastEntry } = await ledgerClient
+        .select("balance_after")
+        .eq("ledger_type", "supplier")
+        .eq("reference_id", po.supplier_id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      const prevBalance = (lastEntry as { balance_after: number } | null)?.balance_after ?? 0
+      const poTotal = Number(po.grand_total)
+
+      const { error: ledgerErr } = await ledgerClient.insert({
+        ledger_type: "supplier",
+        reference_id: po.supplier_id,
+        reference_type: "purchase",
+        entry_type: "debit",
+        amount: poTotal,
+        description: `PO ${po.po_no}`,
+        balance_after: prevBalance + poTotal,
+      })
+      if (ledgerErr) { setError("Ledger entry failed: " + ledgerErr.message); setReceiving(false); return }
+
+      // Also set balance_due on the PO
+      await poClient.update({ balance_due: poTotal, amount_paid: 0 }).eq("id", po.id)
+    }
 
     const { data: refreshed } = await poClient.select("*").eq("id", id).single()
     if (refreshed) setPo(refreshed as PurchaseOrder)
@@ -245,10 +300,109 @@ export default function PurchaseOrderDetailPage({
     setReceiving(false)
   }
 
+  const handleRecordPayment = async () => {
+    if (!po || paymentAmount <= 0 || paymentAmount > Number(po.balance_due ?? 0)) return
+    setSubmittingPayment(true)
+    setError(null)
+    const supabase = createClient()
+
+    const paymentDetails: Record<string, string> = {}
+    if (paymentType === "cheque") {
+      paymentDetails.cheque_number = chequeNumber
+      paymentDetails.bank_code = bankCode
+      paymentDetails.account_number = accountNumber
+    } else if (paymentType === "bank_transfer") {
+      paymentDetails.from_account = fromAccount
+      paymentDetails.to_account = toAccount
+    }
+
+    const newAmountPaid = Number(po.amount_paid ?? 0) + paymentAmount
+    const newBalanceDue = Math.max(0, Number(po.grand_total) - newAmountPaid)
+
+    // Update purchase order
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const poClient = supabase.from("purchase_orders") as any
+    const { error: updateErr } = await poClient.update({
+      amount_paid: newAmountPaid,
+      balance_due: newBalanceDue,
+      payment_type: paymentType,
+      payment_details: paymentDetails,
+    }).eq("id", po.id)
+    if (updateErr) { setError("PO update failed: " + updateErr.message); setSubmittingPayment(false); return }
+
+    // Create supplier ledger credit entry (reduce liability)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ledgerClient = supabase.from("ledger_entries") as any
+    const { data: lastSupplierEntry } = await ledgerClient
+      .select("balance_after")
+      .eq("ledger_type", "supplier")
+      .eq("reference_id", po.supplier_id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const prevSupplierBalance = (lastSupplierEntry as { balance_after: number } | null)?.balance_after ?? 0
+    const { error: supplierLedgerErr } = await ledgerClient.insert({
+      ledger_type: "supplier",
+      reference_id: po.supplier_id,
+      reference_type: "payment",
+      entry_type: "credit",
+      amount: paymentAmount,
+      description: `Payment for ${po.po_no}`,
+      balance_after: prevSupplierBalance - paymentAmount,
+    })
+    if (supplierLedgerErr) { setError("Supplier ledger failed: " + supplierLedgerErr.message); setSubmittingPayment(false); return }
+
+    // Create cash/bank ledger credit entry (money going out)
+    const financialType = paymentType === "cash" ? "cash" : "bank"
+    const { data: lastFinEntry } = await ledgerClient
+      .select("balance_after")
+      .eq("ledger_type", financialType)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const prevFinBalance = (lastFinEntry as { balance_after: number } | null)?.balance_after ?? 0
+    const { error: finLedgerErr } = await ledgerClient.insert({
+      ledger_type: financialType,
+      reference_id: po.id,
+      reference_type: "payment",
+      entry_type: "credit",
+      amount: paymentAmount,
+      description: `Payment for ${po.po_no}`,
+      balance_after: prevFinBalance - paymentAmount,
+    })
+    if (finLedgerErr) { setError("Financial ledger failed: " + finLedgerErr.message); setSubmittingPayment(false); return }
+
+    // Refresh PO
+    const { data: refreshed } = await poClient.select("*").eq("id", id).single()
+    if (refreshed) setPo(refreshed as PurchaseOrder)
+
+    // Reset form
+    setShowPayment(false)
+    setPaymentAmount(0)
+    setPaymentType("cash")
+    setChequeNumber("")
+    setBankCode("")
+    setAccountNumber("")
+    setFromAccount("")
+    setToAccount("")
+    setSubmittingPayment(false)
+  }
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="animate-spin text-gray-900" size={32} />
+      <div>
+        <div className="mb-6 flex items-center gap-4">
+          <div className="h-9 w-9 animate-pulse rounded-lg bg-gray-100" />
+          <div className="h-7 w-48 animate-pulse rounded bg-gray-100" />
+        </div>
+        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-20 animate-pulse rounded-lg bg-gray-50" />
+          ))}
+        </div>
+        <div className="h-64 animate-pulse rounded-lg bg-gray-50" />
       </div>
     )
   }
@@ -331,7 +485,7 @@ export default function PurchaseOrderDetailPage({
         </div>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
         <div className="rounded-lg border bg-white p-4">
           <p className="text-xs font-medium uppercase tracking-wider text-gray-900">
             {t("purchases.supplier")}
@@ -356,7 +510,61 @@ export default function PurchaseOrderDetailPage({
             {formatCurrency(po.grand_total, locale)}
           </p>
         </div>
+        <div className="rounded-lg border bg-white p-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-gray-900">
+            {t("sales.amount_paid")}
+          </p>
+          <p className="mt-1 text-sm font-medium text-gray-900">
+            {formatCurrency(Number(po.amount_paid ?? 0), locale)}
+          </p>
+        </div>
       </div>
+
+      {Number(po.balance_due ?? 0) > 0 && po.status !== "cancelled" && (
+        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="rounded-lg border bg-amber-50 p-4">
+            <p className="text-xs font-medium uppercase tracking-wider text-amber-800">
+              {t("sales.balance_due")}
+            </p>
+            <p className="mt-1 text-lg font-bold text-amber-900">
+              {formatCurrency(po.balance_due ?? 0, locale)}
+            </p>
+          </div>
+          {po.payment_type != null && (
+            <div className="rounded-lg border bg-white p-4">
+              <p className="text-xs font-medium uppercase tracking-wider text-gray-900">
+                Payment Type
+              </p>
+              <p className="mt-1 text-sm font-medium text-gray-900">
+                {paymentTypeLabels[po.payment_type] ?? po.payment_type}
+              </p>
+            </div>
+          )}
+          {po.payment_details && Object.keys(po.payment_details ?? {}).length > 0 && (
+            <div className="rounded-lg border bg-white p-4">
+              <p className="text-xs font-medium uppercase tracking-wider text-gray-900">
+                Payment Details
+              </p>
+              <div className="mt-1 space-y-0.5">
+                {Object.entries(po.payment_details).map(([key, val]) => (
+                  <p key={key} className="text-sm text-gray-900">
+                    <span className="font-medium capitalize">{key.replace(/_/g, " ")}:</span> {val}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="flex items-end">
+            <button
+              onClick={() => { setPaymentAmount(Number(po.balance_due ?? 0)); setShowPayment(true) }}
+              className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+            >
+              <DollarSign size={16} />
+              Pay {formatCurrency(po.balance_due ?? 0, locale)}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="overflow-x-auto rounded-lg border">
         <table className="min-w-full divide-y divide-gray-200">
@@ -482,6 +690,128 @@ export default function PurchaseOrderDetailPage({
             {t("common.notes")}
           </p>
           <p className="mt-1 text-sm text-gray-900">{po.notes}</p>
+        </div>
+      )}
+
+      {/* Record Payment Modal */}
+      {showPayment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">{t("sales.record_payment")}</h2>
+              <button onClick={() => setShowPayment(false)} className="rounded-lg p-1 hover:bg-gray-100">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="mb-4 rounded-lg bg-gray-50 p-3">
+              <p className="text-xs text-gray-900">{t("sales.balance_due")}: <span className="font-semibold">{formatCurrency(po.balance_due ?? 0, locale)}</span></p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-900">
+                  {t("sales.amount_paid")}
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={po.balance_due}
+                  step="0.01"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(Math.min(Number(e.target.value), Number(po.balance_due ?? 0)))}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-900">
+                  {t("sales.payment_type")}
+                </label>
+                <select
+                  value={paymentType}
+                  onChange={(e) => setPaymentType(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                >
+                  <option value="cash">{t("sales.cash")}</option>
+                  <option value="credit">{t("sales.credit")}</option>
+                  <option value="bank_transfer">{t("sales.bank_transfer")}</option>
+                  <option value="cheque">{t("sales.cheque")}</option>
+                  <option value="lanka_qr">{t("sales.lanka_qr")}</option>
+                  <option value="card">{t("sales.card")}</option>
+                  <option value="mixed">{t("sales.mixed")}</option>
+                </select>
+              </div>
+
+              {paymentType === "cheque" && (
+                <>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-900">Cheque Number</label>
+                    <input
+                      type="text"
+                      value={chequeNumber}
+                      onChange={(e) => setChequeNumber(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-900">Bank Code</label>
+                    <input
+                      type="text"
+                      value={bankCode}
+                      onChange={(e) => setBankCode(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-900">Account Number</label>
+                    <input
+                      type="text"
+                      value={accountNumber}
+                      onChange={(e) => setAccountNumber(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                </>
+              )}
+
+              {paymentType === "bank_transfer" && (
+                <>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-900">From Account</label>
+                    <input
+                      type="text"
+                      value={fromAccount}
+                      onChange={(e) => setFromAccount(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-900">To Account</label>
+                    <input
+                      type="text"
+                      value={toAccount}
+                      onChange={(e) => setToAccount(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                </>
+              )}
+
+              <button
+                onClick={handleRecordPayment}
+                disabled={submittingPayment || paymentAmount <= 0}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {submittingPayment ? (
+                  <Loader2 className="animate-spin" size={16} />
+                ) : (
+                  <DollarSign size={16} />
+                )}
+                {t("sales.confirm_payment")}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

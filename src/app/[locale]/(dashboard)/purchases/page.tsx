@@ -16,6 +16,8 @@ type PurchaseOrder = Record<string, unknown> & {
   created_at: string
   expected_date: string | null
   grand_total: number
+  amount_paid: number
+  balance_due: number
   status: "pending" | "partial" | "completed" | "cancelled"
 }
 
@@ -53,7 +55,7 @@ export default function PurchasesPage({
       const supabase = createClient()
       const { data } = await supabase
         .from("purchase_orders")
-        .select("id, po_no, supplier_name, created_at, expected_date, grand_total, status")
+        .select("id, po_no, supplier_name, created_at, expected_date, grand_total, amount_paid, balance_due, status")
         .order("created_at", { ascending: false }) as unknown as {
         data: PurchaseOrder[] | null
       }
@@ -93,6 +95,15 @@ export default function PurchasesPage({
       label: t("common.grand_total"),
       render: (item: PurchaseOrder) =>
         formatCurrency(Number(item.grand_total), locale),
+    },
+    {
+      key: "balance_due",
+      label: t("sales.balance_due"),
+      render: (item: PurchaseOrder) => {
+        const bd = Number(item.balance_due)
+        if (bd <= 0) return <span className="text-green-600">—</span>
+        return <span className="text-amber-700 font-medium">{formatCurrency(bd, locale)}</span>
+      },
     },
     {
       key: "status",

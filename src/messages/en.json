@@ -232,18 +232,32 @@
   },
   "settings": {
     "general": "General Settings",
+    "company": "Company Information",
+    "social_media": "Social Media",
     "notifications": "Notifications",
     "inventory": "Inventory Settings",
     "security": "Security",
     "app_name": "Application Name",
     "currency": "Currency",
     "branch_name": "Branch Name",
+    "company_name": "Company Name",
+    "company_logo": "Company Logo",
+    "address": "Address",
+    "contact_number": "Contact Number",
+    "vat_number": "VAT Number",
+    "whatsapp_link": "WhatsApp Link",
+    "facebook_link": "Facebook Link",
+    "tiktok_link": "TikTok Link",
+    "youtube_link": "YouTube Link",
+    "upload_logo": "Upload Logo",
+    "remove_logo": "Remove",
     "whatsapp_reminders": "WhatsApp Reminders",
     "low_stock_alerts": "Low Stock Alerts",
     "payment_reminders": "Payment Reminders",
     "default_min_stock": "Default Min Stock Level",
     "expiry_warning_days": "Expiry Warning (Days)",
     "two_factor_auth": "Two-Factor Authentication",
-    "session_timeout": "Session Timeout (Minutes)"
+    "session_timeout": "Session Timeout (Minutes)",
+    "saved": "Settings saved successfully"
   }
 }

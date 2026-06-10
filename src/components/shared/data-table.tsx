@@ -69,8 +69,41 @@ export function DataTable<T>({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="animate-spin text-gray-700" size={32} />
+      <div>
+        {searchable && (
+          <div className="relative mb-4 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-700" size={18} />
+            <div className="h-10 w-full animate-pulse rounded-lg bg-gray-100" />
+          </div>
+        )}
+        <div className="overflow-x-auto rounded-lg border">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                {columns.map((col) => (
+                  <th key={col.key} className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+                    {col.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 bg-white">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i}>
+                  {columns.map((col) => (
+                    <td key={col.key} className="px-4 py-3">
+                      <div className="h-4 w-24 animate-pulse rounded bg-gray-100" />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-2 flex items-center justify-center">
+          <Loader2 className="animate-spin text-gray-400" size={16} />
+          <span className="ml-2 text-xs text-gray-400">Loading...</span>
+        </div>
       </div>
     )
   }

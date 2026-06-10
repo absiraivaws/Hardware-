@@ -357,9 +357,15 @@ export default function FinancialLedgerPage({
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
               {loading ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center text-sm text-black">{t("common.loading")}</td>
-                </tr>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i}>
+                    {Array.from({ length: 5 }).map((_, j) => (
+                      <td key={j} className="px-4 py-3">
+                        <div className="h-4 w-20 animate-pulse rounded bg-gray-100" />
+                      </td>
+                    ))}
+                  </tr>
+                ))
               ) : sortedEntries.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-12 text-center text-sm text-black">{t("common.no_results")}</td>

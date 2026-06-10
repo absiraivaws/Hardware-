@@ -6,6 +6,7 @@ import { Plus, Eye, Ban, CheckCircle } from "lucide-react"
 import { DataTable } from "@/components/shared/data-table"
 import { formatCurrency } from "@/lib/format"
 import { createClient } from "@/lib/supabase/client"
+import { getCached, setCache } from "@/lib/query-cache"
 interface Customer {
   id: string
   name: string
@@ -33,9 +34,18 @@ export default function CustomersPage({
   const [form, setForm] = useState({ name: "", phone: "", email: "", address: "", credit_limit: 0 })
 
   const fetchCustomers = async () => {
+    const cached = getCached<Customer[]>("customers:all")
+    if (cached) {
+      setCustomers(cached)
+      setLoading(false)
+      return
+    }
     const supabase = createClient()
     const { data } = await supabase.from("customers").select("*").order("name")
-    if (data) setCustomers(data as Customer[])
+    if (data) {
+      setCustomers(data as Customer[])
+      setCache("customers:all", data)
+    }
     setLoading(false)
   }
 
@@ -91,7 +101,7 @@ export default function CustomersPage({
               : "bg-red-100 text-red-700"
           }`}
         >
-          {t(c.status)}
+          {c.status === "active" ? "Active" : "Inactive"}
         </span>
       ),
     },

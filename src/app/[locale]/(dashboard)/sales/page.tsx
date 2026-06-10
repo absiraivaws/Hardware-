@@ -8,6 +8,10 @@ import { Search, Trash2, ShoppingCart, User, Printer, Smartphone, ArrowUpDown, A
 import { use, useEffect, useMemo, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import type { Database } from "@/types/database"
+import { CompanyHeader, CompanyFooter } from "@/components/shared/company-info"
+import type { CompanySettings } from "@/components/shared/company-info"
+import { getCached, setCache, invalidateCache } from "@/lib/query-cache"
+import { useData } from "@/providers/data-provider"
 
 type Product = Database["public"]["Tables"]["products"]["Row"]
 type PaymentType = Database["public"]["Tables"]["sales"]["Row"]["payment_type"]
@@ -66,6 +70,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
   const [fromAccount, setFromAccount] = useState("")
   const [toAccount, setToAccount] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  const { companySettings } = useData()
   const [completedSale, setCompletedSale] = useState<{
     invoice_no: string
     grand_total: number
@@ -78,15 +83,33 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
   const customerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    const supabase = createClient()
+
     async function load() {
-      const supabase = createClient()
       setLoading(true)
+
+      const cachedProducts = getCached<Product[]>("products:all")
+      const cachedCustomers = getCached<CustomerOption[]>("customers:all")
+
+      if (cachedProducts && cachedCustomers) {
+        setProducts(cachedProducts)
+        setCustomers(cachedCustomers)
+        setLoading(false)
+        return
+      }
+
       const [productRes, customerRes] = await Promise.all([
-        supabase.from("products").select("*").eq("status", "active").order("name"),
+        supabase.from("products").select("id, name, code, barcode, selling_price, current_stock, min_stock").eq("status", "active").order("name"),
         supabase.from("customers").select("id, name, phone").eq("status", "active").order("name"),
       ])
-      if (productRes.data) setProducts(productRes.data as Product[])
-      if (customerRes.data) setCustomers(customerRes.data as CustomerOption[])
+      if (productRes.data) {
+        setProducts(productRes.data as Product[])
+        setCache("products:all", productRes.data)
+      }
+      if (customerRes.data) {
+        setCustomers(customerRes.data as CustomerOption[])
+        setCache("customers:all", customerRes.data)
+      }
       setLoading(false)
     }
     load()
@@ -367,20 +390,15 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       setToAccount("")
       setSelectedCustomer(null)
       setCustomerSearch("")
+      invalidateCache("sales")
+      invalidateCache("products")
+      invalidateCache("customers")
     } catch (err) {
       console.error("Sale error:", err)
       alert("Failed to complete sale. Please try again.")
     } finally {
       setSubmitting(false)
     }
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <p className="text-gray-900">{t("common.loading")}</p>
-      </div>
-    )
   }
 
   return (
@@ -838,6 +856,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       {completedSale && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="mx-4 w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
+            <CompanyHeader settings={companySettings} />
             <div className="mb-4 text-center">
               <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
                 <Printer size={24} className="text-emerald-600" />
@@ -845,7 +864,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
               <h3 className="text-lg font-semibold text-gray-900">{t("sales.complete_sale")}</h3>
               <p className="mt-1 text-sm text-gray-900">{completedSale.invoice_no}</p>
             </div>
-            <div className="border-t pt-4">
+            <div className="pt-4">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b text-gray-900">
@@ -885,7 +904,8 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                 </span>
               </div>
             </div>
-            <div className="mt-6 flex gap-3">
+            <CompanyFooter settings={companySettings} />
+            <div className="mt-4 flex gap-3">
               <button
                 onClick={() => setCompletedSale(null)}
                 className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"

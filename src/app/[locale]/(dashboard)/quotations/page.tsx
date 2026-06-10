@@ -8,6 +8,7 @@ import { DataTable } from "@/components/shared/data-table"
 import { PageHeader } from "@/components/shared/page-header"
 import { formatCurrency, formatDate } from "@/lib/format"
 import { createClient } from "@/lib/supabase/client"
+import { getCached, setCache } from "@/lib/query-cache"
 import type { Database } from "@/types/database"
 
 type Quotation = Database["public"]["Tables"]["quotations"]["Row"]
@@ -39,6 +40,12 @@ export default function QuotationsPage() {
   const [error, setError] = useState<string | null>(null)
 
   async function fetchQuotations() {
+    const cached = getCached<Quotation[]>("quotations:all")
+    if (cached) {
+      setQuotations(cached)
+      setLoading(false)
+      return
+    }
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
@@ -55,6 +62,7 @@ export default function QuotationsPage() {
         setError(error.message)
       } else if (data) {
         setQuotations(data)
+        setCache("quotations:all", data)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load quotations")

@@ -9,6 +9,7 @@ import { DataTable } from "@/components/shared/data-table"
 import { PageHeader } from "@/components/shared/page-header"
 import { formatCurrency } from "@/lib/format"
 import { calculateFIFOValue } from "@/lib/fifo"
+import { getCached, setCache } from "@/lib/query-cache"
 
 interface ProductRow extends Record<string, unknown> {
   id: string
@@ -128,6 +129,13 @@ export default function InventoryPage({ params }: { params: Promise<{ locale: st
   }
 
   async function fetchProducts() {
+    const cached = getCached<ProductRow[]>("products:inventory")
+    if (cached) {
+      setProducts(cached)
+      calcFIFOValues(cached)
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setError(null)
     const { data, error } = await supabase
@@ -140,6 +148,7 @@ export default function InventoryPage({ params }: { params: Promise<{ locale: st
       const productData = data || []
       const updated = await fetchBalances(productData.map((p: ProductRow) => p.id), productData)
       setProducts(updated)
+      setCache("products:inventory", updated)
       calcFIFOValues(updated)
     }
     setLoading(false)

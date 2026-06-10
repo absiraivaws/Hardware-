@@ -7,6 +7,10 @@ import { PageHeader } from "@/components/shared/page-header"
 import { formatCurrency, formatDate } from "@/lib/format"
 import { use, useEffect, useState } from "react"
 import { Banknote, DollarSign, Eye, X } from "lucide-react"
+import { CompanyHeader, CompanyFooter } from "@/components/shared/company-info"
+import type { CompanySettings } from "@/components/shared/company-info"
+import { getCached, setCache, invalidateCache } from "@/lib/query-cache"
+import { useData } from "@/providers/data-provider"
 
 const paymentDetailLabels: Record<string, string> = {
   cheque_number: "Cheque Number",
@@ -83,9 +87,17 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
   const [accountNumber, setAccountNumber] = useState("")
   const [fromAccount, setFromAccount] = useState("")
   const [toAccount, setToAccount] = useState("")
+  const { companySettings } = useData()
 
-  async function loadSales() {
-    const supabase = createClient()
+  async function loadSales(supabaseClient?: ReturnType<typeof createClient>) {
+    const supabase = supabaseClient ?? createClient()
+    const cacheKey = "sales:list"
+    const cached = getCached<SaleRow[]>(cacheKey)
+    if (cached) {
+      setSales(cached)
+      setLoading(false)
+      return
+    }
     setLoading(true)
     const { data } = await supabase
       .from("sales")
@@ -93,13 +105,17 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
       .order("created_at", { ascending: false })
       .limit(200)
 
-    if (data) setSales(data as SaleRow[])
+    if (data) {
+      setSales(data as SaleRow[])
+      setCache(cacheKey, data as SaleRow[])
+    }
     setLoading(false)
   }
 
   useEffect(() => {
+    const supabase = createClient()
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadSales()
+    loadSales(supabase)
   }, [])
 
   async function openDetail(id: string) {
@@ -239,6 +255,7 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
       setAccountNumber("")
       setFromAccount("")
       setToAccount("")
+      invalidateCache("sales")
       loadSales()
     } catch (err) {
       console.error("Payment error:", err)
@@ -261,11 +278,6 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </span>
     )
-  }
-
-  const paymentStatusLabel = (row: SaleRow & { amount_paid?: number; grand_total?: number }) => {
-    const fullyPaid = Number(row.amount_paid ?? 0) >= Number(row.grand_total ?? 0)
-    return fullyPaid ? "Complete" : "Partial"
   }
 
   const paymentLabels: Record<string, string> = {
@@ -315,13 +327,24 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
       key: "payment_status",
       label: "Payment Status",
       render: (row: SaleRow) => {
-        const isCredit = row.payment_type === "credit"
-        const complete = isCredit ? Number(row.amount_paid) >= Number(row.grand_total) : true
-        const label = complete ? "Complete" : "Partial"
-        const color = complete ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+        const fullyPaid = Number(row.amount_paid ?? 0) >= Number(row.grand_total ?? 0)
+        const label = fullyPaid ? "Complete" : "Partial"
+        const color = fullyPaid ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
         return (
           <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${color}`}>
             {label}
+          </span>
+        )
+      },
+    },
+    {
+      key: "balance_due",
+      label: "Balance Due",
+      render: (row: SaleRow) => {
+        const due = Math.max(0, Number(row.grand_total ?? 0) - Number(row.amount_paid ?? 0))
+        return (
+          <span className={`font-medium ${due > 0 ? "text-amber-700" : "text-black"}`}>
+            {formatCurrency(due, locale)}
           </span>
         )
       },
@@ -356,6 +379,7 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
       {viewId && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 pt-10 pb-10">
           <div className="w-full max-w-3xl rounded-lg bg-white shadow-xl">
+            <CompanyHeader settings={companySettings} />
             <div className="flex items-center justify-between border-b px-6 py-4">
               <div>
                 <h2 className="text-lg font-semibold text-black">
@@ -425,11 +449,11 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
                     <div className="flex justify-between items-center">
                       <span className="text-black font-medium">Payment Status</span>
                       <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-bold ${
-                        detail.payment_type !== "credit" || Number(detail.balance_due) <= 0
+                        Number(detail.amount_paid) >= Number(detail.grand_total)
                           ? "bg-emerald-100 text-emerald-700"
                           : "bg-amber-100 text-amber-700"
                       }`}>
-                        {detail.payment_type !== "credit" || Number(detail.balance_due) <= 0 ? "Complete" : "Partial"}
+                        {Number(detail.amount_paid) >= Number(detail.grand_total) ? "Complete" : "Partial"}
                       </span>
                     </div>
                   )}
@@ -519,6 +543,7 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
                 )}
 
                 {/* Record Payment */}
+                <CompanyFooter settings={companySettings} />
                 {Number(detail.balance_due) > 0 && !showPaymentForm && (
                   <button
                     onClick={() => {
