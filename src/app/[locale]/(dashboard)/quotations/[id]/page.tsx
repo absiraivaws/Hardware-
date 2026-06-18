@@ -347,28 +347,24 @@ export default function QuotationDetailPage() {
       .insert(saleItems as never)
     if (itemsError) { setConverting(false); return }
 
-    for (const item of convertItems) {
-      const { data: prod } = await supabase
-        .from("products")
-        .select("current_stock")
-        .eq("id", item.product_id)
-        .single()
-      if (prod) {
-        await supabase
-          .from("products")
-          .update({ current_stock: Number(prod.current_stock) - item.quantity })
-          .eq("id", item.product_id)
+    const productIds = convertItems.map((i) => i.product_id)
+    const { data: products } = await supabase.from("products").select("id, current_stock").in("id", productIds)
+    if (products) {
+      for (const p of products) {
+        const qty = convertItems.find((i) => i.product_id === p.id)?.quantity || 0
+        await supabase.from("products").update({ current_stock: Number(p.current_stock) - qty }).eq("id", p.id)
       }
-      await supabase.from("stock_movements").insert({
-        product_id: item.product_id,
-        type: "out",
-        quantity: item.quantity,
-        reference_type: "sale",
-        reference_id: insertedSale.id,
-        notes: invoiceNo,
-        user_id: user.id,
-      })
     }
+    const movements = convertItems.map((item) => ({
+      product_id: item.product_id,
+      type: "out" as const,
+      quantity: item.quantity,
+      reference_type: "sale" as const,
+      reference_id: insertedSale.id,
+      notes: invoiceNo,
+      user_id: user.id,
+    }))
+    await supabase.from("stock_movements").insert(movements as never)
 
     if (quotation.customer_id) {
       const { data: cust } = await supabase

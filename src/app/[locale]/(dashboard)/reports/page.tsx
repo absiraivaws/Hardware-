@@ -13,7 +13,7 @@ import {
   CalendarDays,
 } from "lucide-react"
 
-type ReportTab = "daily_sales" | "stock_report" | "profit_report" | "outstanding" | "svat_report"
+type ReportTab = "daily_sales" | "stock_report" | "profit_report" | "outstanding" | "svat_report" | "aged_credit" | "profit_loss" | "balance_sheet"
 
 const TABS: { key: ReportTab; labelKey: string }[] = [
   { key: "daily_sales", labelKey: "reports.daily_sales" },
@@ -21,6 +21,9 @@ const TABS: { key: ReportTab; labelKey: string }[] = [
   { key: "profit_report", labelKey: "reports.profit_report" },
   { key: "outstanding", labelKey: "reports.outstanding" },
   { key: "svat_report", labelKey: "reports.svat_report" },
+  { key: "aged_credit", labelKey: "reports_aged_credit.title" },
+  { key: "profit_loss", labelKey: "reports_pl.title" },
+  { key: "balance_sheet", labelKey: "reports_balance_sheet.title" },
 ]
 
 interface DailySale {
@@ -96,6 +99,9 @@ export default function ReportsPage({ params }: PageProps) {
   const [profitItems, setProfitItems] = useState<ProfitItem[]>([])
   const [outstandingCustomers, setOutstandingCustomers] = useState<OutstandingCustomer[]>([])
   const [svatSales, setSvatSales] = useState<SvatSale[]>([])
+  const [agedCreditData, setAgedCreditData] = useState<{ customer_name: string; phone: string | null; bucket_0_30: number; bucket_31_60: number; bucket_61_90: number; bucket_90_plus: number; total: number }[]>([])
+  const [plData, setPlData] = useState({ revenue: 0, cogs: 0, grossProfit: 0, expenses: 0, netProfit: 0 })
+  const [bsData, setBsData] = useState({ cashInHand: 0, bankBalance: 0, inventoryValue: 0, receivables: 0, payables: 0 })
   const [stockSearch, setStockSearch] = useState("")
 
   const perPage = 20
@@ -201,6 +207,65 @@ export default function ReportsPage({ params }: PageProps) {
               .lte("created_at", `${toDate}T23:59:59`)
               .order("created_at", { ascending: false })
             if (data) setSvatSales(data as SvatSale[])
+            break
+          }
+          case "aged_credit": {
+            const { data: salesData } = await supabase
+              .from("sales")
+              .select("id, customer_name, grand_total, balance_due, created_at")
+              .eq("status", "completed")
+              .gt("balance_due", 0)
+              .order("customer_name")
+            if (salesData) {
+              const now = new Date()
+              const buckets = new Map<string, { customer_name: string; phone: string | null; bucket_0_30: number; bucket_31_60: number; bucket_61_90: number; bucket_90_plus: number; total: number }>()
+              for (const s of salesData) {
+                const key = s.customer_name ?? "Unknown"
+                const existing = buckets.get(key) ?? { customer_name: key, phone: null, bucket_0_30: 0, bucket_31_60: 0, bucket_61_90: 0, bucket_90_plus: 0, total: 0 }
+                const days = Math.floor((now.getTime() - new Date(s.created_at).getTime()) / (1000 * 60 * 60 * 24))
+                const balance = s.balance_due
+                if (days <= 30) existing.bucket_0_30 += balance
+                else if (days <= 60) existing.bucket_31_60 += balance
+                else if (days <= 90) existing.bucket_61_90 += balance
+                else existing.bucket_90_plus += balance
+                existing.total += balance
+                buckets.set(key, existing)
+              }
+              setAgedCreditData(Array.from(buckets.values()))
+            }
+            break
+          }
+          case "profit_loss": {
+            const periodStart = `${fromDate}T00:00:00`
+            const periodEnd = `${toDate}T23:59:59`
+            const [{ data: revData }, { data: cogData }, { data: expData }] = await Promise.all([
+              supabase.from("sales").select("grand_total").gte("created_at", periodStart).lte("created_at", periodEnd).eq("status", "completed"),
+              supabase.from("sale_items").select("quantity, unit_price, products(cost_price), sales!inner(created_at, status)").gte("sales.created_at", periodStart).lte("sales.created_at", periodEnd).eq("sales.status", "completed"),
+              supabase.from("ledger_entries").select("amount").eq("ledger_type", "expense").gte("created_at", periodStart).lte("created_at", periodEnd),
+            ])
+            const revenue = (revData ?? []).reduce((s: number, r: Record<string, unknown>) => s + (r.grand_total as number ?? 0), 0)
+            const cogs = (cogData ?? []).reduce((s: number, item: Record<string, unknown>) => {
+              const costPrice = (item.products as unknown as { cost_price: number } | null)?.cost_price ?? 0
+              return s + costPrice * (item.quantity as number)
+            }, 0)
+            const expenses = (expData ?? []).reduce((s: number, e: Record<string, unknown>) => s + (e.amount as number ?? 0), 0)
+            setPlData({ revenue, cogs, grossProfit: revenue - cogs, expenses, netProfit: revenue - cogs - expenses })
+            break
+          }
+          case "balance_sheet": {
+            const [{ data: cashData }, { data: bankData }, { data: prodData }, { data: receivData }, { data: payData }] = await Promise.all([
+              supabase.from("ledger_entries").select("amount, entry_type").eq("ledger_type", "cash"),
+              supabase.from("ledger_entries").select("amount, entry_type").eq("ledger_type", "bank"),
+              supabase.from("products").select("current_stock, cost_price"),
+              supabase.from("customers").select("credit_balance"),
+              supabase.from("suppliers").select("ledger_balance"),
+            ])
+            const cashInHand = (cashData ?? []).reduce((s: number, r: Record<string, unknown>) => r.entry_type === "debit" ? s + (r.amount as number) : s - (r.amount as number), 0)
+            const bankBalance = (bankData ?? []).reduce((s: number, r: Record<string, unknown>) => r.entry_type === "debit" ? s + (r.amount as number) : s - (r.amount as number), 0)
+            const inventoryValue = (prodData ?? []).reduce((s: number, p: Record<string, unknown>) => s + ((p.current_stock as number) * (p.cost_price as number ?? 0)), 0)
+            const receivables = (receivData ?? []).reduce((s: number, c: Record<string, unknown>) => s + (c.credit_balance as number ?? 0), 0)
+            const payables = (payData ?? []).reduce((s: number, p: Record<string, unknown>) => s + (p.ledger_balance as number ?? 0), 0)
+            setBsData({ cashInHand: Math.max(0, cashInHand), bankBalance: Math.max(0, bankBalance), inventoryValue, receivables, payables })
             break
           }
         }
@@ -474,6 +539,125 @@ export default function ReportsPage({ params }: PageProps) {
     )
   }
 
+  const renderAgedCredit = () => {
+    const headers = [
+      t("reports_aged_credit.customer"),
+      t("reports_aged_credit.bucket_0_30"),
+      t("reports_aged_credit.bucket_31_60"),
+      t("reports_aged_credit.bucket_61_90"),
+      t("reports_aged_credit.bucket_90_plus"),
+      t("reports_aged_credit.total_outstanding"),
+    ]
+    const rows = agedCreditData.map((c) => [
+      c.customer_name,
+      formatCurrency(c.bucket_0_30, locale),
+      formatCurrency(c.bucket_31_60, locale),
+      formatCurrency(c.bucket_61_90, locale),
+      <span className="font-medium text-red-600">{formatCurrency(c.bucket_90_plus, locale)}</span>,
+      <span className="font-medium">{formatCurrency(c.total, locale)}</span>,
+    ])
+    const grandTotal = agedCreditData.reduce((s, c) => s + c.total, 0)
+    return (
+      <div>
+        {renderTable(headers, rows, t("reports_aged_credit.no_data"))}
+        <div className="mt-4 flex items-center justify-end gap-2 rounded-lg bg-amber-50 px-4 py-3">
+          <span className="text-sm font-medium text-black">{t("reports_aged_credit.total_outstanding")}:</span>
+          <span className="text-lg font-bold text-amber-700">{formatCurrency(grandTotal, locale)}</span>
+        </div>
+      </div>
+    )
+  }
+
+  const renderProfitLoss = () => {
+    return (
+      <div className="max-w-lg rounded-lg border bg-white p-6">
+        <h3 className="mb-4 text-base font-semibold text-black">{t("reports_pl.title")}</h3>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between border-b pb-2">
+            <span className="text-sm text-black">{t("reports_pl.revenue")}</span>
+            <span className="font-medium text-black">{formatCurrency(plData.revenue, locale)}</span>
+          </div>
+          <div className="flex items-center justify-between border-b pb-2">
+            <span className="text-sm text-black">{t("reports_pl.cogs")}</span>
+            <span className="font-medium text-black">-{formatCurrency(plData.cogs, locale)}</span>
+          </div>
+          <div className="flex items-center justify-between border-b pb-2">
+            <span className="text-sm font-medium text-black">{t("reports_pl.gross_profit")}</span>
+            <span className={`font-semibold ${plData.grossProfit >= 0 ? "text-emerald-700" : "text-red-600"}`}>{formatCurrency(plData.grossProfit, locale)}</span>
+          </div>
+          <div className="flex items-center justify-between border-b pb-2">
+            <span className="text-sm text-black">{t("reports_pl.expenses")}</span>
+            <span className="font-medium text-black">-{formatCurrency(plData.expenses, locale)}</span>
+          </div>
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-base font-bold text-black">{t("reports_pl.net_profit")}</span>
+            <span className={`text-base font-bold ${plData.netProfit >= 0 ? "text-emerald-700" : "text-red-600"}`}>{formatCurrency(plData.netProfit, locale)}</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const renderBalanceSheet = () => {
+    const totalAssets = bsData.cashInHand + bsData.bankBalance + bsData.inventoryValue + bsData.receivables
+    const totalEquity = totalAssets - bsData.payables
+    return (
+      <div className="grid max-w-lg gap-6">
+        <div className="rounded-lg border bg-white p-6">
+          <h3 className="mb-4 text-base font-semibold text-black">{t("reports_balance_sheet.assets")}</h3>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between border-b pb-2">
+              <span className="text-sm text-black">{t("reports_balance_sheet.cash_in_hand")}</span>
+              <span className="font-medium text-black">{formatCurrency(bsData.cashInHand, locale)}</span>
+            </div>
+            <div className="flex items-center justify-between border-b pb-2">
+              <span className="text-sm text-black">{t("reports_balance_sheet.bank_balance")}</span>
+              <span className="font-medium text-black">{formatCurrency(bsData.bankBalance, locale)}</span>
+            </div>
+            <div className="flex items-center justify-between border-b pb-2">
+              <span className="text-sm text-black">{t("reports_balance_sheet.inventory_value")}</span>
+              <span className="font-medium text-black">{formatCurrency(bsData.inventoryValue, locale)}</span>
+            </div>
+            <div className="flex items-center justify-between border-b pb-2">
+              <span className="text-sm text-black">{t("reports_balance_sheet.receivables")}</span>
+              <span className="font-medium text-black">{formatCurrency(bsData.receivables, locale)}</span>
+            </div>
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-base font-bold text-black">{t("reports_balance_sheet.total_assets")}</span>
+              <span className="text-base font-bold text-emerald-700">{formatCurrency(totalAssets, locale)}</span>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-lg border bg-white p-6">
+          <h3 className="mb-4 text-base font-semibold text-black">{t("reports_balance_sheet.liabilities")}</h3>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between border-b pb-2">
+              <span className="text-sm text-black">{t("reports_balance_sheet.payables")}</span>
+              <span className="font-medium text-black">{formatCurrency(bsData.payables, locale)}</span>
+            </div>
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-base font-bold text-black">{t("reports_balance_sheet.total_liabilities")}</span>
+              <span className="text-base font-bold text-black">{formatCurrency(bsData.payables, locale)}</span>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-lg border bg-white p-6">
+          <h3 className="mb-4 text-base font-semibold text-black">{t("reports_balance_sheet.equity")}</h3>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between border-b pb-2">
+              <span className="text-sm text-black">{t("reports_balance_sheet.retained_earnings")}</span>
+              <span className="font-medium text-black">{formatCurrency(totalEquity, locale)}</span>
+            </div>
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-base font-bold text-black">{t("reports_balance_sheet.total_equity")}</span>
+              <span className="text-base font-bold text-emerald-700">{formatCurrency(totalEquity, locale)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const renderContent = () => {
     if (loading) {
       return (
@@ -493,10 +677,16 @@ export default function ReportsPage({ params }: PageProps) {
         return renderOutstanding()
       case "svat_report":
         return renderSvatReport()
+      case "aged_credit":
+        return renderAgedCredit()
+      case "profit_loss":
+        return renderProfitLoss()
+      case "balance_sheet":
+        return renderBalanceSheet()
     }
   }
 
-  const showDateRange = activeTab === "daily_sales" || activeTab === "svat_report"
+  const showDateRange = activeTab === "daily_sales" || activeTab === "svat_report" || activeTab === "profit_loss"
 
   return (
     <div>

@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/shared/page-header"
 import { formatCurrency, formatDate } from "@/lib/format"
 import { use, useEffect, useState } from "react"
 import { Banknote, DollarSign, Eye, X } from "lucide-react"
-import { CompanyHeader, CompanyFooter } from "@/components/shared/company-info"
+import { CompanyFooter } from "@/components/shared/company-info"
 import type { CompanySettings } from "@/components/shared/company-info"
 import { getCached, setCache, invalidateCache } from "@/lib/query-cache"
 import { useData } from "@/providers/data-provider"
@@ -48,6 +48,7 @@ interface SaleDetail {
   amount_paid: number
   balance_due: number
   status: string
+  cheque_status: string | null
   notes: string | null
   created_at: string
   payment_details: Record<string, string> | null
@@ -378,21 +379,46 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
       {/* Detail Modal */}
       {viewId && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 pt-10 pb-10">
-          <div className="w-full max-w-3xl rounded-lg bg-white shadow-xl">
-            <CompanyHeader settings={companySettings} />
-            <div className="flex items-center justify-between border-b px-6 py-4">
+          <div className="relative w-full max-w-3xl rounded-lg bg-white shadow-xl">
+            <button
+              onClick={() => setViewId(null)}
+              className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 shadow"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="flex items-start gap-4 px-6 pt-6 pb-3 border-b">
+              {companySettings?.logo_url && (
+                <img
+                  src={companySettings.logo_url}
+                  alt={companySettings.company_name}
+                  className="h-16 w-auto object-contain shrink-0"
+                />
+              )}
+              <div className="min-w-0">
+                {companySettings?.company_name && (
+                  <h1 className="text-lg font-bold text-black">{companySettings.company_name}</h1>
+                )}
+                {companySettings?.address && (
+                  <p className="text-xs text-black">{companySettings.address}</p>
+                )}
+                {companySettings?.contact_number && (
+                  <p className="text-xs text-black">Tel: {companySettings.contact_number}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between px-6 py-3 border-b bg-gray-50">
               <div>
-                <h2 className="text-lg font-semibold text-black">
+                <h2 className="text-base font-semibold text-black">
                   {detail?.invoice_no || ""}
                 </h2>
                 <p className="text-sm text-black">{detail?.customer_name || "Walk-in Customer"}</p>
               </div>
-              <button
-                onClick={() => setViewId(null)}
-                className="rounded-lg p-1.5 text-black hover:bg-gray-100"
-              >
-                <X size={20} />
-              </button>
+              <div className="flex items-center gap-4 text-sm text-black">
+                <span>{t("common.date")}: {detail && formatDate(detail.created_at)}</span>
+                <span>{t("common.status")}: {detail && statusBadge(detail.status)}</span>
+              </div>
             </div>
 
             {detailLoading ? (
@@ -413,7 +439,15 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
                   </div>
                   <div className="rounded-lg border bg-gray-50 p-3">
                     <p className="text-xs font-medium uppercase tracking-wider text-black">{t("sales.payment_type")}</p>
-                    <p className="mt-1 text-sm font-medium text-black">{paymentLabels[detail.payment_type] || detail.payment_type}</p>
+                    <span className={`mt-1 inline-block rounded-lg border px-2.5 py-1 text-xs font-medium ${
+                      detail.payment_type === "cash" ? "border-emerald-500 bg-emerald-50 text-emerald-700" :
+                      detail.payment_type === "credit" ? "border-blue-500 bg-blue-50 text-blue-700" :
+                      detail.payment_type === "bank_transfer" ? "border-purple-500 bg-purple-50 text-purple-700" :
+                      detail.payment_type === "cheque" ? "border-amber-500 bg-amber-50 text-amber-700" :
+                      "border-gray-300 bg-white text-black"
+                    }`}>
+                      {paymentLabels[detail.payment_type] || detail.payment_type}
+                    </span>
                   </div>
                 </div>
 
@@ -422,10 +456,10 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-black">{t("sales.item")}</th>
-                        <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-black">{t("sales.qty")}</th>
-                        <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-black">{t("sales.price")}</th>
-                        <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-black">{t("sales.amount")}</th>
+                        <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-black">{t("sales.item")}</th>
+                        <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-black">{t("sales.qty")}</th>
+                        <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-black">{t("sales.price")}</th>
+                        <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-black">{t("sales.amount")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -434,7 +468,7 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
                           <td className="px-4 py-2.5 text-sm text-black">{item.product_name}</td>
                           <td className="px-4 py-2.5 text-sm text-black">{item.quantity}</td>
                           <td className="px-4 py-2.5 text-sm text-black">{formatCurrency(Number(item.unit_price), locale)}</td>
-                          <td className="px-4 py-2.5 text-sm font-medium text-black">{formatCurrency(Number(item.total_price), locale)}</td>
+                          <td className="px-4 py-2.5 text-sm text-black">{formatCurrency(Number(item.total_price), locale)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -443,31 +477,10 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
 
                 {/* Totals */}
                 <div className="ml-auto w-72 space-y-1.5 text-sm">
-
-                  {/* Payment Status Badge */}
-                  {Number(detail.amount_paid) > 0 && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-black font-medium">Payment Status</span>
-                      <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-bold ${
-                        Number(detail.amount_paid) >= Number(detail.grand_total)
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-amber-100 text-amber-700"
-                      }`}>
-                        {Number(detail.amount_paid) >= Number(detail.grand_total) ? "Complete" : "Partial"}
-                      </span>
-                    </div>
-                  )}
-
                   <div className="flex justify-between">
                     <span className="text-black">{t("common.subtotal")}</span>
                     <span className="text-black">{formatCurrency(detail.subtotal, locale)}</span>
                   </div>
-                  {detail.discount > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-black">{t("common.discount")}</span>
-                      <span className="text-black">-{formatCurrency(detail.discount, locale)}</span>
-                    </div>
-                  )}
                   {detail.labour_charge > 0 && (
                     <div className="flex justify-between">
                       <span className="text-black">{t("sales.labour_charge")}</span>
@@ -486,10 +499,16 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
                       <span className="text-black">{formatCurrency(detail.tax_amount, locale)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between border-t pt-1.5 text-base font-semibold">
+                  <div className="flex justify-between border-t pt-1.5 text-base font-bold">
                     <span className="text-black">{t("common.grand_total")}</span>
                     <span className="text-emerald-600">{formatCurrency(detail.grand_total, locale)}</span>
                   </div>
+                  {detail.discount > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-red-600">{t("common.discount")}</span>
+                      <span className="text-red-600">-{formatCurrency(detail.discount, locale)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm">
                     <span className="text-black">{t("sales.amount_paid")}</span>
                     <span className="text-black">{formatCurrency(detail.amount_paid, locale)}</span>
@@ -522,15 +541,57 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
 
                 {/* Payment Details */}
                 {detail.payment_details && Object.keys(detail.payment_details).length > 0 && (
-                  <div className="rounded-lg border p-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-black mb-2">Payment Details</p>
-                    <div className="space-y-1 text-sm">
+                  <div className="rounded-lg border p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-black mb-3">Payment Details</p>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
                       {Object.entries(detail.payment_details).map(([key, val]) => (
-                        <div key={key} className="flex justify-between">
-                          <span className="text-black">{paymentDetailLabels[key] || key}</span>
-                          <span className="font-medium text-black">{val}</span>
+                        <div key={key}>
+                          <label className="block text-xs font-medium text-black mb-0.5">{paymentDetailLabels[key] || key}</label>
+                          <div className="rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-black">
+                            {String(val)}
+                          </div>
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Cheque Status */}
+                {detail.payment_type === "cheque" && (
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-black mb-2">Cheque Status</p>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        detail.cheque_status === "cleared" ? "bg-green-100 text-green-700" :
+                        detail.cheque_status === "bounced" ? "bg-red-100 text-red-700" :
+                        "bg-yellow-100 text-yellow-700"
+                      }`}>
+                        {(detail.cheque_status || "pending").toUpperCase()}
+                      </span>
+                      {(detail.cheque_status === "pending" || !detail.cheque_status) && (
+                        <div className="flex gap-1 ml-2">
+                          <button
+                            onClick={async () => {
+                              const supabase = createClient()
+                              await supabase.from("sales").update({ cheque_status: "cleared" }).eq("id", detail.id)
+                              loadSales()
+                            }}
+                            className="rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 hover:bg-green-200"
+                          >
+                            Clear
+                          </button>
+                          <button
+                            onClick={async () => {
+                              const supabase = createClient()
+                              await supabase.from("sales").update({ cheque_status: "bounced" }).eq("id", detail.id)
+                              loadSales()
+                            }}
+                            className="rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 hover:bg-red-200"
+                          >
+                            Bounce
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -561,7 +622,7 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
                   <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 space-y-3">
                     <h4 className="text-sm font-semibold text-black">{t("sales.record_payment")}</h4>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-black">{t("common.total")}</label>
+                      <label className="mb-1 block text-sm font-medium text-black">{t("common.total")}</label>
                       <input
                         type="number"
                         min={0}
@@ -575,26 +636,33 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
                       />
                       <p className="mt-0.5 text-xs text-black">Max: {formatCurrency(detail.balance_due, locale)}</p>
                     </div>
+
+                    {/* Payment Type - Buttons */}
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-black">{t("sales.payment_type")}</label>
-                      <select
-                        value={paymentType}
-                        onChange={(e) => setPaymentType(e.target.value)}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                      >
+                      <label className="mb-1.5 block text-sm font-medium text-black">{t("sales.payment_type")}</label>
+                      <div className="grid grid-cols-3 gap-1.5">
                         {(["cash", "credit", "bank_transfer", "lanka_qr", "card", "mixed", "cheque"] as const).map(
                           (pt) => (
-                            <option key={pt} value={pt}>
+                            <button
+                              key={pt}
+                              type="button"
+                              onClick={() => setPaymentType(pt)}
+                              className={`rounded-lg border px-2 py-1.5 text-xs font-medium transition ${
+                                paymentType === pt
+                                  ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                                  : "border-gray-300 bg-white text-black hover:bg-gray-50"
+                              }`}
+                            >
                               {paymentLabels[pt] || pt}
-                            </option>
+                            </button>
                           ),
                         )}
-                      </select>
+                      </div>
                     </div>
 
                     {/* Cheque Details */}
                     {paymentType === "cheque" && (
-                      <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="mb-1 block text-xs font-medium text-black">Cheque Number</label>
                           <input type="text" value={chequeNumber} onChange={(e) => setChequeNumber(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none" />
@@ -612,7 +680,7 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
 
                     {/* Bank Transfer Details */}
                     {paymentType === "bank_transfer" && (
-                      <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="mb-1 block text-xs font-medium text-black">From Account</label>
                           <input type="text" value={fromAccount} onChange={(e) => setFromAccount(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none" />

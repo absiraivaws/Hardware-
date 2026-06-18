@@ -4,11 +4,10 @@ import { useTranslations } from "next-intl"
 import { createClient } from "@/lib/supabase/client"
 import { usePOSStore } from "@/stores/pos-store"
 import { formatCurrency } from "@/lib/format"
-import { Search, Trash2, ShoppingCart, User, Printer, Smartphone, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
-import { use, useEffect, useMemo, useState, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { Search, Trash2, ShoppingCart, User, Smartphone, ArrowUpDown, ArrowUp, ArrowDown, Plus, X } from "lucide-react"
+import { use, useEffect, useMemo, useState, useRef, useCallback } from "react"
 import type { Database } from "@/types/database"
-import { CompanyHeader, CompanyFooter } from "@/components/shared/company-info"
+import { CompanyFooter } from "@/components/shared/company-info"
 import type { CompanySettings } from "@/components/shared/company-info"
 import { getCached, setCache, invalidateCache } from "@/lib/query-cache"
 import { useData } from "@/providers/data-provider"
@@ -21,6 +20,8 @@ interface CustomerOption {
   id: string
   name: string
   phone: string | null
+  credit_limit: number
+  credit_balance: number
 }
 
 interface ProfileRow {
@@ -40,10 +41,11 @@ interface CustomerCreditRow {
   credit_balance: number
 }
 
+const PAYMENT_TYPES: PaymentType[] = ["cash", "credit", "bank_transfer", "cheque", "lanka_qr", "card", "mixed"]
+
 export default function SalesPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = use(params)
   const t = useTranslations()
-  const router = useRouter()
   const { cart, addToCart, removeFromCart, updateQuantity, clearCart } = usePOSStore()
 
   const [products, setProducts] = useState<Product[]>([])
@@ -51,19 +53,29 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [barcodeInput, setBarcodeInput] = useState("")
+  const [serialInput, setSerialInput] = useState("")
   const [sortKey, setSortKey] = useState<string>("name")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
 
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerOption | null>(null)
   const [customerSearch, setCustomerSearch] = useState("")
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false)
+  const [showNewCustomerForm, setShowNewCustomerForm] = useState(false)
+  const [newCustomerName, setNewCustomerName] = useState("")
+  const [newCustomerPhone, setNewCustomerPhone] = useState("")
+  const [newCustomerEmail, setNewCustomerEmail] = useState("")
+  const [newCustomerAddress, setNewCustomerAddress] = useState("")
+  const [newCustomerCreditLimit, setNewCustomerCreditLimit] = useState(0)
+  const [creatingCustomer, setCreatingCustomer] = useState(false)
 
-  const [discount, setDiscount] = useState(0)
-  const [labourCharge, setLabourCharge] = useState(0)
-  const [transportCharge, setTransportCharge] = useState(0)
+  const [discount, setDiscount] = useState("")
+  const [labourCharge, setLabourCharge] = useState("")
+  const [transportCharge, setTransportCharge] = useState("")
   const [taxType, setTaxType] = useState<TaxType>("non_vat")
   const [paymentType, setPaymentType] = useState<PaymentType>("cash")
-  const [amountPaid, setAmountPaid] = useState(0)
+  const [amountPaid, setAmountPaid] = useState("")
+  const [showApprovalPrompt, setShowApprovalPrompt] = useState(false)
+  const [approvalPin, setApprovalPin] = useState("")
   const [chequeNumber, setChequeNumber] = useState("")
   const [bankCode, setBankCode] = useState("")
   const [accountNumber, setAccountNumber] = useState("")
@@ -80,7 +92,20 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
   } | null>(null)
 
   const barcodeRef = useRef<HTMLInputElement>(null)
+  const serialRef = useRef<HTMLInputElement>(null)
   const customerRef = useRef<HTMLDivElement>(null)
+  const quantityRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  const discountRef = useRef<HTMLInputElement>(null)
+  const labourRef = useRef<HTMLInputElement>(null)
+  const transportRef = useRef<HTMLInputElement>(null)
+  const amountPaidRef = useRef<HTMLInputElement>(null)
+  const completeBtnRef = useRef<HTMLButtonElement>(null)
+  const paymentTypeRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+  const chequeNumberRef = useRef<HTMLInputElement>(null)
+  const bankCodeRef = useRef<HTMLInputElement>(null)
+  const accountNumberRef = useRef<HTMLInputElement>(null)
+  const fromAccountRef = useRef<HTMLInputElement>(null)
+  const toAccountRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -99,8 +124,8 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       }
 
       const [productRes, customerRes] = await Promise.all([
-        supabase.from("products").select("id, name, code, barcode, selling_price, current_stock, min_stock").eq("status", "active").order("name"),
-        supabase.from("customers").select("id, name, phone").eq("status", "active").order("name"),
+        supabase.from("products").select("id, name, code, barcode, serial_no, selling_price, current_stock, min_stock").eq("status", "active").order("name"),
+        supabase.from("customers").select("id, name, phone, credit_limit, credit_balance").eq("status", "active").order("name"),
       ])
       if (productRes.data) {
         setProducts(productRes.data as Product[])
@@ -142,7 +167,8 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
         (p) =>
           p.name.toLowerCase().includes(q) ||
           p.code.toLowerCase().includes(q) ||
-          (p.barcode && p.barcode.toLowerCase().includes(q)),
+          (p.barcode && p.barcode.toLowerCase().includes(q)) ||
+          p.serial_no.toLowerCase().includes(q),
       )
     }
     result = [...result].sort((a, b) => {
@@ -163,40 +189,67 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
     return customers.filter((c) => c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q)))
   }, [customers, customerSearch])
 
-  const handleBarcodeSearch = async () => {
-    if (!barcodeInput.trim()) return
-    const q = barcodeInput.trim().toLowerCase()
-    const product =
-      products.find((p) => p.barcode?.toLowerCase() === q) ||
-      products.find((p) => p.code.toLowerCase() === q)
-    if (product) {
-      addToCart({
-        product_id: product.id,
-        product_name: product.name,
-        quantity: 1,
-        unit_price: product.selling_price,
-      })
-      setBarcodeInput("")
-      barcodeRef.current?.focus()
-    }
-  }
-
-  const handleAddToCart = (product: Product) => {
-    if (product.current_stock <= 0) return
+  const addProductAndFocusQuantity = useCallback((product: Product) => {
     addToCart({
       product_id: product.id,
       product_name: product.name,
       quantity: 1,
       unit_price: product.selling_price,
     })
+    setTimeout(() => {
+      quantityRefs.current[product.id]?.focus()
+      quantityRefs.current[product.id]?.select()
+    }, 50)
+  }, [addToCart])
+
+  const handleBarcodeSearch = () => {
+    if (!barcodeInput.trim()) return
+    const q = barcodeInput.trim().toLowerCase()
+    const product =
+      products.find((p) => p.barcode?.toLowerCase() === q) ||
+      products.find((p) => p.code.toLowerCase() === q)
+    if (product) {
+      addProductAndFocusQuantity(product)
+      setBarcodeInput("")
+    }
+  }
+
+  const handleSerialSearch = () => {
+    const fullSerial = "000" + serialInput
+    if (fullSerial.length < 6) return
+    const product = products.find((p) => p.serial_no === fullSerial)
+    if (product) {
+      addProductAndFocusQuantity(product)
+      setSerialInput("")
+      serialRef.current?.focus()
+    }
+  }
+
+  const handleAddToCart = (product: Product) => {
+    if (product.current_stock <= 0) return
+    addProductAndFocusQuantity(product)
   }
 
   const subtotal = useMemo(() => cart.reduce((sum, i) => sum + i.total_price, 0), [cart])
-  const taxableAmount = subtotal - discount + labourCharge + transportCharge
+  const d = Number(discount) || 0
+  const lc = Number(labourCharge) || 0
+  const tc = Number(transportCharge) || 0
+  const ap = Number(amountPaid) || 0
+  const taxableAmount = subtotal + lc + tc
   const taxAmount = taxType === "svat" ? taxableAmount * 0.15 : 0
   const grandTotal = taxableAmount + taxAmount
-  const changeDue = amountPaid > grandTotal ? amountPaid - grandTotal : 0
-  const balanceDue = Math.max(0, grandTotal - amountPaid)
+  const netAmount = grandTotal - d
+  const changeDue = ap > netAmount ? ap - netAmount : 0
+  const balanceDue = Math.max(0, netAmount - ap)
+
+  const isCreditOverLimit = useMemo(() => {
+    if (paymentType !== "credit" || !selectedCustomer) return false
+    const cust = customers.find((c) => c.id === selectedCustomer.id)
+    if (!cust) return false
+    const creditLimit = (cust as unknown as Record<string, unknown>).credit_limit as number ?? 0
+    const creditBalance = (cust as unknown as Record<string, unknown>).credit_balance as number ?? 0
+    return creditBalance + netAmount > creditLimit
+  }, [paymentType, selectedCustomer, customers, netAmount])
 
   const handleCompleteSale = async () => {
     if (cart.length === 0) return
@@ -254,6 +307,23 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       const customerId = selectedCustomer?.id || null
       const customerName = selectedCustomer?.name || "Walk-in Customer"
 
+      // Credit limit approval check
+      let creditApprovalStatus = "none"
+      let approvedBy: string | null = null
+      if (paymentType === "credit" && isCreditOverLimit) {
+        if (!approvalPin) throw new Error("Manager PIN required for credit over limit")
+        const { data: settings } = await supabase
+          .from("company_settings")
+          .select("manager_pin")
+          .limit(1)
+          .maybeSingle()
+        if (!settings || settings.manager_pin !== approvalPin) {
+          throw new Error("Invalid manager PIN")
+        }
+        creditApprovalStatus = "approved"
+        approvedBy = user.id
+      }
+
       const { data: sale, error: saleError } = await supabase
         .from("sales")
         .insert({
@@ -263,16 +333,18 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
           branch_id: profileData?.branch_id || null,
           user_id: user.id,
           subtotal,
-          discount,
-          labour_charge: labourCharge,
-          transport_charge: transportCharge,
+          discount: d,
+          labour_charge: lc,
+          transport_charge: tc,
           tax_type: taxType,
           tax_amount: taxAmount,
-          grand_total: grandTotal,
+          grand_total: netAmount,
           payment_type: paymentType,
-          amount_paid: amountPaid,
+          amount_paid: ap,
           balance_due: balanceDue,
-          status: balanceDue > 0 && paymentType === "credit" ? "pending" : "completed",
+          status: balanceDue > 0 ? "pending" : "completed",
+          credit_approval_status: creditApprovalStatus,
+          approved_by: approvedBy,
           payment_details: {
             ...(paymentType === "cheque" && { cheque_number: chequeNumber, bank_code: bankCode, account_number: accountNumber }),
             ...(paymentType === "bank_transfer" && { from_account: fromAccount, to_account: toAccount }),
@@ -296,30 +368,71 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       const { error: itemsError } = await supabase.from("sale_items").insert(saleItems as never)
       if (itemsError) throw itemsError
 
-      for (const item of cart) {
-        const { data: prod } = await supabase
-          .from("products")
-          .select("current_stock")
-          .eq("id", item.product_id)
-          .single()
-        if (prod) {
-          await supabase
-            .from("products")
-            .update({ current_stock: Number(prod.current_stock) - item.quantity } as never)
-            .eq("id", item.product_id)
-        }
+      // Reset form state immediately after sale is saved
+      const receiptItems = cart.map((i) => ({
+        product_name: i.product_name,
+        quantity: i.quantity,
+        unit_price: i.unit_price,
+        total_price: i.total_price,
+      }))
+      const completedSaleData = { invoice_no: invoiceNo, grand_total: netAmount, amount_paid: ap, balance_due: balanceDue, items: receiptItems }
+      clearCart()
+      setDiscount("")
+      setLabourCharge("")
+      setTransportCharge("")
+      setTaxType("non_vat")
+      setPaymentType("cash")
+      setAmountPaid("")
+      setApprovalPin("")
+      setShowApprovalPrompt(false)
+      setChequeNumber("")
+      setBankCode("")
+      setAccountNumber("")
+      setFromAccount("")
+      setToAccount("")
+      setSelectedCustomer(null)
+      setCustomerSearch("")
 
-        await supabase.from("stock_movements").insert({
-          product_id: item.product_id,
-          type: "out",
-          quantity: item.quantity,
-          reference_type: "sale",
-          reference_id: saleData.id,
-          notes: invoiceNo,
-          branch_id: profileData?.branch_id || null,
-          user_id: user.id,
-        } as never)
+      // Batch stock operations
+      const productIds = cart.map((i) => i.product_id)
+      const { data: products } = await supabase
+        .from("products")
+        .select("id, current_stock")
+        .in("id", productIds)
+      if (products) {
+        for (const p of products) {
+          const qty = cart.find((i) => i.product_id === p.id)?.quantity || 0
+          await supabase.from("products").update({ current_stock: Number(p.current_stock) - qty } as never).eq("id", p.id)
+        }
       }
+
+      // Batch branch stock updates
+      if (profileData?.branch_id) {
+        const { data: branchStocks } = await supabase
+          .from("branch_stock")
+          .select("product_id, current_stock")
+          .in("product_id", productIds)
+          .eq("branch_id", profileData.branch_id)
+        if (branchStocks) {
+          for (const bs of branchStocks) {
+            const qty = cart.find((i) => i.product_id === bs.product_id)?.quantity || 0
+            await supabase.from("branch_stock").update({ current_stock: Number(bs.current_stock) - qty }).eq("product_id", bs.product_id).eq("branch_id", profileData.branch_id)
+          }
+        }
+      }
+
+      // Batch insert stock movements
+      const movements = cart.map((item) => ({
+        product_id: item.product_id,
+        type: "out" as const,
+        quantity: item.quantity,
+        reference_type: "sale" as const,
+        reference_id: saleData.id,
+        notes: `${customerName || "Walk-in Customer"} - ${invoiceNo}`,
+        branch_id: profileData?.branch_id || null,
+        user_id: user.id,
+      }))
+      await supabase.from("stock_movements").insert(movements as never)
 
       if (customerId && balanceDue > 0) {
         const { data: cust } = await supabase
@@ -337,8 +450,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
         }
       }
 
-      // Financial ledger entry
-      if (amountPaid > 0) {
+      if (ap > 0) {
         const financialType = paymentType === "cash" ? "cash" : "bank"
         const { data: lastEntry } = await supabase
           .from("ledger_entries")
@@ -355,41 +467,14 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
           reference_id: saleData.id,
           reference_type: "sale",
           entry_type: "debit",
-          amount: amountPaid,
+          amount: ap,
           description: `Sale ${invoiceNo}`,
-          balance_after: prevBalance + amountPaid,
+          balance_after: prevBalance + ap,
         } as never)
       }
 
-      const receiptItems = cart.map((i) => ({
-        product_name: i.product_name,
-        quantity: i.quantity,
-        unit_price: i.unit_price,
-        total_price: i.total_price,
-      }))
+      setCompletedSale(completedSaleData)
 
-      setCompletedSale({
-        invoice_no: invoiceNo,
-        grand_total: grandTotal,
-        amount_paid: amountPaid,
-        balance_due: balanceDue,
-        items: receiptItems,
-      })
-
-      clearCart()
-      setDiscount(0)
-      setLabourCharge(0)
-      setTransportCharge(0)
-      setTaxType("non_vat")
-      setPaymentType("cash")
-      setAmountPaid(0)
-      setChequeNumber("")
-      setBankCode("")
-      setAccountNumber("")
-      setFromAccount("")
-      setToAccount("")
-      setSelectedCustomer(null)
-      setCustomerSearch("")
       invalidateCache("sales")
       invalidateCache("products")
       invalidateCache("customers")
@@ -401,10 +486,69 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
     }
   }
 
+  const handleCreateNewCustomer = async () => {
+    if (!newCustomerName.trim()) return
+    setCreatingCustomer(true)
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from("customers")
+      .insert({
+        name: newCustomerName.trim(),
+        phone: newCustomerPhone.trim() || null,
+        email: newCustomerEmail.trim() || null,
+        address: newCustomerAddress.trim() || null,
+        credit_limit: newCustomerCreditLimit,
+        status: "active",
+      } as never)
+      .select("id, name, phone")
+      .single()
+
+    if (error) {
+      console.error("Customer creation error:", error)
+      alert("Failed to create customer")
+      setCreatingCustomer(false)
+      return
+    }
+
+    const newCust = data as CustomerOption
+    setCustomers((prev) => [...prev, newCust])
+    setSelectedCustomer(newCust)
+    setCustomerSearch(newCust.name)
+    setShowNewCustomerForm(false)
+    setNewCustomerName("")
+    setNewCustomerPhone("")
+    setNewCustomerEmail("")
+    setNewCustomerAddress("")
+    setNewCustomerCreditLimit(0)
+    setShowCustomerDropdown(false)
+    invalidateCache("customers")
+    setCreatingCustomer(false)
+  }
+
   return (
     <div className="space-y-4">
-      {/* ===== TOP ROW: Search + Barcode ===== */}
+      {/* ===== TOP ROW: Serial No + Search + Barcode ===== */}
       <div className="flex items-center gap-3">
+        <div className="flex items-center rounded-lg border border-gray-300 px-3 py-2.5 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500">
+          <span className="text-sm text-black font-mono mr-0.5">000</span>
+          <input
+            ref={serialRef}
+            type="text"
+            value={serialInput}
+            onChange={(e) => {
+              const v = e.target.value.replace(/\D/g, "").slice(0, 3)
+              setSerialInput(v)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault()
+                handleSerialSearch()
+              }
+            }}
+            placeholder="—"
+            className="w-10 border-0 p-0 text-sm text-black font-mono focus:outline-none focus:ring-0"
+          />
+        </div>
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-black" size={18} />
           <input
@@ -415,28 +559,20 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
             className="w-full rounded-lg border border-gray-300 py-2.5 pl-10 pr-4 text-sm text-black placeholder-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
           />
         </div>
-        <div className="relative">
-          <input
-            ref={barcodeRef}
-            type="text"
-            value={barcodeInput}
-            onChange={(e) => setBarcodeInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault()
-                handleBarcodeSearch()
-              }
-            }}
-            placeholder={t("sales.scan_barcode")}
-            className="w-52 rounded-lg border border-gray-300 py-2.5 pl-3 pr-4 text-sm text-black placeholder-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-          />
-        </div>
-        <button
-          onClick={() => router.push(`/${locale}/sales/history`)}
-          className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-black hover:bg-gray-50"
-        >
-          {t("sales.sale_history")}
-        </button>
+        <input
+          ref={barcodeRef}
+          type="text"
+          value={barcodeInput}
+          onChange={(e) => setBarcodeInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault()
+              handleBarcodeSearch()
+            }
+          }}
+          placeholder="Barcode / Code"
+          className="w-44 rounded-lg border border-gray-300 py-2.5 px-3 text-sm text-black placeholder-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+        />
       </div>
 
       {/* ===== MAIN CONTENT: Product Grid + Cart/Payment ===== */}
@@ -461,10 +597,11 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-white">
                   <tr className="border-b text-xs">
-                    {(["name", "code", "selling_price", "current_stock"] as const).map((key) => {
+                    {(["serial_no", "name", "code", "selling_price", "current_stock"] as const).map((key) => {
                       const active = sortKey === key
                       const SortIcon = active ? (sortDir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown
                       const labels: Record<string, string> = {
+                        serial_no: "Serial",
                         name: t("inventory.product_name"),
                         code: t("inventory.product_code"),
                         selling_price: t("inventory.selling_price"),
@@ -513,6 +650,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                         onClick={() => handleAddToCart(product)}
                         className={`cursor-pointer border-b transition hover:brightness-95 ${rowBg} ${outOfStock ? "opacity-50 cursor-not-allowed" : ""}`}
                       >
+                        <td className="px-3 py-2.5 font-mono text-xs text-black">{product.serial_no}</td>
                         <td className="px-3 py-2.5 font-medium text-black">{product.name}</td>
                         <td className="px-3 py-2.5 text-black">{product.code}</td>
                         <td className="px-3 py-2.5 text-right font-semibold text-black">
@@ -556,10 +694,10 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-xs text-black">
-                    <th className="px-3 py-2 text-left font-medium">{t("sales.item")}</th>
-                    <th className="px-3 py-2 text-center font-medium">{t("sales.qty")}</th>
-                    <th className="px-3 py-2 text-right font-medium">{t("sales.price")}</th>
-                    <th className="px-3 py-2 text-right font-medium">{t("sales.amount")}</th>
+                    <th className="px-3 py-2 text-left font-bold">{t("sales.item")}</th>
+                    <th className="px-3 py-2 text-center font-bold">{t("sales.qty")}</th>
+                    <th className="px-3 py-2 text-right font-bold">{t("sales.price")}</th>
+                    <th className="px-3 py-2 text-right font-bold">{t("sales.amount")}</th>
                     <th className="w-10 px-3 py-2" />
                   </tr>
                 </thead>
@@ -573,11 +711,12 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                   ) : (
                     cart.map((item) => (
                       <tr key={item.product_id} className="border-b last:border-0">
-                        <td className="break-words px-3 py-2 text-sm font-medium text-black">
+                        <td className="break-words px-3 py-2 text-sm text-black">
                           {item.product_name}
                         </td>
                         <td className="px-3 py-2">
                           <input
+                            ref={(el) => { quantityRefs.current[item.product_id] = el }}
                             type="number"
                             min={1}
                             value={item.quantity}
@@ -585,13 +724,28 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                               const v = parseInt(e.target.value) || 1
                               updateQuantity(item.product_id, v)
                             }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === "Tab") {
+                                e.preventDefault()
+                                const lastItem = cart[cart.length - 1]
+                                if (item.product_id === lastItem?.product_id) {
+                                  labourRef.current?.focus()
+                                } else {
+                                  const idx = cart.findIndex((ci) => ci.product_id === item.product_id)
+                                  const next = cart[idx + 1]
+                                  if (next) {
+                                    setTimeout(() => quantityRefs.current[next.product_id]?.focus(), 0)
+                                  }
+                                }
+                              }
+                            }}
                             className="w-16 rounded border border-gray-300 px-2 py-1 text-center text-sm text-black focus:border-emerald-500 focus:outline-none"
                           />
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-black">
                           {formatCurrency(item.unit_price, locale)}
                         </td>
-                        <td className="whitespace-nowrap px-3 py-2 text-right text-sm font-semibold text-black">
+                        <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-black">
                           {formatCurrency(item.total_price, locale)}
                         </td>
                         <td className="px-3 py-2">
@@ -613,36 +767,40 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
             <div className="space-y-2 border-t px-4 py-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-black">{t("common.subtotal")}</span>
-                <span className="font-medium text-black">{formatCurrency(subtotal, locale)}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-black">{t("common.discount")}</span>
-                <input
-                  type="number"
-                  min={0}
-                  value={discount}
-                  onChange={(e) => setDiscount(Number(e.target.value) || 0)}
-                  className="w-28 rounded border border-gray-300 px-2 py-1 text-right text-sm text-black placeholder-gray-700 focus:border-emerald-500 focus:outline-none"
-                />
+                <span className="text-black">{formatCurrency(subtotal, locale)}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-black">{t("sales.labour_charge")}</span>
                 <input
+                  ref={labourRef}
                   type="number"
                   min={0}
                   value={labourCharge}
-                  onChange={(e) => setLabourCharge(Number(e.target.value) || 0)}
-                  className="w-28 rounded border border-gray-300 px-2 py-1 text-right text-sm text-black placeholder-gray-700 focus:border-emerald-500 focus:outline-none"
+                  onChange={(e) => setLabourCharge(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "Tab") {
+                      e.preventDefault()
+                      transportRef.current?.focus()
+                    }
+                  }}
+                  className="w-28 rounded border border-gray-300 px-2 py-1 text-right text-sm text-black focus:border-emerald-500 focus:outline-none"
                 />
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-black">{t("sales.transport_charge")}</span>
                 <input
+                  ref={transportRef}
                   type="number"
                   min={0}
                   value={transportCharge}
-                  onChange={(e) => setTransportCharge(Number(e.target.value) || 0)}
-                  className="w-28 rounded border border-gray-300 px-2 py-1 text-right text-sm text-black placeholder-gray-700 focus:border-emerald-500 focus:outline-none"
+                  onChange={(e) => setTransportCharge(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "Tab") {
+                      e.preventDefault()
+                      amountPaidRef.current?.focus()
+                    }
+                  }}
+                  className="w-28 rounded border border-gray-300 px-2 py-1 text-right text-sm text-black focus:border-emerald-500 focus:outline-none"
                 />
               </div>
               <div className="flex items-center justify-between text-sm">
@@ -667,6 +825,28 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                 <span className="text-black">{t("common.grand_total")}</span>
                 <span className="text-emerald-600">{formatCurrency(grandTotal, locale)}</span>
               </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-red-600">{t("common.discount")}</span>
+                <input
+                  ref={discountRef}
+                  type="number"
+                  min={0}
+                  value={discount}
+                  onChange={(e) => setDiscount(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "Tab") {
+                      e.preventDefault()
+                      amountPaidRef.current?.focus()
+                    }
+                  }}
+                  className="w-28 rounded border border-gray-300 px-2 py-1 text-right text-sm text-red-600 focus:border-emerald-500 focus:outline-none"
+                  autoComplete="off"
+                />
+              </div>
+              <div className="flex items-center justify-between border-t pt-2 text-base font-bold">
+                <span className="text-black">Net Amount</span>
+                <span className="text-black">{formatCurrency(netAmount, locale)}</span>
+              </div>
             </div>
 
             {/* Payment Section */}
@@ -684,8 +864,20 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                       setShowCustomerDropdown(true)
                     }}
                     onFocus={() => setShowCustomerDropdown(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === "Tab") {
+                        e.preventDefault()
+                        if (showCustomerDropdown && filteredCustomers.length > 0) {
+                          const first = filteredCustomers[0]
+                          setSelectedCustomer(first)
+                          setCustomerSearch(first.name)
+                          setShowCustomerDropdown(false)
+                        }
+                        setTimeout(() => paymentTypeRefs.current["cash"]?.focus(), 0)
+                      }
+                    }}
                     placeholder={t("sales.select_customer")}
-                    className="flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm text-black placeholder-gray-700 focus:border-emerald-500 focus:outline-none"
+                    className="flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm text-black focus:border-emerald-500 focus:outline-none"
                   />
                   {selectedCustomer && (
                     <button
@@ -711,6 +903,16 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                     >
                       {t("sales.walk_in")}
                     </button>
+                    <button
+                      onClick={() => {
+                        setShowCustomerDropdown(false)
+                        setShowNewCustomerForm(true)
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-emerald-700 hover:bg-emerald-50"
+                    >
+                      <Plus size={14} />
+                      New Customer
+                    </button>
                     {filteredCustomers.map((c) => (
                       <button
                         key={c.id}
@@ -729,44 +931,92 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                 )}
               </div>
 
-              {/* Payment Type */}
+              {selectedCustomer && paymentType === "credit" && (
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-2">
+                  <div className="flex items-center justify-between text-xs text-black">
+                    <span>Credit Limit: {formatCurrency((selectedCustomer as unknown as Record<string, unknown>).credit_limit as number ?? 0, locale)}</span>
+                    <span>Used: {formatCurrency((selectedCustomer as unknown as Record<string, unknown>).credit_balance as number ?? 0, locale)}</span>
+                    <span className={isCreditOverLimit ? "font-semibold text-red-600" : "text-green-600"}>
+                      Available: {formatCurrency(Math.max(0, ((selectedCustomer as unknown as Record<string, unknown>).credit_limit as number ?? 0) - ((selectedCustomer as unknown as Record<string, unknown>).credit_balance as number ?? 0)), locale)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Credit Limit Warning */}
+              {isCreditOverLimit && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+                  <p className="text-sm font-medium text-amber-800">
+                    Credit limit exceeded for {selectedCustomer?.name}
+                  </p>
+                  <p className="mt-0.5 text-xs text-amber-700">
+                    Manager PIN required to proceed
+                  </p>
+                  <input
+                    type="password"
+                    maxLength={4}
+                    value={approvalPin}
+                    onChange={(e) => setApprovalPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    placeholder="Enter manager PIN"
+                    className="mt-2 w-36 rounded border border-amber-300 px-2 py-1 text-sm focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+              )}
+
+              {/* Payment Type - Buttons */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-black">
+                <label className="mb-1.5 block text-sm font-medium text-black">
                   {t("sales.payment_type")}
                 </label>
-                <select
-                  value={paymentType}
-                  onChange={(e) => setPaymentType(e.target.value as PaymentType)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                >
-                  {(["cash", "credit", "bank_transfer", "lanka_qr", "card", "mixed", "cheque"] as const).map(
-                    (pt) => (
-                      <option key={pt} value={pt}>
-                        {t(`sales.${pt}`)}
-                      </option>
-                    ),
-                  )}
-                </select>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {PAYMENT_TYPES.map((pt) => (
+                    <button
+                      key={pt}
+                      ref={(el) => { paymentTypeRefs.current[pt] = el }}
+                      type="button"
+                      onClick={() => setPaymentType(pt)}
+                      className={`rounded-lg border px-2 py-1.5 text-xs font-medium transition ${
+                        paymentType === pt
+                          ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                          : "border-gray-300 bg-white text-black hover:bg-gray-50"
+                      }`}
+                    >
+                      {t(`sales.${pt}`)}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {/* Amount Paid + Change Due */}
+              {/* Amount Paid + Overpayment Alert */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-black">
                   {t("common.total")} Paid
                 </label>
-                <input
-                  type="number"
-                  min={0}
-                  value={amountPaid}
-                  onChange={(e) => setAmountPaid(Number(e.target.value) || 0)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black placeholder-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                />
-                {changeDue > 0 && (
-                  <p className="mt-1 text-sm font-medium text-emerald-600">
+                <div className={`rounded-lg border ${ap > netAmount ? "border-red-500 bg-red-50" : "border-gray-300"}`}>
+                  <input
+                    ref={amountPaidRef}
+                    type="number"
+                    min={0}
+                    max={netAmount}
+                    value={amountPaid}
+                    onChange={(e) => setAmountPaid(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === "Tab") {
+                        e.preventDefault()
+                        if (ap >= netAmount) {
+                          completeBtnRef.current?.focus()
+                        }
+                      }
+                    }}
+                    className="w-full rounded-lg border-0 bg-transparent px-3 py-2 text-sm text-black focus:outline-none focus:ring-0"
+                  />
+                </div>
+                {ap > 0 && ap >= netAmount && changeDue > 0 && (
+                  <p className="mt-1.5 rounded bg-yellow-100 px-2 py-1 text-sm font-semibold text-yellow-800">
                     Change Due: {formatCurrency(changeDue, locale)}
                   </p>
                 )}
-                {amountPaid > 0 && amountPaid < grandTotal && (
+                {ap > 0 && ap < netAmount && (
                   <p className="mt-1 text-sm text-amber-600">
                     Balance Due: {formatCurrency(balanceDue, locale)}
                   </p>
@@ -776,30 +1026,53 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
               {/* Cheque Details */}
               {paymentType === "cheque" && (
                 <div className="space-y-2">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-black">Cheque Number</label>
-                    <input
-                      type="text"
-                      value={chequeNumber}
-                      onChange={(e) => setChequeNumber(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-black">Bank Code</label>
-                    <input
-                      type="text"
-                      value={bankCode}
-                      onChange={(e) => setBankCode(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-black">Cheque Number</label>
+                      <input
+                        ref={chequeNumberRef}
+                        type="text"
+                        value={chequeNumber}
+                        onChange={(e) => setChequeNumber(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === "Tab") {
+                            e.preventDefault()
+                            bankCodeRef.current?.focus()
+                          }
+                        }}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-black">Bank Code</label>
+                      <input
+                        ref={bankCodeRef}
+                        type="text"
+                        value={bankCode}
+                        onChange={(e) => setBankCode(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === "Tab") {
+                            e.preventDefault()
+                            accountNumberRef.current?.focus()
+                          }
+                        }}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-black">Account Number</label>
                     <input
+                      ref={accountNumberRef}
                       type="text"
                       value={accountNumber}
                       onChange={(e) => setAccountNumber(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === "Tab") {
+                          e.preventDefault()
+                          amountPaidRef.current?.focus()
+                        }
+                      }}
                       className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
                   </div>
@@ -808,22 +1081,36 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
 
               {/* Bank Transfer Details */}
               {paymentType === "bank_transfer" && (
-                <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="mb-1 block text-xs font-medium text-black">From Account</label>
                     <input
+                      ref={fromAccountRef}
                       type="text"
                       value={fromAccount}
                       onChange={(e) => setFromAccount(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === "Tab") {
+                          e.preventDefault()
+                          toAccountRef.current?.focus()
+                        }
+                      }}
                       className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-black">To Account</label>
                     <input
+                      ref={toAccountRef}
                       type="text"
                       value={toAccount}
                       onChange={(e) => setToAccount(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === "Tab") {
+                          e.preventDefault()
+                          amountPaidRef.current?.focus()
+                        }
+                      }}
                       className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
                   </div>
@@ -834,6 +1121,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
             {/* Complete Sale Button */}
             <div className="border-t px-4 py-3">
               <button
+                ref={completeBtnRef}
                 onClick={handleCompleteSale}
                 disabled={cart.length === 0 || submitting}
                 className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -855,12 +1143,28 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       {/* ===== Completed Sale Modal ===== */}
       {completedSale && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
-            <CompanyHeader settings={companySettings} />
-            <div className="mb-4 text-center">
-              <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
-                <Printer size={24} className="text-emerald-600" />
+          <div className="mx-4 w-full max-w-sm rounded-xl bg-white p-6 shadow-xl receipt-print">
+            <div className="flex items-start gap-4 mb-4 border-b pb-3">
+              {companySettings?.logo_url && (
+                <img
+                  src={companySettings.logo_url}
+                  alt={companySettings.company_name}
+                  className="h-16 w-auto object-contain shrink-0"
+                />
+              )}
+              <div className="min-w-0">
+                {companySettings?.company_name && (
+                  <h1 className="text-lg font-bold text-black">{companySettings.company_name}</h1>
+                )}
+                {companySettings?.address && (
+                  <p className="text-xs text-black">{companySettings.address}</p>
+                )}
+                {companySettings?.contact_number && (
+                  <p className="text-xs text-black">Tel: {companySettings.contact_number}</p>
+                )}
               </div>
+            </div>
+            <div className="mb-4 text-center">
               <h3 className="text-lg font-semibold text-black">{t("sales.complete_sale")}</h3>
               <p className="mt-1 text-sm text-black">{completedSale.invoice_no}</p>
             </div>
@@ -904,22 +1208,107 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                 </span>
               </div>
             </div>
-            <CompanyFooter settings={companySettings} />
-            <div className="mt-4 flex gap-3">
+            <div className="no-print">
+              <CompanyFooter settings={companySettings} />
+              <div className="mt-4 flex gap-3">
+                <button
+                  onClick={() => setCompletedSale(null)}
+                  className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-black hover:bg-gray-50"
+                >
+                  {t("common.no")}
+                </button>
+                <button
+                  onClick={() => {
+                    window.print()
+                    setCompletedSale(null)
+                  }}
+                  className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                >
+                  {t("common.print")}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @media print {
+          @page { size: A4; margin: 10mm; }
+          body * { visibility: hidden; }
+          .receipt-print, .receipt-print * { visibility: visible; }
+          .receipt-print { position: absolute; left: 0; top: 0; width: 100%; max-width: 210mm; margin: 0 auto; box-shadow: none; border-radius: 0; }
+          .no-print, .no-print * { display: none !important; }
+        }
+      `}</style>
+
+      {/* ===== New Customer Modal ===== */}
+      {showNewCustomerForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-black">New Customer</h3>
               <button
-                onClick={() => setCompletedSale(null)}
-                className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-black hover:bg-gray-50"
+                onClick={() => setShowNewCustomerForm(false)}
+                className="rounded p-1 hover:bg-gray-100"
               >
-                {t("common.no")}
+                <X size={20} />
               </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">Name *</label>
+                <input
+                  type="text"
+                  value={newCustomerName}
+                  onChange={(e) => setNewCustomerName(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">Phone</label>
+                <input
+                  type="text"
+                  value={newCustomerPhone}
+                  onChange={(e) => setNewCustomerPhone(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">Email</label>
+                <input
+                  type="text"
+                  value={newCustomerEmail}
+                  onChange={(e) => setNewCustomerEmail(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">Address</label>
+                <input
+                  type="text"
+                  value={newCustomerAddress}
+                  onChange={(e) => setNewCustomerAddress(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">Credit Limit</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={newCustomerCreditLimit}
+                  onChange={(e) => setNewCustomerCreditLimit(Number(e.target.value) || 0)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
               <button
-                onClick={() => {
-                  window.print()
-                  setCompletedSale(null)
-                }}
-                className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                onClick={handleCreateNewCustomer}
+                disabled={creatingCustomer || !newCustomerName.trim()}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
               >
-                {t("common.print")}
+                {creatingCustomer ? "Creating..." : "Save Customer"}
               </button>
             </div>
           </div>

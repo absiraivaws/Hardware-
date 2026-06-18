@@ -7,7 +7,7 @@ import { Plus, Pencil, Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { DataTable } from "@/components/shared/data-table"
 import { PageHeader } from "@/components/shared/page-header"
-import { formatCurrency } from "@/lib/format"
+import { formatCurrency, formatDate } from "@/lib/format"
 import { calculateFIFOValue } from "@/lib/fifo"
 import { getCached, setCache } from "@/lib/query-cache"
 
@@ -16,6 +16,7 @@ interface ProductRow extends Record<string, unknown> {
   code: string
   name: string
   barcode: string | null
+  serial_no: string
   category_id: string | null
   brand_id: string | null
   unit_id: string | null
@@ -25,6 +26,7 @@ interface ProductRow extends Record<string, unknown> {
   min_stock: number
   current_stock: number
   has_expiry: boolean
+  expiry_date: string | null
   is_decimal_qty: boolean
   status: "active" | "inactive"
   categories: { name: string } | null
@@ -171,6 +173,11 @@ export default function InventoryPage({ params }: { params: Promise<{ locale: st
 
   const columns = [
     {
+      key: "serial_no",
+      label: "Serial",
+      render: (item: ProductRow) => <span className="font-mono text-xs">{item.serial_no}</span>,
+    },
+    {
       key: "code",
       label: t("inventory.product_code"),
       render: (item: ProductRow) => <span className="font-medium">{item.code}</span>,
@@ -198,6 +205,21 @@ export default function InventoryPage({ params }: { params: Promise<{ locale: st
           {item.current_stock} {item.units?.symbol || ""}
         </span>
       ),
+    },
+    {
+      key: "expiry_date",
+      label: "Expiry Date",
+      render: (item: ProductRow) => {
+        if (!item.has_expiry || !item.expiry_date) return <span className="text-gray-400">—</span>
+        const now = new Date()
+        const expiry = new Date(item.expiry_date)
+        const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+        let cls = "text-black"
+        if (daysLeft < 0) cls = "font-semibold text-red-600"
+        else if (daysLeft <= 30) cls = "font-semibold text-amber-600"
+        else if (daysLeft <= 90) cls = "text-amber-700"
+        return <span className={cls}>{formatDate(item.expiry_date, locale)}{daysLeft <= 30 && ` (${daysLeft < 0 ? "Expired" : `${daysLeft}d`})`}</span>
+      },
     },
     {
       key: "min_stock",

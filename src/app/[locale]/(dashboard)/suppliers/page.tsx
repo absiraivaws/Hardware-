@@ -14,6 +14,7 @@ interface Supplier {
   email: string | null
   address: string | null
   credit_period: number
+  overdue_penalty_rate: number
   status: "active" | "inactive"
   created_at: string
   updated_at: string
@@ -29,7 +30,7 @@ export default function SuppliersPage({
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ name: "", contact_person: "", phone: "", email: "", address: "", credit_period: 0 })
+  const [form, setForm] = useState({ name: "", contact_person: "", phone: "", email: "", address: "", credit_period: 0, overdue_penalty_rate: 0 })
 
   const fetchSuppliers = async () => {
     const cached = getCached<Supplier[]>("suppliers:all")
@@ -54,9 +55,9 @@ export default function SuppliersPage({
   const handleAdd = async () => {
     if (!form.name) return
     const supabase = createClient()
-    await supabase.from("suppliers").insert([{ ...form, credit_period: Number(form.credit_period) }])
+    await supabase.from("suppliers").insert([{ ...form, credit_period: Number(form.credit_period), overdue_penalty_rate: Number(form.overdue_penalty_rate) }])
     setShowForm(false)
-    setForm({ name: "", contact_person: "", phone: "", email: "", address: "", credit_period: 0 })
+    setForm({ name: "", contact_person: "", phone: "", email: "", address: "", credit_period: 0, overdue_penalty_rate: 0 })
     fetchSuppliers()
   }
 
@@ -87,6 +88,11 @@ export default function SuppliersPage({
       key: "credit_period",
       label: t("credit_period"),
       render: (s: Supplier) => `${s.credit_period} days`,
+    },
+    {
+      key: "overdue_penalty_rate",
+      label: "Penalty Rate",
+      render: (s: Supplier) => `${s.overdue_penalty_rate}%`,
     },
     {
       key: "status",
@@ -171,6 +177,47 @@ export default function SuppliersPage({
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
                 placeholder={t("phone")}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-black">Credit Period (days)</label>
+              <input
+                type="number"
+                min={0}
+                value={form.credit_period}
+                onChange={(e) => setForm({ ...form, credit_period: Number(e.target.value) || 0 })}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-black">Overdue Penalty Rate (%)</label>
+              <input
+                type="number"
+                min={0}
+                step={0.01}
+                value={form.overdue_penalty_rate}
+                onChange={(e) => setForm({ ...form, overdue_penalty_rate: Number(e.target.value) || 0 })}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-black">{t("email")}</label>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                placeholder={t("email")}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-black">{t("address")}</label>
+              <input
+                type="text"
+                value={form.address}
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                placeholder={t("address")}
               />
             </div>
           </div>

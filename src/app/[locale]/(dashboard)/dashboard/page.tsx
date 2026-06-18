@@ -13,6 +13,9 @@ import {
   CreditCard,
   AlertCircle,
   Package,
+  CalendarClock,
+  ShieldAlert,
+  Ban,
 } from "lucide-react"
 import {
   BarChart,
@@ -42,6 +45,9 @@ interface DashboardData {
   creditSales: number
   outstanding: number
   lowStockCount: number
+  expiringSoonCount: number
+  pendingApprovalsCount: number
+  bouncedChequesCount: number
   recentSales: RecentSale[]
   chartData: ChartDataPoint[]
   loading: boolean
@@ -72,6 +78,9 @@ const cards = [
   { key: "credit_sales", accessor: "creditSales" as const, icon: CreditCard, color: "bg-orange-500" },
   { key: "outstanding", accessor: "outstanding" as const, icon: AlertCircle, color: "bg-red-500" },
   { key: "low_stock_alerts", accessor: "lowStockCount" as const, icon: Package, color: "bg-yellow-500" },
+  { key: "expiring_soon", accessor: "expiringSoonCount" as const, icon: CalendarClock, color: "bg-purple-500" },
+  { key: "pending_approvals", accessor: "pendingApprovalsCount" as const, icon: ShieldAlert, color: "bg-orange-500" },
+  { key: "bounced_cheques", accessor: "bouncedChequesCount" as const, icon: Ban, color: "bg-red-500" },
 ]
 
 export default function DashboardPage({
@@ -89,6 +98,9 @@ export default function DashboardPage({
     creditSales: 0,
     outstanding: 0,
     lowStockCount: 0,
+    expiringSoonCount: 0,
+    pendingApprovalsCount: 0,
+    bouncedChequesCount: 0,
     recentSales: [],
     chartData: [],
     loading: true,
@@ -119,15 +131,19 @@ export default function DashboardPage({
           { data: recentRaw },
           { data: chartRaw },
           { data: ledgerData },
+          { data: pendingApprovalsRaw },
+          { data: bouncedChequesRaw },
         ] = await Promise.all([
           supabase.from("sales").select("grand_total").gte("created_at", todayStart).eq("status", "completed"),
           supabase.from("sales").select("grand_total").gte("created_at", monthStart).eq("status", "completed"),
           supabase.from("sales").select("grand_total").eq("payment_type", "credit").eq("status", "completed"),
           supabase.from("sales").select("balance_due").eq("status", "completed").gt("balance_due", 0),
-          supabase.from("products").select("current_stock, min_stock"),
+          supabase.from("products").select("current_stock, min_stock, has_expiry, expiry_date"),
           supabase.from("sales").select("customer_name, grand_total, payment_type, created_at").eq("status", "completed").order("created_at", { ascending: false }).limit(5),
           supabase.from("sales").select("grand_total, created_at").gte("created_at", sevenDaysAgo).eq("status", "completed"),
           supabase.from("ledger_entries").select("entry_type, amount, ledger_type").in("ledger_type", ["cash", "bank"]),
+          supabase.from("sales").select("id", { count: "exact", head: true }).eq("credit_approval_status", "pending"),
+          supabase.from("sales").select("id", { count: "exact", head: true }).eq("cheque_status", "bounced"),
         ])
 
         const dailySales = (dailyRaw ?? []).reduce((s: number, r: Record<string, unknown>) => s + (r.grand_total as number ?? 0), 0)
@@ -135,6 +151,15 @@ export default function DashboardPage({
         const creditSales = (creditRaw ?? []).reduce((s: number, r: Record<string, unknown>) => s + (r.grand_total as number ?? 0), 0)
         const outstanding = (outstandingRaw ?? []).reduce((s: number, r: Record<string, unknown>) => s + (r.balance_due as number ?? 0), 0)
         const lowStockCount = (productsRaw ?? []).filter((p: Record<string, unknown>) => (p.current_stock as number) <= (p.min_stock as number)).length
+        const now = new Date()
+        const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+        const expiringSoonCount = (productsRaw ?? []).filter((p: Record<string, unknown>) => {
+          if (!(p as Record<string, unknown>).has_expiry || !(p as Record<string, unknown>).expiry_date) return false
+          const expiry = new Date((p as Record<string, unknown>).expiry_date as string)
+          return expiry <= thirtyDaysFromNow
+        }).length
+        const pendingApprovalsCount = (pendingApprovalsRaw as unknown as { count: number } | null)?.count ?? 0
+        const bouncedChequesCount = (bouncedChequesRaw as unknown as { count: number } | null)?.count ?? 0
         const recentSales: RecentSale[] = (recentRaw ?? []).map((r: Record<string, unknown>) => ({
           customer_name: r.customer_name as string | null,
           grand_total: r.grand_total as number,
@@ -171,7 +196,7 @@ export default function DashboardPage({
           return { name, total: dayTotals[key] }
         })
 
-        const result = { dailySales, monthlySales, cashInHand, creditSales, outstanding, lowStockCount, recentSales, chartData, loading: false }
+        const result = { dailySales, monthlySales, cashInHand, creditSales, outstanding, lowStockCount, expiringSoonCount, pendingApprovalsCount, bouncedChequesCount, recentSales, chartData, loading: false }
         setCache(cacheKey, result)
         setData(result)
       } catch (error) {
@@ -227,7 +252,7 @@ export default function DashboardPage({
       <div className="flex gap-4 overflow-x-auto pb-2">
         {cards.map(({ key, accessor, icon: Icon, color }) => {
           const value = data[accessor]
-          const isCurrency = accessor !== "lowStockCount"
+          const isCurrency = accessor !== "lowStockCount" && accessor !== "expiringSoonCount" && accessor !== "pendingApprovalsCount" && accessor !== "bouncedChequesCount"
 
           return (
             <div key={key} className="min-w-[180px] shrink-0 rounded-lg border bg-white p-4 shadow-sm">

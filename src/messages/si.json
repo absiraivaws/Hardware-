@@ -29,12 +29,18 @@
   },
   "nav": {
     "dashboard": "උපකරණ පුවරුව",
+    "pos": "POS",
     "sales": "විකුණුම් සහ POS",
     "purchases": "මිලදී ගැනීම්",
     "inventory": "තොග කළමනාකරණය",
     "customers": "ගනුදෙනුකරුවන්",
     "suppliers": "සැපයුම්කරුවන්",
+    "deliveries": "බෙදාහැරීම්",
+    "drivers": "රියදුරන්",
+    "vehicles": "වාහන",
     "quotations": "උපුටා දැක්වීම්",
+    "rentals": "බඩු තැන්පතු",
+    "expenses": "වියදම්",
     "reports": "වාර්තා",
     "ledgers": "ලෙජර්",
     "settings": "සැකසුම්",
@@ -68,7 +74,8 @@
     "branch_performance": "ශාඛා කාර්යසාධනය",
     "purchase_summary": "මිලදී ගැනීම් සාරාංශය",
     "expense_summary": "වියදම් සාරාංශය",
-    "todays_overview": "අද දින දර්ශනය"
+    "todays_overview": "අද දින දළ විශ්ලේෂණය",
+    "expiring_soon": "කල් ඉකුත් වීම ආසන්නයි"
   },
   "sales": {
     "title": "විකුණුම් ස්ථානය",

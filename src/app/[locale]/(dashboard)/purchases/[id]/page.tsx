@@ -28,6 +28,7 @@ interface PurchaseOrder {
   grand_total: number
   status: "pending" | "partial" | "completed" | "cancelled"
   expected_date: string | null
+  payment_due_date: string | null
   notes: string | null
   amount_paid?: number
   balance_due?: number
@@ -97,6 +98,19 @@ export default function PurchaseOrderDetailPage({
   const [accountNumber, setAccountNumber] = useState("")
   const [fromAccount, setFromAccount] = useState("")
   const [toAccount, setToAccount] = useState("")
+  const [showReturn, setShowReturn] = useState(false)
+  const [returnQtys, setReturnQtys] = useState<Record<string, number>>({})
+  const [returnReason, setReturnReason] = useState("")
+  const [returning, setReturning] = useState(false)
+
+  function generateReturnNo(): string {
+    const now = new Date()
+    const y = now.getFullYear()
+    const m = String(now.getMonth() + 1).padStart(2, "0")
+    const d = String(now.getDate()).padStart(2, "0")
+    const rand = String(Math.floor(Math.random() * 100000)).padStart(5, "0")
+    return `RET-${y}${m}${d}-${rand}`
+  }
 
   useEffect(() => {
     params.then((p) => {
@@ -112,7 +126,7 @@ export default function PurchaseOrderDetailPage({
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: poData } = await (supabase.from("purchase_orders") as any)
-        .select("id, po_no, supplier_id, supplier_name, subtotal, discount, grand_total, status, expected_date, notes, amount_paid, balance_due, payment_type, payment_details, created_at, updated_at")
+        .select("id, po_no, supplier_id, supplier_name, subtotal, discount, grand_total, status, expected_date, payment_due_date, notes, amount_paid, balance_due, payment_type, payment_details, created_at, updated_at")
         .eq("id", id)
         .single()
 
@@ -183,7 +197,7 @@ export default function PurchaseOrderDetailPage({
         quantity: qty,
         reference_type: "goods_received_note",
         reference_id: grnId,
-        notes: `${po.po_no}`,
+        notes: `${po.po_no} - ${po.supplier_name}`,
         user_id: userData.user.id,
       })
       if (movErr) { setError("Stock movement failed: " + movErr.message); setReceiving(false); return }
@@ -194,6 +208,20 @@ export default function PurchaseOrderDetailPage({
         const newStock = Number(currentProduct.current_stock) + qty
         const { error: updateErr } = await productClient.update({ current_stock: newStock }).eq("id", item.product_id)
         if (updateErr) { setError("Stock update failed: " + updateErr.message); setReceiving(false); return }
+
+        // Update branch stock
+        if (userData.user) {
+          const { data: profile } = await supabase.from("profiles").select("branch_id").eq("id", userData.user.id).single()
+          if (profile?.branch_id) {
+            const { data: bs } = await supabase.from("branch_stock").select("current_stock").eq("product_id", item.product_id).eq("branch_id", profile.branch_id).maybeSingle()
+            const newBranchStock = (bs ? Number(bs.current_stock) : 0) + qty
+            await supabase.from("branch_stock").upsert({
+              product_id: item.product_id,
+              branch_id: profile.branch_id,
+              current_stock: newBranchStock,
+            }, { onConflict: "product_id,branch_id" })
+          }
+        }
       } else {
         setError("Product not found for stock update"); setReceiving(false); return
       }
@@ -209,8 +237,17 @@ export default function PurchaseOrderDetailPage({
       return item.received_qty + qty >= item.quantity
     })
 
-    // Update status
-    const { error: statusErr } = await poClient.update({ status: allReceived ? "completed" : "partial" }).eq("id", po.id)
+    // Update status and payment due date
+    const updateData: Record<string, unknown> = { status: allReceived ? "completed" : "partial" }
+    if (!po.payment_due_date && po.supplier_id) {
+      const { data: supplier } = await supabase.from("suppliers").select("credit_period").eq("id", po.supplier_id).single()
+      if (supplier && Number(supplier.credit_period) > 0) {
+        const due = new Date()
+        due.setDate(due.getDate() + Number(supplier.credit_period))
+        updateData.payment_due_date = due.toISOString().slice(0, 10)
+      }
+    }
+    const { error: statusErr } = await poClient.update(updateData).eq("id", po.id)
     if (statusErr) { setError("Status update failed: " + statusErr.message); setReceiving(false); return }
 
     // Create supplier ledger debit entry (liability)
@@ -390,6 +427,70 @@ export default function PurchaseOrderDetailPage({
     setSubmittingPayment(false)
   }
 
+  const handleReturn = async () => {
+    if (!po || !po.supplier_id) return
+    const supabase = createClient()
+    setReturning(true)
+    setError(null)
+
+    const { data: userData } = await supabase.auth.getUser()
+    if (!userData.user) { setError("Authentication required"); setReturning(false); return }
+
+    const activeItems = items.filter((item) => (returnQtys[item.id] ?? 0) > 0)
+    if (activeItems.length === 0) { setReturning(false); return }
+
+    const returnNo = generateReturnNo()
+    const totalAmount = activeItems.reduce((s, item) => s + (returnQtys[item.id] ?? 0) * item.unit_price, 0)
+
+    const { data: returnRecord, error: returnErr } = await supabase.from("purchase_returns").insert({
+      return_no: returnNo,
+      po_id: po.id,
+      supplier_id: po.supplier_id,
+      user_id: userData.user.id,
+      reason: returnReason || null,
+      total_amount: totalAmount,
+    }).select("id").single() as unknown as { data: { id: string } | null; error: unknown }
+
+    if (returnErr) { setError("Return creation failed"); setReturning(false); return }
+
+    for (const item of activeItems) {
+      const qty = returnQtys[item.id] ?? 0
+      // Insert return item
+      await supabase.from("purchase_return_items").insert({
+        return_id: returnRecord!.id,
+        product_id: item.product_id,
+        product_name: item.product_name,
+        quantity: qty,
+        unit_price: item.unit_price,
+        total_price: qty * item.unit_price,
+      })
+
+      // Deduct stock (out movement)
+      const { data: product } = await supabase.from("products").select("current_stock").eq("id", item.product_id).single()
+      if (product) {
+        await supabase.from("stock_movements").insert({
+          product_id: item.product_id,
+          type: "out",
+          quantity: qty,
+          unit_price: item.unit_price,
+          reference_type: "purchase_return",
+          reference_id: returnRecord!.id,
+          notes: `Return to supplier ${po.supplier_name} - ${returnNo}`,
+        } as never)
+        await supabase.from("products").update({ current_stock: product.current_stock - qty }).eq("id", item.product_id)
+      }
+    }
+
+    // Refresh data
+    const { data: refreshed } = await supabase.from("purchase_orders").select("*").eq("id", id).single()
+    if (refreshed) setPo(refreshed as PurchaseOrder)
+
+    setShowReturn(false)
+    setReturnQtys({})
+    setReturnReason("")
+    setReturning(false)
+  }
+
   if (loading) {
     return (
       <div>
@@ -457,6 +558,21 @@ export default function PurchaseOrderDetailPage({
                 <Package size={16} />
               )}
               Save Receipt
+            </button>
+          )}
+          {(po.status === "completed" || po.status === "partial") && (
+            <button
+              onClick={() => {
+                setShowReturn(true)
+                const initial: Record<string, number> = {}
+                for (const item of items) {
+                  initial[item.id] = 0
+                }
+                setReturnQtys(initial)
+              }}
+              className="flex items-center gap-2 rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+            >
+              Return
             </button>
           )}
           {po.status === "pending" && (
@@ -809,6 +925,70 @@ export default function PurchaseOrderDetailPage({
                   <DollarSign size={16} />
                 )}
                 {t("sales.confirm_payment")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Return Modal */}
+      {showReturn && po && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-black">Return to Supplier</h3>
+              <button onClick={() => setShowReturn(false)} className="rounded p-1 text-black hover:bg-gray-100">
+                <X size={20} />
+              </button>
+            </div>
+
+            <p className="mb-3 text-sm text-black">PO: {po.po_no} — {po.supplier_name}</p>
+
+            <div className="max-h-64 space-y-2 overflow-y-auto">
+              {items.map((item) => {
+                const maxQty = item.received_qty
+                return (
+                  <div key={item.id} className="flex items-center gap-3 rounded-lg border p-3">
+                    <span className="flex-1 text-sm text-black">{item.product_name}</span>
+                    <span className="text-xs text-black">Received: {maxQty}</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={maxQty}
+                      value={returnQtys[item.id] ?? 0}
+                      onChange={(e) => setReturnQtys({ ...returnQtys, [item.id]: Math.min(Number(e.target.value) || 0, maxQty) })}
+                      className="w-20 rounded border border-gray-300 px-2 py-1 text-right text-sm focus:border-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="mt-3">
+              <label className="mb-1 block text-xs font-medium text-black">Reason</label>
+              <input
+                type="text"
+                value={returnReason}
+                onChange={(e) => setReturnReason(e.target.value)}
+                placeholder="Damaged, wrong item, etc."
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={handleReturn}
+                disabled={returning || Object.values(returnQtys).every((q) => q <= 0)}
+                className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {returning ? <Loader2 className="animate-spin" size={16} /> : null}
+                Process Return
+              </button>
+              <button
+                onClick={() => setShowReturn(false)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-black hover:bg-gray-50"
+              >
+                Cancel
               </button>
             </div>
           </div>

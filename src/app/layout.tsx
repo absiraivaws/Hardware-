@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
+import { WheelGuard } from "@/components/wheel-guard"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,7 +21,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
-      <body className="min-h-screen bg-background font-sans antialiased" suppressHydrationWarning>{children}</body>
+      <body className="min-h-screen bg-background font-sans antialiased" suppressHydrationWarning>
+        <WheelGuard />
+        {children}
+      </body>
     </html>
   )
 }

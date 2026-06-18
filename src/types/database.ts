@@ -145,6 +145,7 @@ export interface Database {
           code: string
           name: string
           barcode: string | null
+          serial_no: string
           description: string | null
           category_id: string | null
           brand_id: string | null
@@ -156,6 +157,7 @@ export interface Database {
           current_stock: number
           image_url: string | null
           has_expiry: boolean
+          expiry_date: string | null
           is_decimal_qty: boolean
           status: "active" | "inactive"
           created_at: string
@@ -166,6 +168,7 @@ export interface Database {
           code: string
           name: string
           barcode?: string | null
+          serial_no?: string
           description?: string | null
           category_id?: string | null
           brand_id?: string | null
@@ -177,6 +180,7 @@ export interface Database {
           current_stock?: number
           image_url?: string | null
           has_expiry?: boolean
+          expiry_date?: string | null
           is_decimal_qty?: boolean
           status?: "active" | "inactive"
           created_at?: string
@@ -187,6 +191,7 @@ export interface Database {
           code?: string
           name?: string
           barcode?: string | null
+          serial_no?: string
           description?: string | null
           category_id?: string | null
           brand_id?: string | null
@@ -198,7 +203,7 @@ export interface Database {
           current_stock?: number
           image_url?: string | null
           has_expiry?: boolean
-          is_decimal_qty?: boolean
+          expiry_date?: string | null
           status?: "active" | "inactive"
           created_at?: string
           updated_at?: string
@@ -254,6 +259,7 @@ export interface Database {
           email: string | null
           address: string | null
           credit_period: number
+          overdue_penalty_rate: number
           status: "active" | "inactive"
           created_at: string
           updated_at: string
@@ -266,6 +272,7 @@ export interface Database {
           email?: string | null
           address?: string | null
           credit_period?: number
+          overdue_penalty_rate?: number
           status?: "active" | "inactive"
           created_at?: string
           updated_at?: string
@@ -278,6 +285,7 @@ export interface Database {
           email?: string | null
           address?: string | null
           credit_period?: number
+          overdue_penalty_rate?: number
           status?: "active" | "inactive"
           created_at?: string
           updated_at?: string
@@ -302,6 +310,9 @@ export interface Database {
           amount_paid: number
           balance_due: number
           status: "completed" | "pending" | "cancelled"
+          credit_approval_status: string
+          approved_by: string | null
+          cheque_status: string | null
           notes: string | null
           created_at: string
           updated_at: string
@@ -325,6 +336,9 @@ export interface Database {
           amount_paid?: number
           balance_due?: number
           status?: "completed" | "pending" | "cancelled"
+          credit_approval_status?: string
+          approved_by?: string | null
+          cheque_status?: string | null
           notes?: string | null
           created_at?: string
           updated_at?: string
@@ -348,7 +362,8 @@ export interface Database {
           amount_paid?: number
           balance_due?: number
           status?: "completed" | "pending" | "cancelled"
-          notes?: string | null
+          credit_approval_status?: string
+          approved_by?: string | null
           created_at?: string
           updated_at?: string
           payment_details?: Json
@@ -399,6 +414,7 @@ export interface Database {
           grand_total: number
           status: "pending" | "partial" | "completed" | "cancelled"
           expected_date: string | null
+          payment_due_date: string | null
           notes: string | null
           amount_paid: number
           balance_due: number
@@ -419,6 +435,7 @@ export interface Database {
           grand_total?: number
           status?: "pending" | "partial" | "completed" | "cancelled"
           expected_date?: string | null
+          payment_due_date?: string | null
           notes?: string | null
           amount_paid?: number
           balance_due?: number
@@ -439,6 +456,7 @@ export interface Database {
           grand_total?: number
           status?: "pending" | "partial" | "completed" | "cancelled"
           expected_date?: string | null
+          payment_due_date?: string | null
           notes?: string | null
           amount_paid?: number
           balance_due?: number
@@ -512,6 +530,73 @@ export interface Database {
           branch_id?: string | null
           user_id?: string
           notes?: string | null
+          created_at?: string
+        }
+      }
+      purchase_returns: {
+        Row: {
+          id: string
+          return_no: string
+          po_id: string
+          supplier_id: string
+          branch_id: string | null
+          user_id: string
+          reason: string | null
+          total_amount: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          return_no: string
+          po_id: string
+          supplier_id: string
+          branch_id?: string | null
+          user_id: string
+          reason?: string | null
+          total_amount?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          return_no?: string
+          po_id?: string
+          supplier_id?: string
+          branch_id?: string | null
+          user_id?: string
+          reason?: string | null
+          total_amount?: number
+          created_at?: string
+        }
+      }
+      purchase_return_items: {
+        Row: {
+          id: string
+          return_id: string
+          product_id: string
+          product_name: string
+          quantity: number
+          unit_price: number
+          total_price: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          return_id: string
+          product_id: string
+          product_name: string
+          quantity: number
+          unit_price: number
+          total_price: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          return_id?: string
+          product_id?: string
+          product_name?: string
+          quantity?: number
+          unit_price?: number
+          total_price?: number
           created_at?: string
         }
       }
@@ -638,7 +723,7 @@ export interface Database {
       ledger_entries: {
         Row: {
           id: string
-          ledger_type: "customer" | "supplier" | "cash" | "bank" | "expense"
+          ledger_type: "customer" | "supplier" | "cash" | "bank" | "expense" | "income"
           reference_id: string | null
           reference_type: string | null
           entry_type: "debit" | "credit"
@@ -649,7 +734,7 @@ export interface Database {
         }
         Insert: {
           id?: string
-          ledger_type: "customer" | "supplier" | "cash" | "bank" | "expense"
+          ledger_type: "customer" | "supplier" | "cash" | "bank" | "expense" | "income"
           reference_id?: string | null
           reference_type?: string | null
           entry_type: "debit" | "credit"
@@ -660,7 +745,7 @@ export interface Database {
         }
         Update: {
           id?: string
-          ledger_type?: "customer" | "supplier" | "cash" | "bank" | "expense"
+          ledger_type?: "customer" | "supplier" | "cash" | "bank" | "expense" | "income"
           reference_id?: string | null
           reference_type?: string | null
           entry_type?: "debit" | "credit"
@@ -678,10 +763,19 @@ export interface Database {
           address: string
           contact_number: string
           vat_number: string
+          manager_pin: string
+          whatsapp_api_key: string
+          whatsapp_phone_number_id: string
+          whatsapp_business_account_id: string
+          sms_provider: string
+          sms_api_key: string
+          sms_api_secret: string
           whatsapp_link: string
           facebook_link: string
           tiktok_link: string
           youtube_link: string
+          cash_opening_balance: number
+          bank_opening_balance: number
           updated_at: string
         }
         Insert: {
@@ -691,10 +785,19 @@ export interface Database {
           address?: string
           contact_number?: string
           vat_number?: string
+          manager_pin?: string
+          whatsapp_api_key?: string
+          whatsapp_phone_number_id?: string
+          whatsapp_business_account_id?: string
+          sms_provider?: string
+          sms_api_key?: string
+          sms_api_secret?: string
           whatsapp_link?: string
           facebook_link?: string
           tiktok_link?: string
           youtube_link?: string
+          cash_opening_balance?: number
+          bank_opening_balance?: number
           updated_at?: string
         }
         Update: {
@@ -704,11 +807,325 @@ export interface Database {
           address?: string
           contact_number?: string
           vat_number?: string
+          manager_pin?: string
+          whatsapp_api_key?: string
+          whatsapp_phone_number_id?: string
+          whatsapp_business_account_id?: string
+          sms_provider?: string
+          sms_api_key?: string
+          sms_api_secret?: string
           whatsapp_link?: string
           facebook_link?: string
           tiktok_link?: string
           youtube_link?: string
+          cash_opening_balance?: number
+          bank_opening_balance?: number
           updated_at?: string
+        }
+      }
+      branch_stock: {
+        Row: {
+          id: string
+          product_id: string
+          branch_id: string
+          current_stock: number
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          branch_id: string
+          current_stock?: number
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          branch_id?: string
+          current_stock?: number
+        }
+      }
+      stock_transfers: {
+        Row: {
+          id: string
+          transfer_no: string
+          from_branch_id: string
+          to_branch_id: string
+          status: "pending" | "completed" | "cancelled"
+          notes: string | null
+          created_by: string
+          completed_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          transfer_no: string
+          from_branch_id: string
+          to_branch_id: string
+          status?: "pending" | "completed" | "cancelled"
+          notes?: string | null
+          created_by: string
+          completed_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          transfer_no?: string
+          from_branch_id?: string
+          to_branch_id?: string
+          status?: "pending" | "completed" | "cancelled"
+          notes?: string | null
+          created_by?: string
+          completed_at?: string | null
+          created_at?: string
+        }
+      }
+      stock_transfer_items: {
+        Row: {
+          id: string
+          transfer_id: string
+          product_id: string
+          product_name: string
+          quantity: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          transfer_id: string
+          product_id: string
+          product_name: string
+          quantity: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          transfer_id?: string
+          product_id?: string
+          product_name?: string
+          quantity?: number
+          created_at?: string
+        }
+      }
+      drivers: {
+        Row: {
+          id: string
+          name: string
+          phone: string
+          license_no: string
+          status: "active" | "inactive"
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          phone?: string
+          license_no?: string
+          status?: "active" | "inactive"
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          phone?: string
+          license_no?: string
+          status?: "active" | "inactive"
+          created_at?: string
+        }
+      }
+      vehicles: {
+        Row: {
+          id: string
+          registration_no: string
+          model: string
+          capacity: string
+          status: "active" | "maintenance" | "inactive"
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          registration_no: string
+          model?: string
+          capacity?: string
+          status?: "active" | "maintenance" | "inactive"
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          registration_no?: string
+          model?: string
+          capacity?: string
+          status?: "active" | "maintenance" | "inactive"
+          created_at?: string
+        }
+      }
+      deliveries: {
+        Row: {
+          id: string
+          sale_id: string | null
+          delivery_no: string
+          driver_id: string | null
+          vehicle_id: string | null
+          delivery_date: string
+          status: "pending" | "in_transit" | "delivered" | "cancelled"
+          address: string
+          notes: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          sale_id?: string | null
+          delivery_no: string
+          driver_id?: string | null
+          vehicle_id?: string | null
+          delivery_date?: string
+          status?: "pending" | "in_transit" | "delivered" | "cancelled"
+          address?: string
+          notes?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          sale_id?: string | null
+          delivery_no?: string
+          driver_id?: string | null
+          vehicle_id?: string | null
+          delivery_date?: string
+          status?: "pending" | "in_transit" | "delivered" | "cancelled"
+          address?: string
+          notes?: string
+          created_at?: string
+        }
+      }
+      delivery_items: {
+        Row: {
+          id: string
+          delivery_id: string
+          product_id: string | null
+          product_name: string
+          quantity: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          delivery_id: string
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          delivery_id?: string
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          created_at?: string
+        }
+      }
+      rentals: {
+        Row: {
+          id: string
+          rental_no: string
+          customer_id: string | null
+          customer_name: string
+          rental_type: "tool" | "cement_bag"
+          status: "active" | "returned" | "overdue" | "cancelled"
+          start_date: string
+          expected_return_date: string
+          actual_return_date: string | null
+          deposit_amount: number
+          total_fee: number
+          late_fee: number
+          notes: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          rental_no: string
+          customer_id?: string | null
+          customer_name?: string
+          rental_type: "tool" | "cement_bag"
+          status?: "active" | "returned" | "overdue" | "cancelled"
+          start_date?: string
+          expected_return_date: string
+          actual_return_date?: string | null
+          deposit_amount?: number
+          total_fee?: number
+          late_fee?: number
+          notes?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          rental_no?: string
+          customer_id?: string | null
+          customer_name?: string
+          rental_type?: "tool" | "cement_bag"
+          status?: "active" | "returned" | "overdue" | "cancelled"
+          start_date?: string
+          expected_return_date?: string
+          actual_return_date?: string | null
+          deposit_amount?: number
+          total_fee?: number
+          late_fee?: number
+          notes?: string
+          created_at?: string
+        }
+      }
+      rental_items: {
+        Row: {
+          id: string
+          rental_id: string
+          product_id: string | null
+          product_name: string
+          quantity: number
+          rate: number
+          deposit: number
+          returned_quantity: number
+          damage_notes: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          rental_id: string
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          rate?: number
+          deposit?: number
+          returned_quantity?: number
+          damage_notes?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          rental_id?: string
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          rate?: number
+          deposit?: number
+          returned_quantity?: number
+          damage_notes?: string
+          created_at?: string
+        }
+      }
+      expense_categories: {
+        Row: {
+          id: string
+          name: string
+          type: "expense" | "income"
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          type: "expense" | "income"
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          type?: "expense" | "income"
+          created_at?: string
         }
       }
     }

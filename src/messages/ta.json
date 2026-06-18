@@ -29,12 +29,18 @@
   },
   "nav": {
     "dashboard": "டாஷ்போர்டு",
-    "sales": "விற்பனை மற்றும் POS",
+    "pos": "POS",
+    "sales": "விற்பனை",
     "purchases": "கொள்முதல்",
-    "inventory": "கையிருப்பு",
+    "inventory": "சரக்கு",
     "customers": "வாடிக்கையாளர்கள்",
     "suppliers": "சப்ளையர்கள்",
+    "deliveries": "டெலிவரிகள்",
+    "drivers": "ஓட்டுநர்கள்",
+    "vehicles": "வாகனங்கள்",
     "quotations": "மேற்கோள்கள்",
+    "rentals": "வாடகைகள்",
+    "expenses": "செலவுகள்",
     "reports": "அறிக்கைகள்",
     "ledgers": "லெட்ஜர்கள்",
     "settings": "அமைப்புகள்",
@@ -68,7 +74,8 @@
     "branch_performance": "கிளை செயல்திறன்",
     "purchase_summary": "கொள்முதல் சுருக்கம்",
     "expense_summary": "செலவு சுருக்கம்",
-    "todays_overview": "இன்றைய கண்ணோட்டம்"
+    "todays_overview": "இன்றைய கண்ணோட்டம்",
+    "expiring_soon": "காலாவதியாக உள்ளது"
   },
   "sales": {
     "title": "விற்பனை நிலையம்",

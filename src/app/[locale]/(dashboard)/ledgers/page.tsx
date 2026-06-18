@@ -2,14 +2,14 @@
 
 import { use, useEffect, useMemo, useState } from "react"
 import { useTranslations } from "next-intl"
-import { ArrowUpDown, ArrowUp, ArrowDown, Landmark, Wallet, Users, Truck } from "lucide-react"
+import { ArrowUpDown, ArrowUp, ArrowDown, Landmark, Wallet, Users, Truck, TrendingDown, TrendingUp } from "lucide-react"
 import { formatCurrency, formatDate } from "@/lib/format"
 import { createClient } from "@/lib/supabase/client"
 import type { Database } from "@/types/database"
 
 type LedgerEntry = Database["public"]["Tables"]["ledger_entries"]["Row"]
 
-type Tab = "cash" | "bank" | "debtors" | "creditors"
+type Tab = "cash" | "bank" | "debtors" | "creditors" | "expenses" | "income"
 
 interface CustomerBalance {
   id: string
@@ -41,25 +41,31 @@ export default function FinancialLedgerPage({
   const [customers, setCustomers] = useState<CustomerBalance[]>([])
   const [suppliers, setSuppliers] = useState<SupplierBalance[]>([])
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null)
+  const [openingBalance, setOpeningBalance] = useState(0)
+  const [editingOpening, setEditingOpening] = useState(false)
+  const [openingInput, setOpeningInput] = useState("")
 
   useEffect(() => {
     setLoading(true)
     setSortKey("created_at")
     setSortDir("asc")
     setSelectedEntity(null)
+    setEditingOpening(false)
     const supabase = createClient()
 
-    if (activeTab === "cash" || activeTab === "bank") {
-      supabase
-        .from("ledger_entries")
-        .select("*")
-        .eq("ledger_type", activeTab)
-        .order("created_at", { ascending: false })
-        .limit(500)
-        .then(({ data }) => {
-          if (data) setEntries(data as LedgerEntry[])
-          setLoading(false)
-        })
+    if (activeTab === "cash" || activeTab === "bank" || activeTab === "expenses" || activeTab === "income") {
+      const ledgerType = activeTab === "expenses" ? "expense" : activeTab === "income" ? "income" : activeTab
+      Promise.all([
+        supabase.from("ledger_entries").select("*").eq("ledger_type", ledgerType).order("created_at", { ascending: false }).limit(500),
+        (activeTab === "cash" || activeTab === "bank") ? supabase.from("company_settings").select(`cash_opening_balance,bank_opening_balance`).single() : Promise.resolve(null),
+      ]).then(([ledgerRes, settingsRes]) => {
+        if (ledgerRes.data) setEntries(ledgerRes.data as LedgerEntry[])
+        if (settingsRes?.data) {
+          const bal = activeTab === "cash" ? Number((settingsRes.data as Record<string, unknown>).cash_opening_balance) : Number((settingsRes.data as Record<string, unknown>).bank_opening_balance)
+          setOpeningBalance(bal)
+        }
+        setLoading(false)
+      })
     } else if (activeTab === "debtors") {
       Promise.all([
         supabase.from("customers").select("*").gt("credit_balance", 0).order("name"),
@@ -153,16 +159,39 @@ export default function FinancialLedgerPage({
     return sorted
   }, [entries, entityEntries, selectedEntity, sortKey, sortDir])
 
+  const allRows = useMemo(() => {
+    if (selectedEntity) return sortedEntries
+    if (activeTab !== "cash" && activeTab !== "bank") return sortedEntries
+    if (openingBalance === 0) return sortedEntries
+    const openingRow = { id: "opening", created_at: "", description: "Opening Balance", entry_type: "debit", amount: openingBalance } as LedgerEntry
+    return [openingRow, ...sortedEntries]
+  }, [sortedEntries, openingBalance, activeTab, selectedEntity])
+
   const totalDebit = useMemo(
-    () => sortedEntries.reduce((s, e) => s + (e.entry_type === "debit" ? Number(e.amount) : 0), 0),
-    [sortedEntries],
+    () => allRows.reduce((s, e) => s + (e.entry_type === "debit" ? Number(e.amount) : 0), 0),
+    [allRows],
   )
   const totalCredit = useMemo(
-    () => sortedEntries.reduce((s, e) => s + (e.entry_type === "credit" ? Number(e.amount) : 0), 0),
-    [sortedEntries],
+    () => allRows.reduce((s, e) => s + (e.entry_type === "credit" ? Number(e.amount) : 0), 0),
+    [allRows],
   )
 
-  const showTable = activeTab === "cash" || activeTab === "bank" || selectedEntity
+  const showTable = activeTab === "cash" || activeTab === "bank" || activeTab === "expenses" || activeTab === "income" || selectedEntity
+
+  const handleSaveOpening = async () => {
+    const val = parseFloat(openingInput)
+    if (isNaN(val) || val < 0) return
+    const supabase = createClient()
+    const col = activeTab === "cash" ? "cash_opening_balance" : "bank_opening_balance"
+    const { data: settings } = await supabase.from("company_settings").select("id").single()
+    if (settings?.id) {
+      const { error } = await supabase.from("company_settings").update({ [col]: val }).eq("id", settings.id)
+      if (!error) {
+        setOpeningBalance(val)
+        setEditingOpening(false)
+      }
+    }
+  }
 
   const SortIcon = (col: string) => {
     if (sortKey !== col) return ArrowUpDown
@@ -181,8 +210,8 @@ export default function FinancialLedgerPage({
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-black">Financial Ledger</h1>
-        <p className="text-sm text-black mt-1">Cash, bank, debtors, and creditors</p>
+        <h1 className="text-2xl font-bold text-black">{t("ledgers.title")}</h1>
+        <p className="text-sm text-black mt-1">{t("ledgers.subtitle")}</p>
       </div>
 
       {/* Tabs */}
@@ -230,6 +259,28 @@ export default function FinancialLedgerPage({
         >
           <Truck size={16} />
           Creditors
+        </button>
+        <button
+          onClick={() => setActiveTab("expenses")}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${
+            activeTab === "expenses"
+              ? "bg-red-100 text-red-700"
+              : "bg-gray-100 text-black hover:bg-gray-200"
+          }`}
+        >
+          <TrendingDown size={16} />
+          {t("ledgers.expenses")}
+        </button>
+        <button
+          onClick={() => setActiveTab("income")}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${
+            activeTab === "income"
+              ? "bg-emerald-100 text-emerald-700"
+              : "bg-gray-100 text-black hover:bg-gray-200"
+          }`}
+        >
+          <TrendingUp size={16} />
+          {t("ledgers.income")}
         </button>
       </div>
 
@@ -366,12 +417,50 @@ export default function FinancialLedgerPage({
                     ))}
                   </tr>
                 ))
-              ) : sortedEntries.length === 0 ? (
+              ) : allRows.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-12 text-center text-sm text-black">{t("common.no_results")}</td>
                 </tr>
               ) : (
-                sortedEntries.map((e) => {
+                allRows.map((e) => {
+                  if (e.id === "opening") {
+                    runningBalance = runningBalance + Number(e.amount)
+                    return (
+                      <tr key="opening" className="bg-amber-50">
+                        <td className="whitespace-nowrap px-4 py-3 text-sm text-black">—</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-black">
+                          {editingOpening ? (
+                            <input
+                              type="number"
+                              value={openingInput}
+                              onChange={(e) => setOpeningInput(e.target.value)}
+                              className="w-32 rounded border px-2 py-1 text-sm"
+                              autoFocus
+                              onKeyDown={(ev) => { if (ev.key === "Enter") handleSaveOpening(); if (ev.key === "Escape") setEditingOpening(false) }}
+                            />
+                          ) : (
+                            <span className="inline-flex items-center gap-2">
+                              Opening Balance
+                              <button
+                                onClick={() => { setOpeningInput(String(openingBalance)); setEditingOpening(true) }}
+                                className="text-gray-400 hover:text-gray-700"
+                                title="Edit opening balance"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                              </button>
+                            </span>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-black">
+                          {editingOpening ? "—" : formatCurrency(Number(e.amount), locale)}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-black">—</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium text-black">
+                          {formatCurrency(runningBalance, locale)}
+                        </td>
+                      </tr>
+                    )
+                  }
                   runningBalance =
                     e.entry_type === "debit"
                       ? runningBalance + Number(e.amount)

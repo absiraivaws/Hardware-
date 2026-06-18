@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl"
 import { use, useEffect, useState } from "react"
 import { PageHeader } from "@/components/shared/page-header"
 import { createClient } from "@/lib/supabase/client"
-import { Globe, Bell, Shield, Database as DatabaseIcon, Building2, Share2, Upload, X } from "lucide-react"
+import { Globe, Bell, Shield, Database as DatabaseIcon, Building2, Share2, MessageCircle, Smartphone, Upload, X } from "lucide-react"
 import { useData } from "@/providers/data-provider"
 
 const sections = [
@@ -51,13 +51,19 @@ export default function SettingsPage({
 }) {
   use(params)
   const t = useTranslations()
-  const { companySettings: contextCompany } = useData()
+  const { companySettings: contextCompany, updateCompanySettings } = useData()
   const supabase = createClient()
   const [companyName, setCompanyName] = useState("")
   const [address, setAddress] = useState("")
   const [contactNumber, setContactNumber] = useState("")
   const [vatNumber, setVatNumber] = useState("")
   const [whatsappLink, setWhatsappLink] = useState("")
+  const [whatsappApiKey, setWhatsappApiKey] = useState("")
+  const [whatsappPhoneNumberId, setWhatsappPhoneNumberId] = useState("")
+  const [whatsappBusinessAccountId, setWhatsappBusinessAccountId] = useState("")
+  const [smsProvider, setSmsProvider] = useState("")
+  const [smsApiKey, setSmsApiKey] = useState("")
+  const [smsApiSecret, setSmsApiSecret] = useState("")
   const [facebookLink, setFacebookLink] = useState("")
   const [tiktokLink, setTiktokLink] = useState("")
   const [youtubeLink, setYoutubeLink] = useState("")
@@ -73,6 +79,13 @@ export default function SettingsPage({
       setContactNumber(contextCompany.contact_number)
       setVatNumber(contextCompany.vat_number)
       setWhatsappLink(contextCompany.whatsapp_link)
+      setWhatsappApiKey(contextCompany.whatsapp_api_key)
+      setWhatsappPhoneNumberId(contextCompany.whatsapp_phone_number_id)
+      setWhatsappBusinessAccountId(contextCompany.whatsapp_business_account_id)
+      setWhatsappBusinessAccountId(contextCompany.whatsapp_business_account_id)
+      setSmsProvider(contextCompany.sms_provider)
+      setSmsApiKey(contextCompany.sms_api_key)
+      setSmsApiSecret(contextCompany.sms_api_secret)
       setFacebookLink(contextCompany.facebook_link)
       setTiktokLink(contextCompany.tiktok_link)
       setYoutubeLink(contextCompany.youtube_link)
@@ -121,6 +134,12 @@ export default function SettingsPage({
       contact_number: contactNumber,
       vat_number: vatNumber,
       whatsapp_link: whatsappLink,
+      whatsapp_api_key: whatsappApiKey,
+      whatsapp_phone_number_id: whatsappPhoneNumberId,
+      whatsapp_business_account_id: whatsappBusinessAccountId,
+      sms_provider: smsProvider,
+      sms_api_key: smsApiKey,
+      sms_api_secret: smsApiSecret,
       facebook_link: facebookLink,
       tiktok_link: tiktokLink,
       youtube_link: youtubeLink,
@@ -136,6 +155,8 @@ export default function SettingsPage({
         .from("company_settings")
         .insert(settings as never)
     }
+
+    updateCompanySettings(settings)
 
     setSaving(false)
     setSaved(true)
@@ -310,6 +331,88 @@ export default function SettingsPage({
                 value={youtubeLink}
                 onChange={(e) => setYoutubeLink(e.target.value)}
                 placeholder="https://youtube.com/@..."
+                className="w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* WhatsApp Business API */}
+        <div className="rounded-lg border bg-white">
+          <div className="flex items-center gap-3 border-b px-6 py-4">
+            <MessageCircle className="h-5 w-5 text-emerald-600" />
+            <h2 className="text-base font-semibold text-black">WhatsApp Business API</h2>
+          </div>
+          <div className="divide-y px-6 py-4">
+            <div className="flex items-center justify-between py-3">
+              <label className="text-sm font-medium text-black">API Key</label>
+              <input
+                type="text"
+                value={whatsappApiKey}
+                onChange={(e) => setWhatsappApiKey(e.target.value)}
+                placeholder="Permanent access token"
+                className="w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              />
+            </div>
+            <div className="flex items-center justify-between py-3">
+              <label className="text-sm font-medium text-black">Phone Number ID</label>
+              <input
+                type="text"
+                value={whatsappPhoneNumberId}
+                onChange={(e) => setWhatsappPhoneNumberId(e.target.value)}
+                placeholder="From Meta Business dashboard"
+                className="w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              />
+            </div>
+            <div className="flex items-center justify-between py-3">
+              <label className="text-sm font-medium text-black">Business Account ID</label>
+              <input
+                type="text"
+                value={whatsappBusinessAccountId}
+                onChange={(e) => setWhatsappBusinessAccountId(e.target.value)}
+                placeholder="From Meta Business dashboard"
+                className="w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* SMS API */}
+        <div className="rounded-lg border bg-white">
+          <div className="flex items-center gap-3 border-b px-6 py-4">
+            <Smartphone className="h-5 w-5 text-emerald-600" />
+            <h2 className="text-base font-semibold text-black">SMS API</h2>
+          </div>
+          <div className="divide-y px-6 py-4">
+            <div className="flex items-center justify-between py-3">
+              <label className="text-sm font-medium text-black">Provider</label>
+              <select
+                value={smsProvider}
+                onChange={(e) => setSmsProvider(e.target.value)}
+                className="w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              >
+                <option value="">None</option>
+                <option value="dialog">Dialog</option>
+                <option value="mobitel">Mobitel</option>
+              </select>
+            </div>
+            <div className="flex items-center justify-between py-3">
+              <label className="text-sm font-medium text-black">API Key</label>
+              <input
+                type="text"
+                value={smsApiKey}
+                onChange={(e) => setSmsApiKey(e.target.value)}
+                placeholder="API key from provider"
+                className="w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              />
+            </div>
+            <div className="flex items-center justify-between py-3">
+              <label className="text-sm font-medium text-black">API Secret</label>
+              <input
+                type="text"
+                value={smsApiSecret}
+                onChange={(e) => setSmsApiSecret(e.target.value)}
+                placeholder="API secret from provider"
                 className="w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
             </div>

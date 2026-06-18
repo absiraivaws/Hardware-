@@ -8,6 +8,7 @@ import { DataTable } from "@/components/shared/data-table"
 import { createClient } from "@/lib/supabase/client"
 import { formatCurrency, formatDate } from "@/lib/format"
 import { cn } from "@/lib/utils"
+import { getCached, setCache, invalidateCache } from "@/lib/query-cache"
 
 type PurchaseOrder = Record<string, unknown> & {
   id: string
@@ -15,6 +16,7 @@ type PurchaseOrder = Record<string, unknown> & {
   supplier_name: string
   created_at: string
   expected_date: string | null
+  payment_due_date: string | null
   grand_total: number
   amount_paid: number
   balance_due: number
@@ -53,13 +55,15 @@ export default function PurchasesPage({
   useEffect(() => {
     const fetchOrders = async () => {
       const supabase = createClient()
+      const cached = getCached<PurchaseOrder[]>("purchase_orders:list")
+      if (cached) { setOrders(cached); setLoading(false); return }
       const { data } = await supabase
         .from("purchase_orders")
-        .select("id, po_no, supplier_name, created_at, expected_date, grand_total, amount_paid, balance_due, status")
+        .select("id, po_no, supplier_name, created_at, expected_date, payment_due_date, grand_total, amount_paid, balance_due, status")
         .order("created_at", { ascending: false }) as unknown as {
         data: PurchaseOrder[] | null
       }
-      if (data) setOrders(data)
+      if (data) { setOrders(data); setCache("purchase_orders:list", data) }
       setLoading(false)
     }
     fetchOrders()
@@ -103,6 +107,25 @@ export default function PurchasesPage({
         const bd = Number(item.balance_due)
         if (bd <= 0) return <span className="text-green-600">—</span>
         return <span className="text-amber-700 font-medium">{formatCurrency(bd, locale)}</span>
+      },
+    },
+    {
+      key: "overdue",
+      label: "Overdue",
+      render: (item: PurchaseOrder) => {
+        const bd = Number(item.balance_due)
+        if (bd <= 0) return <span className="text-gray-400">—</span>
+        const dueDate = item.payment_due_date || item.expected_date
+        if (!dueDate) return <span className="text-gray-400">—</span>
+        const now = new Date()
+        const due = new Date(dueDate)
+        if (due >= now) return <span className="text-gray-400">—</span>
+        const daysOverdue = Math.floor((now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24))
+        return (
+          <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
+            {daysOverdue}d overdue
+          </span>
+        )
       },
     },
     {

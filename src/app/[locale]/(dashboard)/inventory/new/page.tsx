@@ -28,6 +28,7 @@ const productSchema = z.object({
   min_stock: z.number().min(0),
   starting_stock: z.number().min(0),
   has_expiry: z.boolean(),
+  expiry_date: z.string().optional(),
   is_decimal_qty: z.boolean(),
 })
 
@@ -63,6 +64,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
     handleSubmit,
     reset,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<ProductForm>({
     resolver: zodResolver(productSchema),
@@ -80,9 +82,12 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
       min_stock: 0,
       starting_stock: 100,
       has_expiry: false,
+      expiry_date: "",
       is_decimal_qty: false,
     },
   })
+
+  const watchHasExpiry = watch("has_expiry")
 
   useEffect(() => {
     async function loadData() {
@@ -120,6 +125,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
             wholesale_price: data.wholesale_price,
             min_stock: data.min_stock,
             has_expiry: data.has_expiry,
+            expiry_date: data.expiry_date || "",
             is_decimal_qty: data.is_decimal_qty,
           })
         }
@@ -263,6 +269,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
         wholesale_price: data.wholesale_price ?? null,
         min_stock: data.min_stock,
         has_expiry: data.has_expiry,
+        expiry_date: data.has_expiry ? (data.expiry_date || null) : null,
         is_decimal_qty: data.is_decimal_qty,
       }).eq("id", editId!)
 
@@ -271,9 +278,23 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
       return
     }
 
+    // Auto-generate next serial number
+    const { data: maxSerial } = await (supabase.from("products") as any)
+      .select("serial_no")
+      .order("serial_no", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    let nextSerial = "000001"
+    if (maxSerial?.serial_no) {
+      const num = parseInt(maxSerial.serial_no, 10) + 1
+      nextSerial = String(num).padStart(6, "0")
+    }
+
     const { data: newProduct, error } = await productClient.insert({
       code: data.code,
       name: data.name,
+      serial_no: nextSerial,
       barcode: data.barcode || null,
       description: data.description || null,
       category_id: data.category_id || null,
@@ -285,6 +306,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
       min_stock: data.min_stock,
       current_stock: data.starting_stock,
       has_expiry: data.has_expiry,
+      expiry_date: data.has_expiry ? (data.expiry_date || null) : null,
       is_decimal_qty: data.is_decimal_qty,
     }).select("id").single()
 
@@ -574,6 +596,15 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
               />
               Has Expiry
             </label>
+            {watchHasExpiry && (
+              <div>
+                <input
+                  type="date"
+                  {...register("expiry_date")}
+                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-black focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+            )}
             <label className="flex items-center gap-2 text-sm text-black">
               <input
                 type="checkbox"
@@ -665,10 +696,11 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
                     }
                     return sortedMovements.map((m) => {
                       const qty = Math.abs(m.quantity)
-                      const typeLabel = m.reference_type === "starting_stock" ? "Opening" : m.type === "in" ? "Purchase" : "Sale"
-                      const refNum = m.reference_type === "sale" ? m.notes || m.reference_id || "—"
-                        : m.reference_type === "goods_received_note" ? m.notes || m.reference_id || "—"
-                        : m.reference_type === "starting_stock" ? "—"
+                      const typeLabel = m.reference_type === "starting_stock" ? "Opening"
+                        : m.reference_type === "purchase_return" ? "Return"
+                        : m.type === "in" ? "Purchase" : "Sale"
+                      const refNum = m.reference_type === "starting_stock" ? "—"
+                        : m.reference_type === "purchase_return" ? m.notes || "—"
                         : m.notes || m.reference_id || "—"
                       return (
                         <tr key={m.id}>
