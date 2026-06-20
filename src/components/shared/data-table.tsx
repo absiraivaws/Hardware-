@@ -135,7 +135,7 @@ export function DataTable<T>({
                     key={col.key}
                     onClick={() => handleSort(col.key)}
                     className={`cursor-pointer select-none px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                      active ? "text-emerald-700" : "text-black"
+                      "text-black"
                     }`}
                   >
                     <span className="inline-flex items-center gap-1.5">

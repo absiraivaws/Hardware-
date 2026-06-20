@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl"
 import { use, useEffect, useState } from "react"
 import { PageHeader } from "@/components/shared/page-header"
 import { createClient } from "@/lib/supabase/client"
-import { Globe, Bell, Shield, Database as DatabaseIcon, Building2, Share2, MessageCircle, Smartphone, Upload, X } from "lucide-react"
+import { Globe, Bell, Shield, Database as DatabaseIcon, Building2, Share2, MessageCircle, Smartphone, FileText, Upload, X } from "lucide-react"
 import { useData } from "@/providers/data-provider"
 
 const sections = [
@@ -70,6 +70,7 @@ export default function SettingsPage({
   const [logoUrl, setLogoUrl] = useState("")
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [quotationValidDays, setQuotationValidDays] = useState(7)
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
@@ -90,6 +91,7 @@ export default function SettingsPage({
       setTiktokLink(contextCompany.tiktok_link)
       setYoutubeLink(contextCompany.youtube_link)
       setLogoUrl(contextCompany.logo_url)
+      setQuotationValidDays(contextCompany.quotation_valid_days ?? 7)
     }
   }, [contextCompany])
 
@@ -143,6 +145,7 @@ export default function SettingsPage({
       facebook_link: facebookLink,
       tiktok_link: tiktokLink,
       youtube_link: youtubeLink,
+      quotation_valid_days: quotationValidDays,
     }
 
     if (contextCompany?.id) {
@@ -176,9 +179,9 @@ export default function SettingsPage({
               {t("settings.company")}
             </h2>
           </div>
-          <div className="divide-y px-6 py-4 space-y-4">
+          <div className="px-6 py-4 space-y-4">
             {/* Logo Upload */}
-            <div className="py-3">
+            <div>
               <label className="mb-2 block text-sm font-medium text-black">
                 {t("settings.company_logo")}
               </label>
@@ -223,56 +226,52 @@ export default function SettingsPage({
               </div>
             </div>
 
-            {/* Company Name */}
-            <div className="flex items-center justify-between py-3">
-              <label className="text-sm font-medium text-black">
-                {t("settings.company_name")}
-              </label>
-              <input
-                type="text"
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-                className="w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
-            </div>
-
-            {/* Address */}
-            <div className="flex items-start justify-between py-3">
-              <label className="pt-2 text-sm font-medium text-black">
-                {t("settings.address")}
-              </label>
-              <textarea
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                rows={2}
-                className="w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 resize-none"
-              />
-            </div>
-
-            {/* Contact Number */}
-            <div className="flex items-center justify-between py-3">
-              <label className="text-sm font-medium text-black">
-                {t("settings.contact_number")}
-              </label>
-              <input
-                type="text"
-                value={contactNumber}
-                onChange={(e) => setContactNumber(e.target.value)}
-                className="w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
-            </div>
-
-            {/* VAT Number */}
-            <div className="flex items-center justify-between py-3">
-              <label className="text-sm font-medium text-black">
-                {t("settings.vat_number")}
-              </label>
-              <input
-                type="text"
-                value={vatNumber}
-                onChange={(e) => setVatNumber(e.target.value)}
-                className="w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
+            {/* Fields in grid */}
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">
+                  {t("settings.company_name")}
+                </label>
+                <input
+                  type="text"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">
+                  {t("settings.contact_number")}
+                </label>
+                <input
+                  type="text"
+                  value={contactNumber}
+                  onChange={(e) => setContactNumber(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">
+                  {t("settings.vat_number")}
+                </label>
+                <input
+                  type="text"
+                  value={vatNumber}
+                  onChange={(e) => setVatNumber(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">
+                  {t("settings.address")}
+                </label>
+                <textarea
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  rows={1}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none resize-none"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -285,54 +284,79 @@ export default function SettingsPage({
               {t("settings.social_media")}
             </h2>
           </div>
-          <div className="divide-y px-6 py-4">
-            <div className="flex items-center justify-between py-3">
-              <label className="text-sm font-medium text-black">
-                {t("settings.whatsapp_link")}
-              </label>
-              <input
-                type="text"
-                value={whatsappLink}
-                onChange={(e) => setWhatsappLink(e.target.value)}
-                placeholder="https://wa.me/..."
-                className="w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
+          <div className="px-6 py-4">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">
+                  {t("settings.whatsapp_link")}
+                </label>
+                <input
+                  type="text"
+                  value={whatsappLink}
+                  onChange={(e) => setWhatsappLink(e.target.value)}
+                  placeholder="https://wa.me/..."
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">
+                  {t("settings.facebook_link")}
+                </label>
+                <input
+                  type="text"
+                  value={facebookLink}
+                  onChange={(e) => setFacebookLink(e.target.value)}
+                  placeholder="https://facebook.com/..."
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">
+                  {t("settings.tiktok_link")}
+                </label>
+                <input
+                  type="text"
+                  value={tiktokLink}
+                  onChange={(e) => setTiktokLink(e.target.value)}
+                  placeholder="https://tiktok.com/@..."
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">
+                  {t("settings.youtube_link")}
+                </label>
+                <input
+                  type="text"
+                  value={youtubeLink}
+                  onChange={(e) => setYoutubeLink(e.target.value)}
+                  placeholder="https://youtube.com/@..."
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
             </div>
-            <div className="flex items-center justify-between py-3">
-              <label className="text-sm font-medium text-black">
-                {t("settings.facebook_link")}
-              </label>
-              <input
-                type="text"
-                value={facebookLink}
-                onChange={(e) => setFacebookLink(e.target.value)}
-                placeholder="https://facebook.com/..."
-                className="w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
-            </div>
-            <div className="flex items-center justify-between py-3">
-              <label className="text-sm font-medium text-black">
-                {t("settings.tiktok_link")}
-              </label>
-              <input
-                type="text"
-                value={tiktokLink}
-                onChange={(e) => setTiktokLink(e.target.value)}
-                placeholder="https://tiktok.com/@..."
-                className="w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
-            </div>
-            <div className="flex items-center justify-between py-3">
-              <label className="text-sm font-medium text-black">
-                {t("settings.youtube_link")}
-              </label>
-              <input
-                type="text"
-                value={youtubeLink}
-                onChange={(e) => setYoutubeLink(e.target.value)}
-                placeholder="https://youtube.com/@..."
-                className="w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
+          </div>
+        </div>
+
+        {/* Quotations */}
+        <div className="rounded-lg border bg-white">
+          <div className="flex items-center gap-3 border-b px-6 py-4">
+            <FileText className="h-5 w-5 text-emerald-600" />
+            <h2 className="text-base font-semibold text-black">{t("quotations.title")}</h2>
+          </div>
+          <div className="px-6 py-4">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">Valid Days</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={quotationValidDays}
+                  onChange={(e) => setQuotationValidDays(Number(e.target.value))}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+                <p className="mt-1 text-xs text-black">Auto-calculates valid until date in new quotations</p>
+              </div>
             </div>
           </div>
         </div>
@@ -343,36 +367,38 @@ export default function SettingsPage({
             <MessageCircle className="h-5 w-5 text-emerald-600" />
             <h2 className="text-base font-semibold text-black">WhatsApp Business API</h2>
           </div>
-          <div className="divide-y px-6 py-4">
-            <div className="flex items-center justify-between py-3">
-              <label className="text-sm font-medium text-black">API Key</label>
-              <input
-                type="text"
-                value={whatsappApiKey}
-                onChange={(e) => setWhatsappApiKey(e.target.value)}
-                placeholder="Permanent access token"
-                className="w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
-            </div>
-            <div className="flex items-center justify-between py-3">
-              <label className="text-sm font-medium text-black">Phone Number ID</label>
-              <input
-                type="text"
-                value={whatsappPhoneNumberId}
-                onChange={(e) => setWhatsappPhoneNumberId(e.target.value)}
-                placeholder="From Meta Business dashboard"
-                className="w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
-            </div>
-            <div className="flex items-center justify-between py-3">
-              <label className="text-sm font-medium text-black">Business Account ID</label>
-              <input
-                type="text"
-                value={whatsappBusinessAccountId}
-                onChange={(e) => setWhatsappBusinessAccountId(e.target.value)}
-                placeholder="From Meta Business dashboard"
-                className="w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
+          <div className="px-6 py-4">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">API Key</label>
+                <input
+                  type="text"
+                  value={whatsappApiKey}
+                  onChange={(e) => setWhatsappApiKey(e.target.value)}
+                  placeholder="Permanent access token"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">Phone Number ID</label>
+                <input
+                  type="text"
+                  value={whatsappPhoneNumberId}
+                  onChange={(e) => setWhatsappPhoneNumberId(e.target.value)}
+                  placeholder="From Meta Business dashboard"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">Business Account ID</label>
+                <input
+                  type="text"
+                  value={whatsappBusinessAccountId}
+                  onChange={(e) => setWhatsappBusinessAccountId(e.target.value)}
+                  placeholder="From Meta Business dashboard"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -383,38 +409,40 @@ export default function SettingsPage({
             <Smartphone className="h-5 w-5 text-emerald-600" />
             <h2 className="text-base font-semibold text-black">SMS API</h2>
           </div>
-          <div className="divide-y px-6 py-4">
-            <div className="flex items-center justify-between py-3">
-              <label className="text-sm font-medium text-black">Provider</label>
-              <select
-                value={smsProvider}
-                onChange={(e) => setSmsProvider(e.target.value)}
-                className="w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              >
-                <option value="">None</option>
-                <option value="dialog">Dialog</option>
-                <option value="mobitel">Mobitel</option>
-              </select>
-            </div>
-            <div className="flex items-center justify-between py-3">
-              <label className="text-sm font-medium text-black">API Key</label>
-              <input
-                type="text"
-                value={smsApiKey}
-                onChange={(e) => setSmsApiKey(e.target.value)}
-                placeholder="API key from provider"
-                className="w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
-            </div>
-            <div className="flex items-center justify-between py-3">
-              <label className="text-sm font-medium text-black">API Secret</label>
-              <input
-                type="text"
-                value={smsApiSecret}
-                onChange={(e) => setSmsApiSecret(e.target.value)}
-                placeholder="API secret from provider"
-                className="w-72 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
+          <div className="px-6 py-4">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">Provider</label>
+                <select
+                  value={smsProvider}
+                  onChange={(e) => setSmsProvider(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="">None</option>
+                  <option value="dialog">Dialog</option>
+                  <option value="mobitel">Mobitel</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">API Key</label>
+                <input
+                  type="text"
+                  value={smsApiKey}
+                  onChange={(e) => setSmsApiKey(e.target.value)}
+                  placeholder="API key from provider"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">API Secret</label>
+                <input
+                  type="text"
+                  value={smsApiSecret}
+                  onChange={(e) => setSmsApiSecret(e.target.value)}
+                  placeholder="API secret from provider"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
             </div>
           </div>
         </div>

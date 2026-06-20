@@ -6,8 +6,10 @@ import { Plus, Eye, Ban, CheckCircle } from "lucide-react"
 import { DataTable } from "@/components/shared/data-table"
 import { createClient } from "@/lib/supabase/client"
 import { getCached, setCache } from "@/lib/query-cache"
+import { generateNextCode } from "@/lib/code-gen"
 interface Supplier {
   id: string
+  code: string
   name: string
   contact_person: string | null
   phone: string | null
@@ -55,7 +57,8 @@ export default function SuppliersPage({
   const handleAdd = async () => {
     if (!form.name) return
     const supabase = createClient()
-    await supabase.from("suppliers").insert([{ ...form, credit_period: Number(form.credit_period), overdue_penalty_rate: Number(form.overdue_penalty_rate) }])
+    const code = await generateNextCode("suppliers")
+    await supabase.from("suppliers").insert([{ ...form, code, credit_period: Number(form.credit_period), overdue_penalty_rate: Number(form.overdue_penalty_rate) }])
     setShowForm(false)
     setForm({ name: "", contact_person: "", phone: "", email: "", address: "", credit_period: 0, overdue_penalty_rate: 0 })
     fetchSuppliers()
@@ -69,6 +72,11 @@ export default function SuppliersPage({
   }
 
   const columns = [
+    {
+      key: "code",
+      label: "Code",
+      render: (s: Supplier) => <span className="font-mono text-xs text-gray-500">{s.code}</span>,
+    },
     {
       key: "name",
       label: t("name"),

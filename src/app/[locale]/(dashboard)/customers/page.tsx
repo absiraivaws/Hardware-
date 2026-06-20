@@ -7,8 +7,10 @@ import { DataTable } from "@/components/shared/data-table"
 import { formatCurrency } from "@/lib/format"
 import { createClient } from "@/lib/supabase/client"
 import { getCached, setCache } from "@/lib/query-cache"
+import { generateNextCode } from "@/lib/code-gen"
 interface Customer {
   id: string
+  code: string
   name: string
   phone: string | null
   email: string | null
@@ -56,7 +58,8 @@ export default function CustomersPage({
   const handleAdd = async () => {
     if (!form.name) return
     const supabase = createClient()
-    await supabase.from("customers").insert([{ ...form, credit_limit: Number(form.credit_limit) }])
+    const code = await generateNextCode("customers")
+    await supabase.from("customers").insert([{ ...form, code, credit_limit: Number(form.credit_limit) }])
     setShowForm(false)
     setForm({ name: "", phone: "", email: "", address: "", credit_limit: 0 })
     fetchCustomers()
@@ -70,6 +73,11 @@ export default function CustomersPage({
   }
 
   const columns = [
+    {
+      key: "code",
+      label: "Code",
+      render: (c: Customer) => <span className="font-mono text-xs text-gray-500">{c.code}</span>,
+    },
     {
       key: "name",
       label: t("name"),

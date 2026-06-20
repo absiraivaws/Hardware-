@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl"
 import { PageHeader } from "@/components/shared/page-header"
 import { createClient } from "@/lib/supabase/client"
 import { formatCurrency, formatDate } from "@/lib/format"
-import { Plus, X, TrendingDown, TrendingUp, Wallet, Pencil, Trash2 } from "lucide-react"
+import { Plus, X, TrendingDown, TrendingUp, Wallet } from "lucide-react"
 
 interface Entry {
   id: string
@@ -51,7 +51,6 @@ export default function ExpensesPage({ params }: { params: Promise<{ locale: str
   const [entries, setEntries] = useState<Entry[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState<"expense" | "income" | null>(null)
-  const [editingId, setEditingId] = useState<string | null>(null)
   const [entryDate, setEntryDate] = useState(new Date().toISOString().slice(0, 10))
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash")
   const [category, setCategory] = useState("")
@@ -61,8 +60,6 @@ export default function ExpensesPage({ params }: { params: Promise<{ locale: str
   const [customCategories, setCustomCategories] = useState<Category[]>([])
   const [showNewCatInput, setShowNewCatInput] = useState(false)
   const [newCatName, setNewCatName] = useState("")
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
-
   async function fetchEntries() {
     const today = new Date().toISOString().slice(0, 10)
     const [allRes, todayRes, catRes] = await Promise.all([
@@ -78,26 +75,7 @@ export default function ExpensesPage({ params }: { params: Promise<{ locale: str
 
   useEffect(() => { setPaymentMethod(storedPaymentMethod()); fetchEntries() }, [])
 
-  function resetForm() { setCategory(""); setDescription(""); setAmount(""); setEntryDate(new Date().toISOString().slice(0, 10)); setShowNewCatInput(false); setNewCatName(""); setEditingId(null) }
-
-  function parseDesc(desc: string | null): { cat: string; detail: string } {
-    if (!desc) return { cat: "", detail: "" }
-    const sep = desc.indexOf(" - ")
-    if (sep > 0) return { cat: desc.slice(0, sep), detail: desc.slice(sep + 3) }
-    return { cat: desc, detail: "" }
-  }
-
-  function openEdit(e: Entry) {
-    const { cat, detail } = parseDesc(e.description)
-    const found = allCategories.find(c => c.label === cat)
-    setEditingId(e.id)
-    setEntryDate(e.created_at.slice(0, 10))
-    setPaymentMethod(storedPaymentMethod())
-    setCategory(found?.value || cat)
-    setDescription(detail)
-    setAmount(String(e.amount))
-    setShowForm(e.ledger_type)
-  }
+  function resetForm() { setCategory(""); setDescription(""); setAmount(""); setEntryDate(new Date().toISOString().slice(0, 10)); setShowNewCatInput(false); setNewCatName("") }
 
   async function handleSave(type: "expense" | "income") {
     if (!amount || Number(amount) <= 0) return
@@ -118,53 +96,25 @@ export default function ExpensesPage({ params }: { params: Promise<{ locale: str
 
     try { localStorage.setItem("expense_payment_method", paymentMethod) } catch { /* ignore */ }
 
-    if (editingId) {
-      const { data: orig } = await supabase.from("ledger_entries").select("reference_id").eq("id", editingId).single()
-      const pairKey = (orig as { reference_id: string | null })?.reference_id
-      await supabase.from("ledger_entries").update({ amount: val, description: desc, entry_type: entryType, ledger_type: type, created_at: ts } as never).eq("id", editingId)
-      if (pairKey) {
-        if (mirrorLedger) {
-          await supabase.from("ledger_entries").update({ amount: val, description: desc, entry_type: entryType, ledger_type: mirrorLedger, created_at: ts } as never).eq("reference_id", pairKey)
-        } else {
-          await supabase.from("ledger_entries").delete().eq("reference_id", pairKey)
-        }
-      } else if (mirrorLedger) {
-        const { data: lastMirror } = await supabase.from("ledger_entries").select("balance_after").eq("ledger_type", mirrorLedger).order("created_at", { ascending: false }).limit(1).maybeSingle()
-        const prev = Number((lastMirror as { balance_after: number } | null)?.balance_after ?? 0)
-        await supabase.from("ledger_entries").insert({ ledger_type: mirrorLedger, entry_type: entryType, amount: val, description: desc, balance_after: entryType === "debit" ? prev + val : prev - val, reference_type: "expense_pair", reference_id: editingId, created_at: ts })
+    const pairKey = crypto.randomUUID()
+    const ledgerTypes = mirrorLedger ? [type, mirrorLedger] : [type]
+    const { data: lastEntries } = await supabase.from("ledger_entries").select("ledger_type, balance_after").in("ledger_type", ledgerTypes).order("created_at", { ascending: false }).limit(ledgerTypes.length)
+    const lastBal: Record<string, number> = {}
+    if (lastEntries) {
+      for (const e of lastEntries as { ledger_type: string; balance_after: number }[]) {
+        if (!(e.ledger_type in lastBal)) lastBal[e.ledger_type] = Number(e.balance_after)
       }
-    } else {
-      const pairKey = crypto.randomUUID()
-      const ledgerTypes = mirrorLedger ? [type, mirrorLedger] : [type]
-      const { data: lastEntries } = await supabase.from("ledger_entries").select("ledger_type, balance_after").in("ledger_type", ledgerTypes).order("created_at", { ascending: false }).limit(ledgerTypes.length)
-      const lastBal: Record<string, number> = {}
-      if (lastEntries) {
-        for (const e of lastEntries as { ledger_type: string; balance_after: number }[]) {
-          if (!(e.ledger_type in lastBal)) lastBal[e.ledger_type] = Number(e.balance_after)
-        }
-      }
-      const inserts: Record<string, unknown>[] = [
-        { ledger_type: type, entry_type: entryType, amount: val, description: desc, balance_after: (lastBal[type] ?? 0) + (entryType === "debit" ? val : -val), reference_type: "expense_pair", reference_id: pairKey, created_at: ts },
-      ]
-      if (mirrorLedger) {
-        inserts.push({ ledger_type: mirrorLedger, entry_type: entryType, amount: val, description: desc, balance_after: (lastBal[mirrorLedger] ?? 0) + (entryType === "debit" ? val : -val), reference_type: "expense_pair", reference_id: pairKey, created_at: ts })
-      }
-      await supabase.from("ledger_entries").insert(inserts)
     }
+    const inserts: Record<string, unknown>[] = [
+      { ledger_type: type, entry_type: entryType, amount: val, description: desc, balance_after: (lastBal[type] ?? 0) + (entryType === "debit" ? val : -val), reference_type: "expense_pair", reference_id: pairKey, created_at: ts },
+    ]
+    if (mirrorLedger) {
+      inserts.push({ ledger_type: mirrorLedger, entry_type: entryType, amount: val, description: desc, balance_after: (lastBal[mirrorLedger] ?? 0) + (entryType === "debit" ? val : -val), reference_type: "expense_pair", reference_id: pairKey, created_at: ts })
+    }
+    await supabase.from("ledger_entries").insert(inserts)
 
     resetForm()
     setShowForm(null)
-    fetchEntries()
-  }
-
-  async function handleDelete(id: string) {
-    const { data: entry } = await supabase.from("ledger_entries").select("reference_id").eq("id", id).single()
-    const pairKey = (entry as { reference_id: string | null })?.reference_id
-    await supabase.from("ledger_entries").delete().eq("id", id)
-    if (pairKey) {
-      await supabase.from("ledger_entries").delete().eq("reference_id", pairKey)
-    }
-    setDeleteConfirm(null)
     fetchEntries()
   }
 
@@ -190,23 +140,17 @@ export default function ExpensesPage({ params }: { params: Promise<{ locale: str
 
   function renderRow(e: Entry, showDate = false) {
     return (
-      <tr key={e.id} className="border-b last:border-0 group">
+      <tr key={e.id} className="border-b last:border-0">
         {showDate && <td className="px-4 py-3 text-black whitespace-nowrap">{formatDate(e.created_at)}</td>}
         <td className="px-4 py-3">
-          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${e.ledger_type === "expense" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>
+          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${e.ledger_type === "expense" ? "bg-red-100 text-black" : "bg-emerald-100 text-black"}`}>
             {e.ledger_type === "expense" ? <TrendingDown size={12} /> : <TrendingUp size={12} />}
             {e.ledger_type === "expense" ? t("expenses.expense") : t("expenses.income")}
           </span>
         </td>
         <td className="px-4 py-3 text-black">{e.description || "-"}</td>
-        <td className={`px-4 py-3 text-right font-medium ${e.ledger_type === "expense" ? "text-red-600" : "text-emerald-600"}`}>
+        <td className={`px-4 py-3 text-right font-medium ${e.ledger_type === "expense" ? "text-black" : "text-black"}`}>
           {e.ledger_type === "expense" ? "-" : "+"}{formatCurrency(e.amount, locale)}
-        </td>
-        <td className="px-4 py-3 text-right">
-          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button onClick={() => openEdit(e)} className="rounded-lg p-1.5 hover:bg-gray-100" title="Edit"><Pencil size={14} className="text-black" /></button>
-            <button onClick={() => setDeleteConfirm(e.id)} className="rounded-lg p-1.5 hover:bg-red-50" title="Delete"><Trash2 size={14} className="text-red-500" /></button>
-          </div>
         </td>
       </tr>
     )
@@ -219,33 +163,33 @@ export default function ExpensesPage({ params }: { params: Promise<{ locale: str
       <div className="mb-6 grid grid-cols-3 gap-4">
         <div className="rounded-lg border bg-white p-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100"><TrendingDown size={20} className="text-red-600" /></div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100"><TrendingDown size={20} className="text-black" /></div>
             <div>
               <p className="text-xs font-medium text-black">{t("expenses.total_expenses")}</p>
               <p className="text-lg font-bold text-black">{formatCurrency(todayTotalExpense, locale)}</p>
-              <p className="text-[10px] text-gray-500">Today</p>
+              <p className="text-[10px] text-black">Today</p>
             </div>
           </div>
         </div>
         <div className="rounded-lg border bg-white p-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100"><TrendingUp size={20} className="text-emerald-600" /></div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100"><TrendingUp size={20} className="text-black" /></div>
             <div>
               <p className="text-xs font-medium text-black">{t("expenses.total_income")}</p>
               <p className="text-lg font-bold text-black">{formatCurrency(todayTotalIncome, locale)}</p>
-              <p className="text-[10px] text-gray-500">Today</p>
+              <p className="text-[10px] text-black">Today</p>
             </div>
           </div>
         </div>
         <div className="rounded-lg border bg-white p-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100"><Wallet size={20} className="text-blue-600" /></div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100"><Wallet size={20} className="text-black" /></div>
             <div>
               <p className="text-xs font-medium text-black">{t("expenses.net")}</p>
-              <p className={`text-lg font-bold ${todayTotalIncome - todayTotalExpense >= 0 ? "text-emerald-700" : "text-red-600"}`}>
+              <p className={`text-lg font-bold ${todayTotalIncome - todayTotalExpense >= 0 ? "text-black" : "text-black"}`}>
                 {formatCurrency(todayTotalIncome - todayTotalExpense, locale)}
               </p>
-              <p className="text-[10px] text-gray-500">Today</p>
+              <p className="text-[10px] text-black">Today</p>
             </div>
           </div>
         </div>
@@ -264,7 +208,7 @@ export default function ExpensesPage({ params }: { params: Promise<{ locale: str
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowForm(null)}>
           <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl" onClick={e => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-black">{editingId ? "Edit" : showForm === "expense" ? t("expenses.add_expense") : t("expenses.add_income")}</h2>
+              <h2 className="text-lg font-semibold text-black">{showForm === "expense" ? t("expenses.add_expense") : t("expenses.add_income")}</h2>
               <button onClick={() => setShowForm(null)}><X size={20} className="text-black" /></button>
             </div>
             <div className="space-y-4">
@@ -324,19 +268,6 @@ export default function ExpensesPage({ params }: { params: Promise<{ locale: str
         </div>
       )}
 
-      {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setDeleteConfirm(null)}>
-          <div className="mx-4 w-full max-w-sm rounded-xl bg-white p-6 shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="mb-2 text-base font-semibold text-black">Confirm Delete</h3>
-            <p className="mb-4 text-sm text-black">Delete this entry and its ledger mirror?</p>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setDeleteConfirm(null)} className="rounded-lg border px-4 py-2 text-sm text-black hover:bg-gray-50">Cancel</button>
-              <button onClick={() => handleDelete(deleteConfirm)} className="rounded-lg bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700">Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="mb-6">
         <h2 className="mb-3 text-base font-semibold text-black">{t("expenses.today_summary")}</h2>
         <div className="overflow-x-auto rounded-lg border bg-white">
@@ -346,12 +277,11 @@ export default function ExpensesPage({ params }: { params: Promise<{ locale: str
                 <th className="px-4 py-3">{t("expenses.type")}</th>
                 <th className="px-4 py-3">{t("expenses.description")}</th>
                 <th className="px-4 py-3 text-right">{t("expenses.amount")}</th>
-                <th className="px-4 py-3 w-20"></th>
               </tr>
             </thead>
             <tbody>
               {todayEntries.length === 0 ? (
-                <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-black">{t("expenses.no_entries")}</td></tr>
+                <tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-black">{t("expenses.no_entries")}</td></tr>
               ) : (
                 todayEntries.map(e => renderRow(e))
               )}
@@ -370,14 +300,13 @@ export default function ExpensesPage({ params }: { params: Promise<{ locale: str
                 <th className="px-4 py-3">{t("expenses.type")}</th>
                 <th className="px-4 py-3">{t("expenses.description")}</th>
                 <th className="px-4 py-3 text-right">{t("expenses.amount")}</th>
-                <th className="px-4 py-3 w-20"></th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                Array.from({ length: 5 }).map((_, i) => <tr key={i}><td colSpan={5} className="px-4 py-3"><div className="h-4 animate-pulse rounded bg-gray-100" /></td></tr>)
+                Array.from({ length: 5 }).map((_, i) => <tr key={i}><td colSpan={4} className="px-4 py-3"><div className="h-4 animate-pulse rounded bg-gray-100" /></td></tr>)
               ) : entries.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-black">{t("expenses.no_entries")}</td></tr>
+                <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-black">{t("expenses.no_entries")}</td></tr>
               ) : (
                 entries.map(e => renderRow(e, true))
               )}
@@ -387,11 +316,11 @@ export default function ExpensesPage({ params }: { params: Promise<{ locale: str
         <div className="mt-4 grid grid-cols-2 gap-4">
           <div className="flex items-center justify-between rounded-lg bg-red-50 px-4 py-3">
             <span className="text-sm font-medium text-black">{t("expenses.total_expenses")}</span>
-            <span className="text-lg font-bold text-red-700">{formatCurrency(allTotalExpense, locale)}</span>
+            <span className="text-lg font-bold text-black">{formatCurrency(allTotalExpense, locale)}</span>
           </div>
           <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-4 py-3">
             <span className="text-sm font-medium text-black">{t("expenses.total_income")}</span>
-            <span className="text-lg font-bold text-emerald-700">{formatCurrency(allTotalIncome, locale)}</span>
+            <span className="text-lg font-bold text-black">{formatCurrency(allTotalIncome, locale)}</span>
           </div>
         </div>
       </div>

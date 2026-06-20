@@ -136,7 +136,7 @@ export default function SupplierLedgerPage({
           <option value="">{t("select_supplier")}</option>
           {suppliers.map((s) => (
             <option key={s.id} value={s.id}>
-              {s.name} — {s.phone ?? ""}
+              {s.name} — {s.code ?? s.phone ?? ""}
             </option>
           ))}
         </select>
@@ -153,7 +153,7 @@ export default function SupplierLedgerPage({
                   <th
                     key={col.key}
                     onClick={() => handleSort(col.key)}
-                    className={`cursor-pointer select-none px-4 py-3 ${col.align} text-xs font-medium uppercase tracking-wider ${active ? "text-emerald-700" : "text-black"}`}
+                    className={`cursor-pointer select-none px-4 py-3 ${col.align} text-xs font-medium uppercase tracking-wider text-black`}
                   >
                     <span className="inline-flex items-center gap-1">
                       {col.label}
@@ -210,16 +210,16 @@ export default function SupplierLedgerPage({
       {sortedEntries.length > 0 && (
         <div className="mt-4 grid grid-cols-3 gap-4">
           <div className="rounded-lg border bg-red-50 p-4 text-center">
-            <div className="text-xs font-medium uppercase tracking-wider text-red-700">{t("total_debit")}</div>
-            <div className="mt-1 text-lg font-bold text-red-700">{formatCurrency(totalDebit, locale)}</div>
+            <div className="text-xs font-medium uppercase tracking-wider text-black">{t("total_debit")}</div>
+            <div className="mt-1 text-lg font-bold text-black">{formatCurrency(totalDebit, locale)}</div>
           </div>
           <div className="rounded-lg border bg-green-50 p-4 text-center">
-            <div className="text-xs font-medium uppercase tracking-wider text-green-700">{t("total_credit")}</div>
-            <div className="mt-1 text-lg font-bold text-green-700">{formatCurrency(totalCredit, locale)}</div>
+            <div className="text-xs font-medium uppercase tracking-wider text-black">{t("total_credit")}</div>
+            <div className="mt-1 text-lg font-bold text-black">{formatCurrency(totalCredit, locale)}</div>
           </div>
           <div className="rounded-lg border bg-blue-50 p-4 text-center">
-            <div className="text-xs font-medium uppercase tracking-wider text-blue-700">{t("net_balance")}</div>
-            <div className="mt-1 text-lg font-bold text-blue-700">{formatCurrency(netBalance, locale)}</div>
+            <div className="text-xs font-medium uppercase tracking-wider text-black">{t("net_balance")}</div>
+            <div className="mt-1 text-lg font-bold text-black">{formatCurrency(netBalance, locale)}</div>
           </div>
         </div>
       )}

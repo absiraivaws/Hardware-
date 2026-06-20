@@ -30,8 +30,8 @@ interface Product {
 }
 
 const statusStyles: Record<string, string> = {
-  pending: "bg-yellow-100 text-yellow-800",
-  completed: "bg-green-100 text-green-800",
+  pending: "bg-yellow-100 text-black",
+  completed: "bg-green-100 text-black",
   cancelled: "bg-gray-100 text-black",
 }
 
@@ -137,7 +137,7 @@ export default function StockTransfersPage({ params }: { params: Promise<{ local
                 const { data: refreshed } = await supabase.from("stock_transfers").select("*, from_branch:branches!from_branch_id(name), to_branch:branches!to_branch_id(name)").order("created_at", { ascending: false })
                 if (refreshed) setTransfers(refreshed as unknown as Transfer[])
               }}
-              className="rounded bg-emerald-100 p-1.5 text-emerald-700 hover:bg-emerald-200"
+              className="rounded bg-emerald-100 p-1.5 text-black hover:bg-emerald-200"
               title="Complete"
             >
               <Check size={16} />
@@ -150,7 +150,7 @@ export default function StockTransfersPage({ params }: { params: Promise<{ local
                 const { data: refreshed } = await supabase.from("stock_transfers").select("*, from_branch:branches!from_branch_id(name), to_branch:branches!to_branch_id(name)").order("created_at", { ascending: false })
                 if (refreshed) setTransfers(refreshed as unknown as Transfer[])
               }}
-              className="rounded bg-red-100 p-1.5 text-red-700 hover:bg-red-200"
+              className="rounded bg-red-100 p-1.5 text-black hover:bg-red-200"
               title="Cancel"
             >
               <X size={16} />
@@ -279,12 +279,12 @@ export default function StockTransfersPage({ params }: { params: Promise<{ local
                   onChange={(e) => updateItem(i, "quantity", e.target.value)}
                   className="w-20 rounded-lg border border-gray-300 px-3 py-2 text-sm text-right focus:border-emerald-500 focus:outline-none"
                 />
-                <button onClick={() => removeItem(i)} className="rounded p-1.5 text-red-500 hover:bg-red-50">
+                <button onClick={() => removeItem(i)} className="rounded p-1.5 text-black hover:bg-red-50">
                   <X size={16} />
                 </button>
               </div>
             ))}
-            <button onClick={addItem} className="text-sm text-emerald-600 hover:text-emerald-700">+ Add Item</button>
+            <button onClick={addItem} className="text-sm text-black hover:text-black">+ Add Item</button>
           </div>
           <div className="mt-3">
             <label className="mb-1 block text-xs font-medium text-black">Notes</label>

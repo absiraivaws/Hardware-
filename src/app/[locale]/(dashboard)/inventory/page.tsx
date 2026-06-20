@@ -201,7 +201,7 @@ export default function InventoryPage({ params }: { params: Promise<{ locale: st
       key: "current_stock",
       label: t("inventory.current_stock"),
       render: (item: ProductRow) => (
-        <span className={item.current_stock <= item.min_stock ? "font-semibold text-red-600" : ""}>
+        <span className={item.current_stock <= item.min_stock ? "font-semibold text-black" : ""}>
           {item.current_stock} {item.units?.symbol || ""}
         </span>
       ),
@@ -210,14 +210,14 @@ export default function InventoryPage({ params }: { params: Promise<{ locale: st
       key: "expiry_date",
       label: "Expiry Date",
       render: (item: ProductRow) => {
-        if (!item.has_expiry || !item.expiry_date) return <span className="text-gray-400">—</span>
+        if (!item.has_expiry || !item.expiry_date) return <span className="text-black">—</span>
         const now = new Date()
         const expiry = new Date(item.expiry_date)
         const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
         let cls = "text-black"
-        if (daysLeft < 0) cls = "font-semibold text-red-600"
-        else if (daysLeft <= 30) cls = "font-semibold text-amber-600"
-        else if (daysLeft <= 90) cls = "text-amber-700"
+        if (daysLeft < 0) cls = "font-semibold text-black"
+        else if (daysLeft <= 30) cls = "font-semibold text-black"
+        else if (daysLeft <= 90) cls = "text-black"
         return <span className={cls}>{formatDate(item.expiry_date, locale)}{daysLeft <= 30 && ` (${daysLeft < 0 ? "Expired" : `${daysLeft}d`})`}</span>
       },
     },
@@ -230,7 +230,7 @@ export default function InventoryPage({ params }: { params: Promise<{ locale: st
       key: "selling_price",
       label: t("inventory.selling_price"),
       render: (item: ProductRow) => (
-        <span className={isLowStock(item) ? "text-red-600" : ""}>
+        <span className={isLowStock(item) ? "text-black" : ""}>
           {numberFormat.format(item.selling_price)}
         </span>
       ),
@@ -251,7 +251,7 @@ export default function InventoryPage({ params }: { params: Promise<{ locale: st
         <span
           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
             item.status === "active"
-              ? "bg-green-100 text-green-800"
+              ? "bg-green-100 text-black"
               : "bg-gray-100 text-black"
           }`}
         >
@@ -266,13 +266,13 @@ export default function InventoryPage({ params }: { params: Promise<{ locale: st
         <div className="flex items-center gap-2">
           <Link
             href={`/${locale}/inventory/new?id=${item.id}`}
-            className="rounded-lg p-1.5 text-black hover:bg-gray-100 hover:text-emerald-600"
+            className="rounded-lg p-1.5 text-black hover:bg-gray-100 hover:text-black"
           >
             <Pencil size={16} />
           </Link>
           <button
             onClick={() => handleDelete(item.id)}
-            className="rounded-lg p-1.5 text-black hover:bg-gray-100 hover:text-red-600"
+            className="rounded-lg p-1.5 text-black hover:bg-gray-100 hover:text-black"
           >
             <Trash2 size={16} />
           </button>
@@ -294,7 +294,7 @@ export default function InventoryPage({ params }: { params: Promise<{ locale: st
       </PageHeader>
 
       {error && (
-        <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-black">{error}</div>
       )}
 
       <DataTable

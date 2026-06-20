@@ -15,10 +15,10 @@ type Quotation = Database["public"]["Tables"]["quotations"]["Row"]
 
 const statusStyles: Record<string, string> = {
   draft: "bg-gray-100 text-black",
-  sent: "bg-blue-100 text-blue-700",
-  accepted: "bg-green-100 text-green-700",
-  expired: "bg-red-100 text-red-700",
-  converted: "bg-purple-100 text-purple-700",
+  sent: "bg-blue-100 text-black",
+  accepted: "bg-green-100 text-black",
+  expired: "bg-red-100 text-black",
+  converted: "bg-purple-100 text-black",
 }
 
 const statusLabels: Record<string, string> = {
@@ -148,7 +148,7 @@ export default function QuotationsPage() {
       </PageHeader>
 
       {error && (
-        <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-black">{error}</div>
       )}
 
       <DataTable<Quotation>

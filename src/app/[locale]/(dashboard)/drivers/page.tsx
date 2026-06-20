@@ -111,7 +111,7 @@ export default function DriversPage({ params }: { params: Promise<{ locale: stri
                   <td className="px-4 py-3 font-medium text-black">{d.name}</td>
                   <td className="px-4 py-3 text-black">{d.phone}</td>
                   <td className="px-4 py-3 text-black">{d.license_no}</td>
-                  <td className="px-4 py-3"><span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${d.status === "active" ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>{d.status}</span></td>
+                  <td className="px-4 py-3"><span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${d.status === "active" ? "bg-emerald-100 text-black" : "bg-gray-100 text-black"}`}>{d.status}</span></td>
                   <td className="px-4 py-3"><button onClick={() => handleEdit(d)} className="rounded-lg p-1.5 hover:bg-gray-100"><Pencil size={16} className="text-black" /></button></td>
                 </tr>
               ))}

@@ -362,7 +362,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
               {errors.code && (
-                <p className="mt-1 text-xs text-red-600">{errors.code.message}</p>
+                <p className="mt-1 text-xs text-black">{errors.code.message}</p>
               )}
             </div>
 
@@ -375,7 +375,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
               {errors.name && (
-                <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>
+                <p className="mt-1 text-xs text-black">{errors.name.message}</p>
               )}
             </div>
 
@@ -427,7 +427,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
                       placeholder="New name"
                       autoFocus
                     />
-                    <button type="button" onClick={handleAddCategory} className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50">
+                    <button type="button" onClick={handleAddCategory} className="rounded-lg p-1.5 text-black hover:bg-emerald-50">
                       <Check size={16} />
                     </button>
                     <button type="button" onClick={() => { setAddingCategory(false); setNewCategoryName("") }} className="rounded-lg p-1.5 text-black hover:bg-gray-100">
@@ -469,7 +469,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
                       placeholder="New name"
                       autoFocus
                     />
-                    <button type="button" onClick={handleAddBrand} className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50">
+                    <button type="button" onClick={handleAddBrand} className="rounded-lg p-1.5 text-black hover:bg-emerald-50">
                       <Check size={16} />
                     </button>
                     <button type="button" onClick={() => { setAddingBrand(false); setNewBrandName("") }} className="rounded-lg p-1.5 text-black hover:bg-gray-100">
@@ -512,7 +512,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
               {errors.cost_price && (
-                <p className="mt-1 text-xs text-red-600">{errors.cost_price.message}</p>
+                <p className="mt-1 text-xs text-black">{errors.cost_price.message}</p>
               )}
             </div>
 
@@ -527,7 +527,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
               {errors.selling_price && (
-                <p className="mt-1 text-xs text-red-600">{errors.selling_price.message}</p>
+                <p className="mt-1 text-xs text-black">{errors.selling_price.message}</p>
               )}
             </div>
 
@@ -544,7 +544,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
               {errors.wholesale_price && (
-                <p className="mt-1 text-xs text-red-600">{errors.wholesale_price.message}</p>
+                <p className="mt-1 text-xs text-black">{errors.wholesale_price.message}</p>
               )}
             </div>
 
@@ -558,7 +558,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
               {errors.min_stock && (
-                <p className="mt-1 text-xs text-red-600">{errors.min_stock.message}</p>
+                <p className="mt-1 text-xs text-black">{errors.min_stock.message}</p>
               )}
             </div>
             {isEdit ? (
@@ -581,7 +581,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 />
                 {errors.starting_stock && (
-                  <p className="mt-1 text-xs text-red-600">{errors.starting_stock.message}</p>
+                  <p className="mt-1 text-xs text-black">{errors.starting_stock.message}</p>
                 )}
               </div>
             )}
@@ -592,7 +592,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
               <input
                 type="checkbox"
                 {...register("has_expiry")}
-                className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                className="rounded border-gray-300 text-black focus:ring-emerald-500"
               />
               Has Expiry
             </label>
@@ -609,7 +609,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
               <input
                 type="checkbox"
                 {...register("is_decimal_qty")}
-                className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                className="rounded border-gray-300 text-black focus:ring-emerald-500"
               />
               Decimal Quantity
             </label>
@@ -660,7 +660,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
                       <th
                         key={col.key}
                         onClick={() => handleHistorySort(col.key!)}
-                        className={`cursor-pointer select-none px-4 py-3 ${col.align} text-xs font-medium uppercase tracking-wider ${active ? "text-emerald-700" : "text-black"}`}
+                        className={`cursor-pointer select-none px-4 py-3 ${col.align} text-xs font-medium uppercase tracking-wider ${active ? "text-black" : "text-black"}`}
                       >
                         <span className="inline-flex items-center gap-1">
                           {col.label}
@@ -709,7 +709,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
                           </td>
                           <td className="px-4 py-3">
                             <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                              m.type === "in" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                              m.type === "in" ? "bg-green-100 text-black" : "bg-red-100 text-black"
                             }`}>
                               {typeLabel}
                             </span>

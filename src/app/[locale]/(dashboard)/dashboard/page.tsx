@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl"
 import { PageHeader } from "@/components/shared/page-header"
 import { createClient } from "@/lib/supabase/client"
 import { getCached, setCache } from "@/lib/query-cache"
-import { formatCurrency, formatCompactCurrency, formatDate } from "@/lib/format"
+import { formatCurrency, formatCompactCurrency } from "@/lib/format"
 import {
   DollarSign,
   TrendingUp,
@@ -26,13 +26,6 @@ import {
   ResponsiveContainer,
 } from "recharts"
 
-interface RecentSale {
-  customer_name: string | null
-  grand_total: number
-  payment_type: string
-  created_at: string
-}
-
 interface ChartDataPoint {
   name: string
   total: number
@@ -48,7 +41,6 @@ interface DashboardData {
   expiringSoonCount: number
   pendingApprovalsCount: number
   bouncedChequesCount: number
-  recentSales: RecentSale[]
   chartData: ChartDataPoint[]
   loading: boolean
 }
@@ -101,7 +93,6 @@ export default function DashboardPage({
     expiringSoonCount: 0,
     pendingApprovalsCount: 0,
     bouncedChequesCount: 0,
-    recentSales: [],
     chartData: [],
     loading: true,
   })
@@ -160,12 +151,6 @@ export default function DashboardPage({
         }).length
         const pendingApprovalsCount = (pendingApprovalsRaw as unknown as { count: number } | null)?.count ?? 0
         const bouncedChequesCount = (bouncedChequesRaw as unknown as { count: number } | null)?.count ?? 0
-        const recentSales: RecentSale[] = (recentRaw ?? []).map((r: Record<string, unknown>) => ({
-          customer_name: r.customer_name as string | null,
-          grand_total: r.grand_total as number,
-          payment_type: r.payment_type as string,
-          created_at: r.created_at as string,
-        }))
 
         const cashLedger = (ledgerData ?? []).filter((r: Record<string, unknown>) => r.ledger_type === "cash")
         const cashInHand = cashLedger.reduce((s: number, r: Record<string, unknown>) => {
@@ -196,7 +181,7 @@ export default function DashboardPage({
           return { name, total: dayTotals[key] }
         })
 
-        const result = { dailySales, monthlySales, cashInHand, creditSales, outstanding, lowStockCount, expiringSoonCount, pendingApprovalsCount, bouncedChequesCount, recentSales, chartData, loading: false }
+        const result = { dailySales, monthlySales, cashInHand, creditSales, outstanding, lowStockCount, expiringSoonCount, pendingApprovalsCount, bouncedChequesCount, chartData, loading: false }
         setCache(cacheKey, result)
         setData(result)
       } catch (error) {
@@ -212,9 +197,9 @@ export default function DashboardPage({
     return (
       <div>
         <PageHeader titleKey="dashboard.title" />
-        <div className="flex gap-4 overflow-x-auto pb-2">
+        <div className="grid grid-cols-5 gap-4">
           {cards.map(({ key, icon: Icon, color }) => (
-            <div key={key} className="min-w-[180px] shrink-0 rounded-lg border bg-white p-4 shadow-sm">
+            <div key={key} className="rounded-lg border bg-white p-4 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${color}`}>
                   <Icon className="h-5 w-5 text-white" />
@@ -249,13 +234,13 @@ export default function DashboardPage({
     <div>
       <PageHeader titleKey="dashboard.title" />
 
-      <div className="flex gap-4 overflow-x-auto pb-2">
+      <div className="grid grid-cols-5 gap-4">
         {cards.map(({ key, accessor, icon: Icon, color }) => {
           const value = data[accessor]
           const isCurrency = accessor !== "lowStockCount" && accessor !== "expiringSoonCount" && accessor !== "pendingApprovalsCount" && accessor !== "bouncedChequesCount"
 
           return (
-            <div key={key} className="min-w-[180px] shrink-0 rounded-lg border bg-white p-4 shadow-sm">
+            <div key={key} className="rounded-lg border bg-white p-4 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${color}`}>
                   <Icon className="h-5 w-5 text-white" />
@@ -286,39 +271,6 @@ export default function DashboardPage({
               <Bar dataKey="total" fill="#059669" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
-
-        <div className="min-w-[300px] rounded-lg border bg-white p-4 shadow-sm">
-          <h2 className="mb-4 text-base font-semibold text-black">{t("sales.sale_history")}</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b text-xs font-medium uppercase text-black">
-                  <th className="w-[20%] pb-2 pr-3">{t("common.date")}</th>
-                  <th className="w-[40%] pb-2 pr-3">{t("customers.customer_name")}</th>
-                  <th className="w-[20%] pb-2 pr-3">{t("common.grand_total")}</th>
-                  <th className="w-[20%] pb-2">{t("sales.payment_type")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.recentSales.map((sale, i) => (
-                  <tr key={i} className="border-b last:border-0">
-                    <td className="whitespace-nowrap py-2 pr-3 text-black">{formatDate(sale.created_at)}</td>
-                    <td className="py-2 pr-3 font-medium text-black">{sale.customer_name ?? t("sales.walk_in")}</td>
-                    <td className="py-2 pr-3 text-black">{formatCurrency(sale.grand_total, locale)}</td>
-                    <td className="py-2 text-black">{t(`sales.${sale.payment_type}`)}</td>
-                  </tr>
-                ))}
-                {data.recentSales.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="py-6 text-center text-black">
-                      {t("common.no_results")}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
         </div>
       </div>
     </div>

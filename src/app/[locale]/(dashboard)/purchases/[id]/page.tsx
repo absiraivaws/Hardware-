@@ -39,9 +39,9 @@ interface PurchaseOrder {
 }
 
 const statusStyles: Record<string, string> = {
-  pending: "bg-yellow-100 text-yellow-800",
-  partial: "bg-blue-100 text-blue-800",
-  completed: "bg-green-100 text-green-800",
+  pending: "bg-yellow-100 text-black",
+  partial: "bg-blue-100 text-black",
+  completed: "bg-green-100 text-black",
   cancelled: "bg-gray-100 text-black",
 }
 
@@ -102,6 +102,7 @@ export default function PurchaseOrderDetailPage({
   const [returnQtys, setReturnQtys] = useState<Record<string, number>>({})
   const [returnReason, setReturnReason] = useState("")
   const [returning, setReturning] = useState(false)
+  const [supplierCode, setSupplierCode] = useState<string | null>(null)
 
   function generateReturnNo(): string {
     const now = new Date()
@@ -130,7 +131,11 @@ export default function PurchaseOrderDetailPage({
         .eq("id", id)
         .single()
 
-      if (poData) setPo(poData as PurchaseOrder)
+      if (poData) {
+        setPo(poData as PurchaseOrder)
+        const { data: supData } = await supabase.from("suppliers").select("code").eq("id", (poData as PurchaseOrder).supplier_id).single()
+        if (supData) setSupplierCode(supData.code)
+      }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: itemsData } = await (supabase.from("purchase_items") as any)
@@ -519,7 +524,7 @@ export default function PurchaseOrderDetailPage({
   return (
     <div>
       {error && (
-        <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-black">{error}</div>
       )}
 
       <div className="mb-6 flex items-center justify-between">
@@ -570,7 +575,7 @@ export default function PurchaseOrderDetailPage({
                 }
                 setReturnQtys(initial)
               }}
-              className="flex items-center gap-2 rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+              className="flex items-center gap-2 rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-black hover:bg-red-50"
             >
               Return
             </button>
@@ -606,7 +611,10 @@ export default function PurchaseOrderDetailPage({
           <p className="text-xs font-medium uppercase tracking-wider text-black">
             {t("purchases.supplier")}
           </p>
-          <p className="mt-1 text-sm font-medium text-black">{po.supplier_name}</p>
+          <p className="mt-1 text-sm font-medium text-black">
+            {po.supplier_name}
+            {supplierCode && <span className="ml-2 font-mono text-xs text-black">({supplierCode})</span>}
+          </p>
         </div>
         <div className="rounded-lg border bg-white p-4">
           <p className="text-xs font-medium uppercase tracking-wider text-black">
@@ -639,10 +647,10 @@ export default function PurchaseOrderDetailPage({
       {Number(po.balance_due ?? 0) > 0 && po.status !== "cancelled" && (
         <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="rounded-lg border bg-amber-50 p-4">
-            <p className="text-xs font-medium uppercase tracking-wider text-amber-800">
+            <p className="text-xs font-medium uppercase tracking-wider text-black">
               {t("sales.balance_due")}
             </p>
-            <p className="mt-1 text-lg font-bold text-amber-900">
+            <p className="mt-1 text-lg font-bold text-black">
               {formatCurrency(po.balance_due ?? 0, locale)}
             </p>
           </div>

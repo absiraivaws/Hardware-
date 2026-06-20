@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation"
 import { useFieldArray, useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { Plus, Trash2, Search, Loader2 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { Plus, Trash2, Search, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
 import { formatCurrency } from "@/lib/format"
 import { createClient } from "@/lib/supabase/client"
 
@@ -19,7 +19,10 @@ interface Product {
   id: string
   name: string
   code: string
+  serial_no: string
   cost_price: number
+  brands: { name: string } | null
+  categories: { name: string } | null
 }
 
 const itemSchema = z.object({
@@ -62,6 +65,32 @@ export default function NewPurchaseOrderPage({
   const [showProductPicker, setShowProductPicker] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pickerSortKey, setPickerSortKey] = useState("name")
+  const [pickerSortDir, setPickerSortDir] = useState<"asc" | "desc">("asc")
+
+  const handlePickerSort = (key: string) => {
+    if (pickerSortKey === key) {
+      setPickerSortDir(pickerSortDir === "asc" ? "desc" : "asc")
+    } else {
+      setPickerSortKey(key)
+      setPickerSortDir("asc")
+    }
+  }
+
+  const sortedProducts = useMemo(() => {
+    return [...products].sort((a, b) => {
+      const getVal = (p: Product, key: string): string => {
+        if (key === "serial_no") return p.serial_no || ""
+        if (key === "name") return p.name
+        if (key === "code") return p.code
+        if (key === "brand") return p.brands?.name || ""
+        if (key === "category") return p.categories?.name || ""
+        return ""
+      }
+      const cmp = getVal(a, pickerSortKey).localeCompare(getVal(b, pickerSortKey))
+      return pickerSortDir === "asc" ? cmp : -cmp
+    })
+  }, [products, pickerSortKey, pickerSortDir])
 
   useEffect(() => {
     params.then((p) => setLocale(p.locale))
@@ -109,10 +138,9 @@ export default function NewPurchaseOrderPage({
     const supabase = createClient()
     const { data } = await supabase
       .from("products")
-      .select("id, name, code, cost_price")
+      .select("id, name, code, serial_no, cost_price, brands(name), categories(name)")
       .eq("status", "active")
-      .order("name")
-      .limit(50) as unknown as { data: Product[] | null }
+      .order("name") as unknown as { data: Product[] | null }
     if (data) {
       setAllProducts(data)
       setProducts(data)
@@ -135,7 +163,10 @@ export default function NewPurchaseOrderPage({
       allProducts.filter(
         (p) =>
           p.name.toLowerCase().includes(query) ||
-          p.code.toLowerCase().includes(query),
+          p.code.toLowerCase().includes(query) ||
+          p.serial_no?.toLowerCase().includes(query) ||
+          (p.brands?.name || "").toLowerCase().includes(query) ||
+          (p.categories?.name || "").toLowerCase().includes(query),
       ),
     )
   }
@@ -295,18 +326,51 @@ export default function NewPurchaseOrderPage({
                 />
               </div>
               {products.length > 0 && (
-                <ul className="mt-2 max-h-40 overflow-y-auto rounded-lg border bg-white">
-                  {products.map((p) => (
-                    <li
-                      key={p.id}
-                      onClick={() => addItem(p)}
-                      className="flex cursor-pointer items-center justify-between px-3 py-2 text-sm text-black hover:bg-emerald-50"
-                    >
-                      <span>{p.name}</span>
-                      <span className="text-black">{p.code}</span>
-                    </li>
-                  ))}
-                </ul>
+                <div className="mt-2 max-h-60 overflow-y-auto rounded-lg border bg-white">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-100 sticky top-0">
+                      <tr>
+                        {[
+                          { key: "serial_no", label: "Serial No", align: "text-left" },
+                          { key: "name", label: "Product Name", align: "text-left" },
+                          { key: "code", label: "Product ID", align: "text-left" },
+                          { key: "brand", label: "Brand", align: "text-left" },
+                          { key: "category", label: "Category", align: "text-left" },
+                        ].map(col => {
+                          const active = pickerSortKey === col.key
+                          const Icon = active ? (pickerSortDir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown
+                          return (
+                            <th
+                              key={col.key}
+                              onClick={() => handlePickerSort(col.key)}
+                              className={`cursor-pointer select-none px-3 py-2 ${col.align} font-medium text-black`}
+                            >
+                              <span className="inline-flex items-center gap-1">
+                                {col.label}
+                                <Icon size={11} className="shrink-0" />
+                              </span>
+                            </th>
+                          )
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedProducts.map((p) => (
+                        <tr
+                          key={p.id}
+                          onClick={() => addItem(p)}
+                          className="cursor-pointer border-b last:border-0 hover:bg-emerald-50"
+                        >
+                          <td className="px-3 py-2 font-mono text-black">{p.serial_no}</td>
+                          <td className="px-3 py-2 text-black">{p.name}</td>
+                          <td className="px-3 py-2 font-mono text-black">{p.code}</td>
+                          <td className="px-3 py-2 text-black">{p.brands?.name || "—"}</td>
+                          <td className="px-3 py-2 text-black">{p.categories?.name || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
               <button
                 type="button"

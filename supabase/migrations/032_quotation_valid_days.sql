@@ -1,0 +1,1 @@
+ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS quotation_valid_days INTEGER NOT NULL DEFAULT 7;

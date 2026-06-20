@@ -39,10 +39,10 @@ interface Customer { id: string; name: string }
 interface Product { id: string; name: string; selling_price: number }
 
 const statusColors: Record<string, string> = {
-  active: "bg-blue-100 text-blue-700",
-  returned: "bg-emerald-100 text-emerald-700",
-  overdue: "bg-red-100 text-red-700",
-  cancelled: "bg-gray-100 text-gray-500",
+  active: "bg-blue-100 text-black",
+  returned: "bg-emerald-100 text-black",
+  overdue: "bg-red-100 text-black",
+  cancelled: "bg-gray-100 text-black",
 }
 
 export default function RentalsPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -229,7 +229,7 @@ export default function RentalsPage({ params }: { params: Promise<{ locale: stri
               <div className="border-t pt-4">
                 <div className="mb-2 flex items-center justify-between">
                   <h3 className="text-sm font-medium text-black">{t("rentals.items")}</h3>
-                  <button onClick={addItem} className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700">
+                  <button onClick={addItem} className="flex items-center gap-1 text-xs text-black hover:text-black">
                     <Plus size={14} /> Add Item
                   </button>
                 </div>
@@ -244,7 +244,7 @@ export default function RentalsPage({ params }: { params: Promise<{ locale: stri
                     <input type="number" value={item.deposit} onChange={e => updateItem(i, "deposit", e.target.value)} placeholder="Deposit" className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm" />
                   </div>
                 ))}
-                {items.length === 0 && <p className="text-xs text-gray-500">Add at least one item</p>}
+                {items.length === 0 && <p className="text-xs text-black">Add at least one item</p>}
               </div>
 
               <div>
@@ -277,7 +277,7 @@ export default function RentalsPage({ params }: { params: Promise<{ locale: stri
                 <div><span className="font-medium text-black">{t("rentals.expected_return")}:</span> <span className="text-black">{formatDate(selectedRental.expected_return_date)}</span></div>
                 <div><span className="font-medium text-black">{t("rentals.deposit_amount")}:</span> <span className="text-black">{formatCurrency(selectedRental.deposit_amount, locale)}</span></div>
                 <div><span className="font-medium text-black">{t("rentals.total_fee")}:</span> <span className="text-black">{formatCurrency(selectedRental.total_fee, locale)}</span></div>
-                {selectedRental.late_fee > 0 && <div><span className="font-medium text-black">{t("rentals.late_fee")}:</span> <span className="text-red-600">{formatCurrency(selectedRental.late_fee, locale)}</span></div>}
+                {selectedRental.late_fee > 0 && <div><span className="font-medium text-black">{t("rentals.late_fee")}:</span> <span className="text-black">{formatCurrency(selectedRental.late_fee, locale)}</span></div>}
                 <div><span className="font-medium text-black">{t("rentals.status")}:</span> <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[selectedRental.status]}`}>{selectedRental.status}</span></div>
               </div>
 

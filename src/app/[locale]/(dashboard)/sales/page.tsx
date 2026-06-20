@@ -10,6 +10,7 @@ import type { Database } from "@/types/database"
 import { CompanyFooter } from "@/components/shared/company-info"
 import type { CompanySettings } from "@/components/shared/company-info"
 import { getCached, setCache, invalidateCache } from "@/lib/query-cache"
+import { generateNextCode } from "@/lib/code-gen"
 import { useData } from "@/providers/data-provider"
 
 type Product = Database["public"]["Tables"]["products"]["Row"]
@@ -18,6 +19,7 @@ type TaxType = Database["public"]["Tables"]["sales"]["Row"]["tax_type"]
 
 interface CustomerOption {
   id: string
+  code: string
   name: string
   phone: string | null
   credit_limit: number
@@ -125,7 +127,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
 
       const [productRes, customerRes] = await Promise.all([
         supabase.from("products").select("id, name, code, barcode, serial_no, selling_price, current_stock, min_stock").eq("status", "active").order("name"),
-        supabase.from("customers").select("id, name, phone, credit_limit, credit_balance").eq("status", "active").order("name"),
+        supabase.from("customers").select("id, code, name, phone, credit_limit, credit_balance").eq("status", "active").order("name"),
       ])
       if (productRes.data) {
         setProducts(productRes.data as Product[])
@@ -465,7 +467,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
         await supabase.from("ledger_entries").insert({
           ledger_type: financialType,
           reference_id: saleData.id,
-          reference_type: "sale",
+          reference_type: "payment",
           entry_type: "debit",
           amount: ap,
           description: `Sale ${invoiceNo}`,
@@ -490,10 +492,12 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
     if (!newCustomerName.trim()) return
     setCreatingCustomer(true)
     const supabase = createClient()
+    const code = await generateNextCode("customers")
     const { data, error } = await supabase
       .from("customers")
       .insert({
         name: newCustomerName.trim(),
+        code,
         phone: newCustomerPhone.trim() || null,
         email: newCustomerEmail.trim() || null,
         address: newCustomerAddress.trim() || null,
@@ -613,7 +617,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                           key={key}
                           onClick={() => handleSort(key)}
                           className={`cursor-pointer select-none px-3 py-2 ${align} font-medium ${
-                            active ? "text-emerald-700" : "text-black"
+                            active ? "text-black" : "text-black"
                           }`}
                         >
                           <span className="inline-flex items-center gap-1">
@@ -638,10 +642,10 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                       rowBg = "bg-emerald-50"
                     } else if (outOfStock) {
                       rowBg = "bg-red-50"
-                      stockColor = "text-red-700"
+                      stockColor = "text-black"
                     } else if (lowStock) {
                       rowBg = "bg-amber-50"
-                      stockColor = "text-amber-700"
+                      stockColor = "text-black"
                     }
 
                     return (
@@ -658,8 +662,8 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                         </td>
                         <td className={`px-3 py-2.5 text-right font-medium ${stockColor}`}>
                           {product.current_stock}
-                          {outOfStock && <span className="ml-1.5 rounded bg-red-200 px-1 py-0.5 text-[10px] font-medium text-red-800">Out</span>}
-                          {lowStock && <span className="ml-1.5 rounded bg-amber-200 px-1 py-0.5 text-[10px] font-medium text-amber-800">Low</span>}
+                          {outOfStock && <span className="ml-1.5 rounded bg-red-200 px-1 py-0.5 text-[10px] font-medium text-black">Out</span>}
+                          {lowStock && <span className="ml-1.5 rounded bg-amber-200 px-1 py-0.5 text-[10px] font-medium text-black">Low</span>}
                         </td>
                         <td className="px-3 py-2.5 text-right">
                           <span className={`inline-flex h-6 w-6 items-center justify-center rounded text-xs font-bold text-white ${
@@ -684,7 +688,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
             <div className="flex items-center gap-2 border-b px-4 py-3">
               <ShoppingCart size={18} className="text-black" />
               <span className="font-semibold text-black">{t("sales.cart")}</span>
-              <span className="ml-auto rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+              <span className="ml-auto rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-black">
                 {cart.length}
               </span>
             </div>
@@ -751,7 +755,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                         <td className="px-3 py-2">
                           <button
                             onClick={() => removeFromCart(item.product_id)}
-                            className="flex h-7 w-7 items-center justify-center rounded text-red-400 hover:bg-red-50 hover:text-red-600"
+                            className="flex h-7 w-7 items-center justify-center rounded text-black hover:bg-red-50 hover:text-black"
                           >
                             <Trash2 size={14} />
                           </button>
@@ -813,7 +817,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                     onClick={() => setTaxType(taxType === "svat" ? "non_vat" : "svat")}
                     className={`rounded-full px-3 py-0.5 text-xs font-medium transition ${
                       taxType === "svat"
-                        ? "bg-emerald-100 text-emerald-700"
+                        ? "bg-emerald-100 text-black"
                         : "bg-gray-200 text-black"
                     }`}
                   >
@@ -823,10 +827,10 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
               </div>
               <div className="flex items-center justify-between border-t pt-2 text-base font-bold">
                 <span className="text-black">{t("common.grand_total")}</span>
-                <span className="text-emerald-600">{formatCurrency(grandTotal, locale)}</span>
+                <span className="text-black">{formatCurrency(grandTotal, locale)}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-red-600">{t("common.discount")}</span>
+                <span className="text-black">{t("common.discount")}</span>
                 <input
                   ref={discountRef}
                   type="number"
@@ -839,7 +843,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                       amountPaidRef.current?.focus()
                     }
                   }}
-                  className="w-28 rounded border border-gray-300 px-2 py-1 text-right text-sm text-red-600 focus:border-emerald-500 focus:outline-none"
+                  className="w-28 rounded border border-gray-300 px-2 py-1 text-right text-sm text-black focus:border-emerald-500 focus:outline-none"
                   autoComplete="off"
                 />
               </div>
@@ -908,7 +912,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                         setShowCustomerDropdown(false)
                         setShowNewCustomerForm(true)
                       }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-emerald-700 hover:bg-emerald-50"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-black hover:bg-emerald-50"
                     >
                       <Plus size={14} />
                       New Customer
@@ -924,6 +928,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                         className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
                       >
                         <span className="text-black">{c.name}</span>
+                        <span className="ml-2 text-xs text-black">{c.code}</span>
                         {c.phone && <span className="ml-2 text-xs text-black">{c.phone}</span>}
                       </button>
                     ))}
@@ -936,7 +941,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                   <div className="flex items-center justify-between text-xs text-black">
                     <span>Credit Limit: {formatCurrency((selectedCustomer as unknown as Record<string, unknown>).credit_limit as number ?? 0, locale)}</span>
                     <span>Used: {formatCurrency((selectedCustomer as unknown as Record<string, unknown>).credit_balance as number ?? 0, locale)}</span>
-                    <span className={isCreditOverLimit ? "font-semibold text-red-600" : "text-green-600"}>
+                    <span className={isCreditOverLimit ? "font-semibold text-black" : "text-black"}>
                       Available: {formatCurrency(Math.max(0, ((selectedCustomer as unknown as Record<string, unknown>).credit_limit as number ?? 0) - ((selectedCustomer as unknown as Record<string, unknown>).credit_balance as number ?? 0)), locale)}
                     </span>
                   </div>
@@ -946,10 +951,10 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
               {/* Credit Limit Warning */}
               {isCreditOverLimit && (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
-                  <p className="text-sm font-medium text-amber-800">
+                  <p className="text-sm font-medium text-black">
                     Credit limit exceeded for {selectedCustomer?.name}
                   </p>
-                  <p className="mt-0.5 text-xs text-amber-700">
+                  <p className="mt-0.5 text-xs text-black">
                     Manager PIN required to proceed
                   </p>
                   <input
@@ -977,7 +982,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                       onClick={() => setPaymentType(pt)}
                       className={`rounded-lg border px-2 py-1.5 text-xs font-medium transition ${
                         paymentType === pt
-                          ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                          ? "border-emerald-500 bg-emerald-50 text-black"
                           : "border-gray-300 bg-white text-black hover:bg-gray-50"
                       }`}
                     >
@@ -1012,12 +1017,12 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                   />
                 </div>
                 {ap > 0 && ap >= netAmount && changeDue > 0 && (
-                  <p className="mt-1.5 rounded bg-yellow-100 px-2 py-1 text-sm font-semibold text-yellow-800">
+                  <p className="mt-1.5 rounded bg-yellow-100 px-2 py-1 text-sm font-semibold text-black">
                     Change Due: {formatCurrency(changeDue, locale)}
                   </p>
                 )}
                 {ap > 0 && ap < netAmount && (
-                  <p className="mt-1 text-sm text-amber-600">
+                  <p className="mt-1 text-sm text-black">
                     Balance Due: {formatCurrency(balanceDue, locale)}
                   </p>
                 )}
@@ -1203,7 +1208,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
               </div>
               <div className="flex justify-between">
                 <span className="text-black">{t("sales.balance_due")}</span>
-                <span className="font-medium text-amber-600">
+                <span className="font-medium text-black">
                   {formatCurrency(completedSale.balance_due, locale)}
                 </span>
               </div>

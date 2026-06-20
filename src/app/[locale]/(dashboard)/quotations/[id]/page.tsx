@@ -36,6 +36,9 @@ interface QuotationItem {
   quantity: number
   unit_price: number
   total_price: number
+  code?: string
+  serial_no?: string
+  brand?: string
 }
 
 interface EditableItem {
@@ -48,10 +51,10 @@ interface EditableItem {
 
 const statusStyles: Record<string, string> = {
   draft: "bg-gray-100 text-black",
-  sent: "bg-blue-100 text-blue-700",
-  accepted: "bg-green-100 text-green-700",
-  expired: "bg-red-100 text-red-700",
-  converted: "bg-purple-100 text-purple-700",
+  sent: "bg-blue-100 text-black",
+  accepted: "bg-green-100 text-black",
+  expired: "bg-red-100 text-black",
+  converted: "bg-purple-100 text-black",
 }
 
 const statusLabels: Record<string, string> = {
@@ -98,12 +101,17 @@ export default function QuotationDetailPage() {
 
     supabase
       .from("quotation_items")
-      .select("*")
+      .select("*, products!inner(code, serial_no, brands(name))")
       .eq("quotation_id", id)
       .order("product_name")
       .then(({ data }) => {
         if (data) {
-          const fetched = data as QuotationItem[]
+          const fetched = data.map((item: any) => ({
+            ...item,
+            code: item.products?.code,
+            serial_no: item.products?.serial_no,
+            brand: item.products?.brands?.name,
+          })) as QuotationItem[]
           setItems(fetched)
         }
         setLoading(false)
@@ -153,91 +161,137 @@ export default function QuotationDetailPage() {
     setConvertItems((prev) => prev.filter((_, i) => i !== index))
   }
 
-  function downloadPdf() {
+  async function downloadPdf() {
     if (!quotation) return
-    const doc = new jsPDF()
+    const doc = new jsPDF({ format: "a4" })
     const pageWidth = doc.internal.pageSize.getWidth()
+    const margin = 14
+    const contentWidth = pageWidth - margin * 2
 
     let y = 20
 
-    // Company header
+    // Company header: logo left, info right
     if (companySettings) {
-      if (companySettings.company_name) {
-        doc.setFontSize(16)
-        doc.setFont("helvetica", "bold")
-        doc.text(companySettings.company_name, pageWidth / 2, y, { align: "center" })
-        y += 7
+      if (companySettings.logo_url) {
+        try {
+          const img = new Image()
+          img.crossOrigin = "anonymous"
+          img.src = companySettings.logo_url
+          await new Promise((resolve, reject) => {
+            img.onload = resolve
+            img.onerror = reject
+          })
+          const maxH = 30
+          const ratio = img.width / img.height
+          const w = Math.min(50, maxH * ratio)
+          const h = w / ratio
+          doc.addImage(img, "JPEG", margin, y, w, h)
+        } catch {
+          // fallback: no logo
+        }
       }
-      if (companySettings.address) {
-        doc.setFontSize(9)
-        doc.setFont("helvetica", "normal")
-        doc.text(companySettings.address, pageWidth / 2, y, { align: "center" })
-        y += 5
-      }
-      if (companySettings.contact_number || companySettings.vat_number) {
-        doc.setFontSize(9)
-        const info = [companySettings.contact_number && `Tel: ${companySettings.contact_number}`, companySettings.vat_number && `VAT: ${companySettings.vat_number}`].filter(Boolean).join("  |  ")
-        doc.text(info, pageWidth / 2, y, { align: "center" })
-        y += 5
-      }
-      y += 3
+      const infoX = margin + 55
+      doc.setFontSize(14)
+      doc.setFont("helvetica", "bold")
+      doc.text(companySettings.company_name || "", infoX, y + 6)
+
+      const infoLines: string[] = []
+      if (companySettings.address) infoLines.push(companySettings.address)
+      const contactParts = []
+      if (companySettings.contact_number) contactParts.push(`Tel: ${companySettings.contact_number}`)
+      if (companySettings.vat_number) contactParts.push(`VAT: ${companySettings.vat_number}`)
+      if (contactParts.length > 0) infoLines.push(contactParts.join(" | "))
+
+      doc.setFontSize(8)
+      doc.setFont("helvetica", "normal")
+      infoLines.forEach((line, i) => {
+        doc.text(line, infoX, y + 14 + i * 4)
+      })
+
+      y += Math.max(36, infoLines.length * 4 + 18)
+
       doc.setDrawColor(200)
-      doc.line(14, y, pageWidth - 14, y)
+      doc.line(margin, y, pageWidth - margin, y)
       y += 8
     }
 
-    doc.setFontSize(18)
+    // Title
+    doc.setFontSize(16)
     doc.setFont("helvetica", "bold")
     doc.text("Quotation", pageWidth / 2, y, { align: "center" })
-    y += 7
+    y += 8
 
+    // Details
     doc.setFontSize(10)
     doc.setFont("helvetica", "normal")
-    doc.text(`Q No: ${quotation.q_no}`, 14, y + 8)
-    doc.text(`Date: ${new Date(quotation.created_at).toLocaleDateString()}`, 14, y + 15)
-    doc.text(`Customer: ${quotation.customer_name || "N/A"}`, 14, y + 22)
+    doc.text(`Q No: ${quotation.q_no}`, margin, y)
+    doc.text(`Date: ${new Date(quotation.created_at).toLocaleDateString()}`, margin, y + 7)
+    doc.text(`Customer: ${quotation.customer_name || "N/A"}`, margin, y + 14)
     if (quotation.valid_until) {
-      doc.text(`Valid Until: ${new Date(quotation.valid_until).toLocaleDateString()}`, 14, y + 29)
+      doc.text(`Valid Until: ${new Date(quotation.valid_until).toLocaleDateString()}`, margin, y + 21)
     }
 
-    const tableTop = quotation.valid_until ? y + 37 : y + 30
-    const colX = [14, 60, 110, 140, 170]
-    const headers = ["Item", "Qty", "Unit Price", "Total"]
+    const tableTop = quotation.valid_until ? y + 30 : y + 23
 
-    doc.setFontSize(10)
+    // Table
+    const itemColEnd = pageWidth - margin - 85
+    const colQty = pageWidth - margin - 60
+    const colPrice = pageWidth - margin - 35
+    const colTotal = pageWidth - margin
+
+    doc.setDrawColor(200)
+    doc.line(margin, tableTop - 2, pageWidth - margin, tableTop - 2)
+    doc.setFontSize(9)
     doc.setFont("helvetica", "bold")
-    headers.forEach((h, i) => doc.text(h, colX[i], tableTop))
+    doc.text("Item", margin, tableTop)
+    doc.text("Qty", colQty, tableTop, { align: "right" })
+    doc.text("Price", colPrice, tableTop, { align: "right" })
+    doc.text("Total", colTotal, tableTop, { align: "right" })
+    doc.line(margin, tableTop + 2, pageWidth - margin, tableTop + 2)
     doc.setFont("helvetica", "normal")
 
     y = tableTop + 8
+    const lineH = 5
     items.forEach((item) => {
-      doc.text(item.product_name, colX[0], y)
-      doc.text(String(item.quantity), colX[1], y)
-      doc.text(Number(item.unit_price).toFixed(2), colX[2], y)
-      doc.text(Number(item.total_price).toFixed(2), colX[3], y)
-      y += 7
+      const nameLines = doc.splitTextToSize(item.product_name, itemColEnd - margin)
+      nameLines.forEach((l: string) => {
+        doc.text(l, margin, y)
+        y += lineH
+      })
+      const info = [item.code, item.serial_no, item.brand].filter(Boolean).join(" | ")
+      if (info) {
+        doc.text(info, margin + 4, y)
+        y += lineH
+      }
+      doc.text(String(item.quantity), colQty, y - lineH, { align: "right" })
+      doc.text(Number(item.unit_price).toFixed(2), colPrice, y - lineH, { align: "right" })
+      doc.text(Number(item.total_price).toFixed(2), colTotal, y - lineH, { align: "right" })
     })
 
+    doc.line(margin, y, pageWidth - margin, y)
     y += 4
+
+    // Totals
+    doc.setFontSize(10)
     doc.setFont("helvetica", "bold")
-    doc.text(`Subtotal: ${Number(quotation.subtotal).toFixed(2)}`, colX[0], y)
+    const totalX = pageWidth - margin - 60
+    doc.text(`Subtotal: ${Number(quotation.subtotal).toFixed(2)}`, totalX, y, { align: "right" })
     y += 7
-    doc.text(`Discount: ${Number(quotation.discount).toFixed(2)}`, colX[0], y)
+    doc.text(`Discount: ${Number(quotation.discount).toFixed(2)}`, totalX, y, { align: "right" })
     y += 7
     doc.setFontSize(12)
-    doc.text(`Grand Total: ${Number(quotation.grand_total).toFixed(2)}`, colX[0], y)
+    doc.text(`Grand Total: ${Number(quotation.grand_total).toFixed(2)}`, totalX, y, { align: "right" })
 
     if (quotation.notes) {
       y += 10
       doc.setFontSize(9)
       doc.setFont("helvetica", "normal")
-      doc.text(`Notes: ${quotation.notes}`, colX[0], y)
+      doc.text(`Notes: ${quotation.notes}`, margin, y)
     }
 
-    // Social links footer
+    // Social links footer (no WhatsApp text)
     if (companySettings) {
       const socialLinks = [
-        companySettings.whatsapp_link && "WhatsApp",
         companySettings.facebook_link && "Facebook",
         companySettings.tiktok_link && "TikTok",
         companySettings.youtube_link && "YouTube",
@@ -246,7 +300,7 @@ export default function QuotationDetailPage() {
       if (socialLinks.length > 0) {
         y += 12
         doc.setDrawColor(200)
-        doc.line(14, y, pageWidth - 14, y)
+        doc.line(margin, y, pageWidth - margin, y)
         y += 5
         doc.setFontSize(8)
         doc.setFont("helvetica", "normal")
@@ -404,7 +458,7 @@ export default function QuotationDetailPage() {
         <p className="text-black">{t("common.no_results")}</p>
         <button
           onClick={() => router.push(`/${locale}/quotations`)}
-          className="mt-4 text-sm text-emerald-600 hover:underline"
+          className="mt-4 text-sm text-black hover:underline"
         >
           {t("common.cancel")}
         </button>
@@ -464,9 +518,13 @@ export default function QuotationDetailPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">#</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">Serial No</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">Code</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">
                   {t("sales.item")}
                 </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">Brand</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">
                   {t("sales.qty")}
                 </th>
@@ -479,9 +537,13 @@ export default function QuotationDetailPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {items.map((item) => (
+              {items.map((item, idx) => (
                 <tr key={item.id}>
+                  <td className="px-4 py-3 text-sm text-black">{idx + 1}</td>
+                  <td className="px-4 py-3 text-sm font-mono text-black">{item.serial_no ?? "—"}</td>
+                  <td className="px-4 py-3 text-sm font-mono text-black">{item.code ?? "—"}</td>
                   <td className="px-4 py-3 text-sm text-black">{item.product_name}</td>
+                  <td className="px-4 py-3 text-sm text-black">{item.brand ?? "—"}</td>
                   <td className="px-4 py-3 text-sm text-black">{item.quantity}</td>
                   <td className="px-4 py-3 text-sm text-black">{formatCurrency(Number(item.unit_price), locale)}</td>
                   <td className="px-4 py-3 text-sm font-medium text-black">
@@ -497,15 +559,15 @@ export default function QuotationDetailPage() {
           <div className="ml-auto w-64 space-y-1.5 text-sm">
             <div className="flex justify-between">
               <span className="text-black">{t("common.subtotal")}</span>
-              <span>{formatCurrency(Number(quotation.subtotal), locale)}</span>
+              <span className="text-black">{formatCurrency(Number(quotation.subtotal), locale)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-black">{t("common.discount")}</span>
-              <span>{formatCurrency(Number(quotation.discount), locale)}</span>
+              <span className="text-black">{formatCurrency(Number(quotation.discount), locale)}</span>
             </div>
             <div className="flex justify-between border-t pt-1.5 text-base font-semibold">
-              <span>{t("common.grand_total")}</span>
-              <span className="text-emerald-600">{formatCurrency(Number(quotation.grand_total), locale)}</span>
+              <span className="text-black">{t("common.grand_total")}</span>
+              <span className="text-black">{formatCurrency(Number(quotation.grand_total), locale)}</span>
             </div>
           </div>
         </div>
@@ -618,7 +680,7 @@ export default function QuotationDetailPage() {
                         <td className="px-3 py-2">
                           <button
                             onClick={() => removeConvertItem(i)}
-                            className="rounded p-1 text-red-500 hover:bg-red-50"
+                            className="rounded p-1 text-black hover:bg-gray-50"
                           >
                             <X size={16} />
                           </button>
@@ -688,29 +750,29 @@ export default function QuotationDetailPage() {
                 <div className="space-y-1.5 rounded-lg border bg-gray-50 p-4 text-sm">
                   <div className="flex justify-between">
                     <span className="text-black">{t("common.subtotal")}</span>
-                    <span>{formatCurrency(convertSubtotal, locale)}</span>
+                    <span className="text-black">{formatCurrency(convertSubtotal, locale)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-black">{t("common.discount")}</span>
-                    <span>-{formatCurrency(convertDiscount, locale)}</span>
+                    <span className="text-black">-{formatCurrency(convertDiscount, locale)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-black">{t("sales.labour_charge")}</span>
-                    <span>{formatCurrency(convertLabour, locale)}</span>
+                    <span className="text-black">{formatCurrency(convertLabour, locale)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-black">{t("sales.transport_charge")}</span>
-                    <span>{formatCurrency(convertTransport, locale)}</span>
+                    <span className="text-black">{formatCurrency(convertTransport, locale)}</span>
                   </div>
                   {convertTaxType === "svat" && (
                     <div className="flex justify-between">
                       <span className="text-black">{t("common.tax")} (15%)</span>
-                      <span>{formatCurrency(taxAmount, locale)}</span>
+                      <span className="text-black">{formatCurrency(taxAmount, locale)}</span>
                     </div>
                   )}
                   <div className="flex justify-between border-t pt-1.5 text-base font-semibold">
-                    <span>{t("common.grand_total")}</span>
-                    <span className="text-emerald-600">{formatCurrency(convertGrandTotal, locale)}</span>
+                    <span className="text-black">{t("common.grand_total")}</span>
+                    <span className="text-black">{formatCurrency(convertGrandTotal, locale)}</span>
                   </div>
                 </div>
               </div>

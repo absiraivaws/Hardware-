@@ -212,6 +212,7 @@ export interface Database {
       customers: {
         Row: {
           id: string
+          code: string
           name: string
           phone: string | null
           email: string | null
@@ -225,6 +226,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          code?: string
           name: string
           phone?: string | null
           email?: string | null
@@ -238,6 +240,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          code?: string
           name?: string
           phone?: string | null
           email?: string | null
@@ -253,6 +256,7 @@ export interface Database {
       suppliers: {
         Row: {
           id: string
+          code: string
           name: string
           contact_person: string | null
           phone: string | null
@@ -266,6 +270,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          code?: string
           name: string
           contact_person?: string | null
           phone?: string | null
@@ -279,6 +284,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          code?: string
           name?: string
           contact_person?: string | null
           phone?: string | null
@@ -776,6 +782,7 @@ export interface Database {
           youtube_link: string
           cash_opening_balance: number
           bank_opening_balance: number
+          quotation_valid_days: number
           updated_at: string
         }
         Insert: {
@@ -798,6 +805,7 @@ export interface Database {
           youtube_link?: string
           cash_opening_balance?: number
           bank_opening_balance?: number
+          quotation_valid_days?: number
           updated_at?: string
         }
         Update: {
@@ -820,6 +828,7 @@ export interface Database {
           youtube_link?: string
           cash_opening_balance?: number
           bank_opening_balance?: number
+          quotation_valid_days?: number
           updated_at?: string
         }
       }

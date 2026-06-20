@@ -25,10 +25,10 @@ interface Vehicle { id: string; registration_no: string; model: string }
 interface Sale { id: string; invoice_no: string; customer_name: string | null; grand_total: number }
 
 const statusColors: Record<string, string> = {
-  pending: "bg-yellow-100 text-yellow-700",
-  in_transit: "bg-blue-100 text-blue-700",
-  delivered: "bg-emerald-100 text-emerald-700",
-  cancelled: "bg-red-100 text-red-700",
+  pending: "bg-yellow-100 text-black",
+  in_transit: "bg-blue-100 text-black",
+  delivered: "bg-emerald-100 text-black",
+  cancelled: "bg-red-100 text-black",
 }
 
 export default function DeliveryDetailPage({ params }: { params: Promise<{ locale: string; id: string }> }) {
@@ -76,7 +76,7 @@ export default function DeliveryDetailPage({ params }: { params: Promise<{ local
   return (
     <div>
       <div className="mb-4">
-        <Link href={`/${locale}/deliveries`} className="inline-flex items-center gap-1 text-sm text-black hover:text-emerald-700">
+        <Link href={`/${locale}/deliveries`} className="inline-flex items-center gap-1 text-sm text-black hover:text-black">
           <ArrowLeft size={16} /> {t("deliveries.title")}
         </Link>
       </div>
@@ -100,19 +100,19 @@ export default function DeliveryDetailPage({ params }: { params: Promise<{ local
             <h3 className="mb-2 text-sm font-medium text-black">{t("deliveries.driver")}</h3>
             {driver ? (
               <div className="text-sm text-black"><p className="font-medium">{driver.name}</p><p>{driver.phone}</p></div>
-            ) : <p className="text-sm text-gray-500">-</p>}
+            ) : <p className="text-sm text-black">-</p>}
           </div>
           <div>
             <h3 className="mb-2 text-sm font-medium text-black">{t("deliveries.vehicle")}</h3>
             {vehicle ? (
               <div className="text-sm text-black"><p className="font-medium">{vehicle.registration_no}</p><p>{vehicle.model}</p></div>
-            ) : <p className="text-sm text-gray-500">-</p>}
+            ) : <p className="text-sm text-black">-</p>}
           </div>
           <div className="col-span-2">
             <h3 className="mb-2 text-sm font-medium text-black">{t("deliveries.sale_ref")}</h3>
             {sale ? (
               <div className="text-sm text-black"><p className="font-medium">{sale.invoice_no} - {sale.customer_name || "Walk-in"}</p><p>{formatCurrency(sale.grand_total, locale)}</p></div>
-            ) : <p className="text-sm text-gray-500">-</p>}
+            ) : <p className="text-sm text-black">-</p>}
           </div>
           <div className="col-span-2">
             <h3 className="mb-2 text-sm font-medium text-black">{t("deliveries.address")}</h3>

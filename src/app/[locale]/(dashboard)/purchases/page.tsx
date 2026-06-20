@@ -13,6 +13,7 @@ import { getCached, setCache, invalidateCache } from "@/lib/query-cache"
 type PurchaseOrder = Record<string, unknown> & {
   id: string
   po_no: string
+  supplier_id: string
   supplier_name: string
   created_at: string
   expected_date: string | null
@@ -24,9 +25,9 @@ type PurchaseOrder = Record<string, unknown> & {
 }
 
 const statusStyles: Record<string, string> = {
-  pending: "bg-yellow-100 text-yellow-800",
-  partial: "bg-blue-100 text-blue-800",
-  completed: "bg-green-100 text-green-800",
+  pending: "bg-yellow-100 text-black",
+  partial: "bg-blue-100 text-black",
+  completed: "bg-green-100 text-black",
   cancelled: "bg-gray-100 text-black",
 }
 
@@ -47,6 +48,7 @@ export default function PurchasesPage({
   const [locale, setLocale] = useState("en")
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
   const [loading, setLoading] = useState(true)
+  const [supplierCodes, setSupplierCodes] = useState<Record<string, string>>({})
 
   useEffect(() => {
     params.then((p) => setLocale(p.locale))
@@ -59,11 +61,18 @@ export default function PurchasesPage({
       if (cached) { setOrders(cached); setLoading(false); return }
       const { data } = await supabase
         .from("purchase_orders")
-        .select("id, po_no, supplier_name, created_at, expected_date, payment_due_date, grand_total, amount_paid, balance_due, status")
+        .select("id, po_no, supplier_id, supplier_name, created_at, expected_date, payment_due_date, grand_total, amount_paid, balance_due, status")
         .order("created_at", { ascending: false }) as unknown as {
         data: PurchaseOrder[] | null
       }
       if (data) { setOrders(data); setCache("purchase_orders:list", data) }
+      const ids = [...new Set((data ?? []).map((o) => o.supplier_id).filter(Boolean))]
+      if (ids.length > 0) {
+        const { data: suppliers } = await supabase.from("suppliers").select("id, code").in("id", ids)
+        const map: Record<string, string> = {}
+        suppliers?.forEach((s) => { map[s.id] = s.code })
+        setSupplierCodes(map)
+      }
       setLoading(false)
     }
     fetchOrders()
@@ -90,9 +99,18 @@ export default function PurchasesPage({
       ),
     },
     {
+      key: "supplier_code",
+      label: t("purchases.supplier") + " ID",
+      render: (item: PurchaseOrder) => (
+        <span className="font-mono text-black">{supplierCodes[item.supplier_id] || "—"}</span>
+      ),
+    },
+    {
       key: "supplier_name",
       label: t("purchases.supplier"),
-      render: (item: PurchaseOrder) => item.supplier_name,
+      render: (item: PurchaseOrder) => (
+        <span className="text-black">{item.supplier_name}</span>
+      ),
     },
     {
       key: "grand_total",
@@ -105,8 +123,8 @@ export default function PurchasesPage({
       label: t("sales.balance_due"),
       render: (item: PurchaseOrder) => {
         const bd = Number(item.balance_due)
-        if (bd <= 0) return <span className="text-green-600">—</span>
-        return <span className="text-amber-700 font-medium">{formatCurrency(bd, locale)}</span>
+        if (bd <= 0) return <span className="text-black">—</span>
+        return <span className="text-black font-medium">{formatCurrency(bd, locale)}</span>
       },
     },
     {
@@ -114,15 +132,15 @@ export default function PurchasesPage({
       label: "Overdue",
       render: (item: PurchaseOrder) => {
         const bd = Number(item.balance_due)
-        if (bd <= 0) return <span className="text-gray-400">—</span>
+        if (bd <= 0) return <span className="text-black">—</span>
         const dueDate = item.payment_due_date || item.expected_date
-        if (!dueDate) return <span className="text-gray-400">—</span>
+        if (!dueDate) return <span className="text-black">—</span>
         const now = new Date()
         const due = new Date(dueDate)
-        if (due >= now) return <span className="text-gray-400">—</span>
+        if (due >= now) return <span className="text-black">—</span>
         const daysOverdue = Math.floor((now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24))
         return (
-          <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
+          <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-black">
             {daysOverdue}d overdue
           </span>
         )

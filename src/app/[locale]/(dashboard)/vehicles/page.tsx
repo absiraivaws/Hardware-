@@ -50,7 +50,7 @@ export default function VehiclesPage({ params }: { params: Promise<{ locale: str
     setEditing(v); setRegNo(v.registration_no); setModel(v.model); setCapacity(v.capacity); setStatus(v.status); setShowForm(true)
   }
 
-  const statusColors: Record<string, string> = { active: "bg-emerald-100 text-emerald-700", maintenance: "bg-yellow-100 text-yellow-700", inactive: "bg-gray-100 text-gray-500" }
+  const statusColors: Record<string, string> = { active: "bg-emerald-100 text-black", maintenance: "bg-yellow-100 text-black", inactive: "bg-gray-100 text-black" }
 
   return (
     <div>

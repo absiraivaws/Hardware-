@@ -8,13 +8,26 @@ import { formatCurrency } from "@/lib/format"
 import { createClient } from "@/lib/supabase/client"
 
 interface Customer { id: string; name: string; phone: string | null; email: string | null }
-interface Product { id: string; name: string; code: string; selling_price: number; current_stock: number }
+interface Product {
+  id: string
+  name: string
+  code: string
+  serial_no: string
+  selling_price: number
+  current_stock: number
+  brand_id: string | null
+  brands: { name: string } | null
+}
 
 interface LineItem {
   product_id: string
   product_name: string
-  quantity: number
+  product_code: string
+  product_serial: string
+  brand_name: string
+  current_stock: number
   unit_price: number
+  quantity: number
   total_price: number
 }
 
@@ -36,7 +49,8 @@ export default function NewQuotationPage() {
 
   const [productSearch, setProductSearch] = useState("")
   const [productResults, setProductResults] = useState<Product[]>([])
-  const [showProductSearch, setShowProductSearch] = useState(false)
+  const [allProducts, setAllProducts] = useState<Product[]>([])
+  const [showProductTable, setShowProductTable] = useState(false)
 
   const supabase = createClient()
 
@@ -44,26 +58,25 @@ export default function NewQuotationPage() {
     supabase.from("customers").select("*").order("name").then(({ data }) => {
       if (data) setCustomers(data as Customer[])
     })
+    supabase.from("products").select("*, brands(name)").order("name").then(({ data }) => {
+      if (data) setAllProducts(data as unknown as Product[])
+    })
+    supabase.from("company_settings").select("quotation_valid_days").limit(1).single().then(({ data }) => {
+      const days = data?.quotation_valid_days ?? 7
+      const d = new Date()
+      d.setDate(d.getDate() + days)
+      setValidUntil(d.toISOString().split("T")[0])
+    })
   }, [])
 
-  useEffect(() => {
-    if (productSearch.length < 1) {
-      setProductResults([])
-      return
-    }
-    const timer = setTimeout(() => {
-      supabase
-        .from("products")
-        .select("*")
-        .or(`name.ilike.%${productSearch}%,code.ilike.%${productSearch}%`)
-        .order("name")
-        .limit(10)
-        .then(({ data }) => {
-          if (data) setProductResults(data as Product[])
-        })
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [productSearch])
+  const filteredProducts = allProducts.filter(
+    (p) =>
+      !productSearch ||
+      p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+      p.code.toLowerCase().includes(productSearch.toLowerCase()) ||
+      (p.brands?.name ?? "").toLowerCase().includes(productSearch.toLowerCase()) ||
+      (p.serial_no ?? "").toLowerCase().includes(productSearch.toLowerCase()),
+  )
 
   const subtotal = items.reduce((sum, i) => sum + i.total_price, 0)
   const grandTotal = subtotal - discount
@@ -88,14 +101,17 @@ export default function NewQuotationPage() {
       {
         product_id: product.id,
         product_name: product.name,
+        product_code: product.code,
+        product_serial: product.serial_no,
+        brand_name: product.brands?.name ?? "",
+        current_stock: product.current_stock,
         quantity: 1,
         unit_price: product.selling_price,
         total_price: product.selling_price,
       },
     ])
-    setShowProductSearch(false)
+    setShowProductTable(false)
     setProductSearch("")
-    setProductResults([])
   }
 
   function updateItem(index: number, field: keyof LineItem, value: number | string) {
@@ -216,7 +232,7 @@ export default function NewQuotationPage() {
   return (
     <div>
       {saveError && (
-        <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{saveError}</div>
+        <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-black">{saveError}</div>
       )}
 
       <div className="mb-6 flex items-center justify-between border-b pb-4">
@@ -249,7 +265,7 @@ export default function NewQuotationPage() {
           <select
             value={customerId}
             onChange={(e) => handleCustomerChange(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
           >
             <option value="">{t("sales.select_customer")}</option>
             <option value="walk-in">{t("sales.walk_in")}</option>
@@ -266,17 +282,17 @@ export default function NewQuotationPage() {
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-medium text-black">{t("sales.item")}s</h2>
             <button
-              onClick={() => setShowProductSearch(true)}
-              className="flex items-center gap-1.5 text-sm font-medium text-emerald-600 hover:text-emerald-700"
+              onClick={() => setShowProductTable((v) => !v)}
+              className="flex items-center gap-1.5 text-sm font-medium text-black hover:text-gray-700"
             >
               <Plus size={16} />
               {t("sales.add_item")}
             </button>
           </div>
 
-          {showProductSearch && (
-            <div className="mb-4 rounded-lg border bg-gray-50 p-3">
-              <div className="relative">
+          {showProductTable && (
+            <div className="mb-4 rounded-lg border bg-white p-3">
+              <div className="relative mb-3">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-black" size={16} />
                 <input
                   type="text"
@@ -284,26 +300,60 @@ export default function NewQuotationPage() {
                   value={productSearch}
                   onChange={(e) => setProductSearch(e.target.value)}
                   autoFocus
-                  className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-4 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-4 text-sm text-black focus:border-emerald-500 focus:outline-none"
                 />
               </div>
-              {productResults.length > 0 && (
-                <ul className="mt-2 max-h-48 divide-y overflow-y-auto rounded-lg border bg-white">
-                  {productResults.map((p) => (
-                    <li
-                      key={p.id}
-                      onClick={() => addItem(p)}
-                      className="flex cursor-pointer items-center justify-between px-3 py-2 text-sm hover:bg-gray-50"
-                    >
-                      <span className="font-medium">{p.name}</span>
-                      <span className="text-black">{formatCurrency(Number(p.selling_price), locale)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {productSearch.length > 0 && productResults.length === 0 && (
-                <p className="mt-2 text-sm text-black">{t("common.no_results")}</p>
-              )}
+              <div className="max-h-64 overflow-y-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-black">#</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-black">Serial No</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-black">Code</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-black">Name</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-black">Brand</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-black">Selling Price</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-black">Stock</th>
+                      <th className="px-3 py-2" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredProducts.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="px-3 py-6 text-center text-sm text-black">{t("common.no_results")}</td>
+                      </tr>
+                    ) : (
+                      filteredProducts.map((p, idx) => (
+                        <tr
+                          key={p.id}
+                          tabIndex={0}
+                          role="button"
+                          onClick={() => addItem(p)}
+                          onKeyDown={(e) => { if (e.key === "Enter") addItem(p) }}
+                          className="cursor-pointer hover:bg-gray-50 focus:bg-gray-100 focus:outline-none"
+                        >
+                          <td className="whitespace-nowrap px-3 py-2 text-xs text-black">{idx + 1}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-xs font-mono text-black">{p.serial_no}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-xs font-mono text-black">{p.code}</td>
+                          <td className="px-3 py-2 text-sm text-black">{p.name}</td>
+                          <td className="px-3 py-2 text-sm text-black">{p.brands?.name ?? "—"}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-black">{formatCurrency(Number(p.selling_price), locale)}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-black">{p.current_stock}</td>
+                          <td className="px-3 py-2 text-right">
+                            <button
+                              onClick={() => addItem(p)}
+                              className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-black hover:bg-gray-100"
+                            >
+                              <Plus size={14} />
+                              Add
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
@@ -314,8 +364,16 @@ export default function NewQuotationPage() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-black">#</th>
                     <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-black">
                       {t("sales.item")}
+                    </th>
+                    <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-black">Brand</th>
+                    <th className="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-black">
+                      {t("inventory.current_stock")}
+                    </th>
+                    <th className="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-black">
+                      {t("sales.price")}
                     </th>
                     <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-black">
                       {t("sales.qty")}
@@ -332,7 +390,14 @@ export default function NewQuotationPage() {
                 <tbody className="divide-y divide-gray-200 bg-white">
                   {items.map((item, i) => (
                     <tr key={i}>
-                      <td className="px-4 py-2 text-sm text-black">{item.product_name}</td>
+                      <td className="px-4 py-2 text-sm text-black">{i + 1}</td>
+                      <td className="px-4 py-2 text-sm text-black">
+                        <div className="font-medium">{item.product_name}</div>
+                        <div className="text-xs text-black">{item.product_code}</div>
+                      </td>
+                      <td className="px-4 py-2 text-sm text-black">{item.brand_name || "—"}</td>
+                      <td className="px-4 py-2 text-right text-sm text-black">{item.current_stock}</td>
+                      <td className="whitespace-nowrap px-4 py-2 text-right text-sm text-black">{formatCurrency(item.unit_price, locale)}</td>
                       <td className="px-4 py-2">
                         <input
                           type="number"
@@ -340,7 +405,7 @@ export default function NewQuotationPage() {
                           step="any"
                           value={item.quantity}
                           onChange={(e) => updateItem(i, "quantity", e.target.value)}
-                          className="w-20 rounded border border-gray-300 px-2 py-1 text-sm focus:border-emerald-500 focus:outline-none"
+                          className="w-20 rounded border border-gray-300 px-2 py-1 text-sm text-black focus:border-emerald-500 focus:outline-none"
                         />
                       </td>
                       <td className="px-4 py-2">
@@ -350,7 +415,7 @@ export default function NewQuotationPage() {
                           step="0.01"
                           value={item.unit_price}
                           onChange={(e) => updateItem(i, "unit_price", e.target.value)}
-                          className="w-24 rounded border border-gray-300 px-2 py-1 text-sm focus:border-emerald-500 focus:outline-none"
+                          className="w-24 rounded border border-gray-300 px-2 py-1 text-sm text-black focus:border-emerald-500 focus:outline-none"
                         />
                       </td>
                       <td className="px-4 py-2 text-sm font-medium text-black">
@@ -359,7 +424,7 @@ export default function NewQuotationPage() {
                       <td className="px-4 py-2">
                         <button
                           onClick={() => removeItem(i)}
-                          className="rounded-lg p-1 text-red-500 hover:bg-red-50"
+                          className="rounded-lg p-1 text-black hover:bg-gray-50"
                         >
                           <Trash2 size={16} />
                         </button>
@@ -375,7 +440,7 @@ export default function NewQuotationPage() {
           <div className="mt-4 space-y-1.5 border-t pt-4 text-sm">
             <div className="flex justify-between">
               <span className="text-black">{t("common.subtotal")}</span>
-              <span className="font-medium">{formatCurrency(subtotal, locale)}</span>
+              <span className="font-medium text-black">{formatCurrency(subtotal, locale)}</span>
             </div>
             <div className="flex items-center justify-between gap-4">
               <span className="text-black">{t("common.discount")}</span>
@@ -385,18 +450,27 @@ export default function NewQuotationPage() {
                 step="0.01"
                 value={discount}
                 onChange={(e) => setDiscount(Number(e.target.value))}
-                className="w-28 rounded border border-gray-300 px-2 py-1 text-right text-sm focus:border-emerald-500 focus:outline-none"
+                className="w-28 rounded border border-gray-300 px-2 py-1 text-right text-sm text-black focus:border-emerald-500 focus:outline-none"
               />
             </div>
-            <div className="flex justify-between border-t pt-1.5 text-base font-semibold">
+            <div className="flex justify-between border-t pt-1.5 text-base font-semibold text-black">
               <span>{t("common.grand_total")}</span>
-              <span className="text-emerald-600">{formatCurrency(grandTotal, locale)}</span>
+              <span className="text-black">{formatCurrency(grandTotal, locale)}</span>
             </div>
           </div>
         </div>
 
-        {/* Valid Until & Notes */}
-        <div className="grid grid-cols-2 gap-4">
+        {/* Quotation Date, Valid Until & Notes */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="rounded-lg border bg-white p-4">
+            <label className="mb-1.5 block text-sm font-medium text-black">Quotation Date</label>
+            <input
+              type="date"
+              value={new Date().toISOString().split("T")[0]}
+              readOnly
+              className="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-black"
+            />
+          </div>
           <div className="rounded-lg border bg-white p-4">
             <label className="mb-1.5 block text-sm font-medium text-black">
               {t("quotations.valid_until")}
@@ -405,7 +479,7 @@ export default function NewQuotationPage() {
               type="date"
               value={validUntil}
               onChange={(e) => setValidUntil(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none"
             />
           </div>
           <div className="rounded-lg border bg-white p-4">
@@ -415,8 +489,8 @@ export default function NewQuotationPage() {
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-              className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              rows={1}
+              className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none"
             />
           </div>
         </div>

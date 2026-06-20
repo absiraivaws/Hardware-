@@ -103,6 +103,7 @@ export default function ReportsPage({ params }: PageProps) {
   const [plData, setPlData] = useState({ revenue: 0, cogs: 0, grossProfit: 0, expenses: 0, netProfit: 0 })
   const [bsData, setBsData] = useState({ cashInHand: 0, bankBalance: 0, inventoryValue: 0, receivables: 0, payables: 0 })
   const [stockSearch, setStockSearch] = useState("")
+  const [reportSearch, setReportSearch] = useState("")
 
   const perPage = 20
 
@@ -354,8 +355,18 @@ export default function ReportsPage({ params }: PageProps) {
   }
 
   const renderDailySales = () => {
-    const { paged, totalPages } = paginate(dailySales)
-    const totalAmount = dailySales.reduce((sum, s) => sum + s.grand_total, 0)
+    const filtered = reportSearch
+      ? dailySales.filter(
+          (s) =>
+            s.invoice_no.toLowerCase().includes(reportSearch.toLowerCase()) ||
+            (s.customer_name ?? "").toLowerCase().includes(reportSearch.toLowerCase()) ||
+            s.payment_type.toLowerCase().includes(reportSearch.toLowerCase()) ||
+            s.status.toLowerCase().includes(reportSearch.toLowerCase()) ||
+            t(`sales.${s.payment_type}`).toLowerCase().includes(reportSearch.toLowerCase()),
+        )
+      : dailySales
+    const { paged, totalPages } = paginate(filtered)
+    const totalAmount = filtered.reduce((sum, s) => sum + s.grand_total, 0)
     const headers = [
       t("common.date"),
       t("sales.invoice_no"),
@@ -378,7 +389,7 @@ export default function ReportsPage({ params }: PageProps) {
         {renderPagination(totalPages)}
         <div className="mt-4 flex items-center justify-end gap-2 rounded-lg bg-emerald-50 px-4 py-3">
           <span className="text-sm font-medium text-black">{t("common.total")}:</span>
-          <span className="text-lg font-bold text-emerald-700">
+          <span className="text-lg font-bold text-black">
             {formatCurrency(totalAmount, locale)}
           </span>
         </div>
@@ -412,12 +423,12 @@ export default function ReportsPage({ params }: PageProps) {
             ? "Low Stock"
             : "In Stock"
       return [
-        <span className={isLow ? "text-red-600 font-medium" : ""}>{s.code}</span>,
-        <span className={isLow ? "text-red-600" : ""}>{s.name}</span>,
+        <span className={isLow ? "text-black font-medium" : ""}>{s.code}</span>,
+        <span className={isLow ? "text-black" : ""}>{s.name}</span>,
         s.category_name ?? "-",
-        <span className={isLow ? "text-red-600 font-medium" : ""}>{s.current_stock}</span>,
+        <span className={isLow ? "text-black font-medium" : ""}>{s.current_stock}</span>,
         s.min_stock,
-        <span className={isLow ? "text-red-600 font-medium" : "text-emerald-600 font-medium"}>
+        <span className={isLow ? "text-black font-medium" : "text-black font-medium"}>
           {statusLabel}
         </span>,
       ]
@@ -441,8 +452,14 @@ export default function ReportsPage({ params }: PageProps) {
   }
 
   const renderProfitReport = () => {
-    const { paged, totalPages } = paginate(profitItems)
-    const grandProfit = profitItems.reduce((sum, p) => sum + p.total_profit, 0)
+    const filtered = reportSearch
+      ? profitItems.filter(
+          (p) =>
+            p.product_name.toLowerCase().includes(reportSearch.toLowerCase()),
+        )
+      : profitItems
+    const { paged, totalPages } = paginate(filtered)
+    const grandProfit = filtered.reduce((sum, p) => sum + p.total_profit, 0)
     const headers = [
       t("inventory.product_name"),
       t("sales.qty"),
@@ -456,7 +473,7 @@ export default function ReportsPage({ params }: PageProps) {
       p.qty_sold,
       formatCurrency(p.avg_cost, locale),
       formatCurrency(p.avg_price, locale),
-      <span className={p.profit_per_item >= 0 ? "text-emerald-600" : "text-red-600"}>
+      <span className={p.profit_per_item >= 0 ? "text-black" : "text-black"}>
         {formatCurrency(p.profit_per_item, locale)}
       </span>,
       <span className="font-medium">{formatCurrency(p.total_profit, locale)}</span>,
@@ -467,7 +484,7 @@ export default function ReportsPage({ params }: PageProps) {
         {renderPagination(totalPages)}
         <div className="mt-4 flex items-center justify-end gap-2 rounded-lg bg-emerald-50 px-4 py-3">
           <span className="text-sm font-medium text-black">Total Profit:</span>
-          <span className="text-lg font-bold text-emerald-700">
+          <span className="text-lg font-bold text-black">
             {formatCurrency(grandProfit, locale)}
           </span>
         </div>
@@ -476,8 +493,15 @@ export default function ReportsPage({ params }: PageProps) {
   }
 
   const renderOutstanding = () => {
-    const { paged, totalPages } = paginate(outstandingCustomers)
-    const totalBalance = outstandingCustomers.reduce((sum, c) => sum + c.credit_balance, 0)
+    const filtered = reportSearch
+      ? outstandingCustomers.filter(
+          (c) =>
+            c.name.toLowerCase().includes(reportSearch.toLowerCase()) ||
+            (c.phone ?? "").toLowerCase().includes(reportSearch.toLowerCase()),
+        )
+      : outstandingCustomers
+    const { paged, totalPages } = paginate(filtered)
+    const totalBalance = filtered.reduce((sum, c) => sum + c.credit_balance, 0)
     const headers = [
       t("customers.customer_name"),
       t("customers.phone"),
@@ -490,7 +514,7 @@ export default function ReportsPage({ params }: PageProps) {
       c.name,
       c.phone ?? "-",
       formatCurrency(c.credit_limit, locale),
-      <span className="font-medium text-amber-600">{formatCurrency(c.credit_balance, locale)}</span>,
+      <span className="font-medium text-black">{formatCurrency(c.credit_balance, locale)}</span>,
       formatCurrency(c.overdue_amount, locale),
       c.days_overdue,
     ])
@@ -500,7 +524,7 @@ export default function ReportsPage({ params }: PageProps) {
         {renderPagination(totalPages)}
         <div className="mt-4 flex items-center justify-end gap-2 rounded-lg bg-amber-50 px-4 py-3">
           <span className="text-sm font-medium text-black">Total Outstanding:</span>
-          <span className="text-lg font-bold text-amber-700">
+          <span className="text-lg font-bold text-black">
             {formatCurrency(totalBalance, locale)}
           </span>
         </div>
@@ -509,8 +533,15 @@ export default function ReportsPage({ params }: PageProps) {
   }
 
   const renderSvatReport = () => {
-    const { paged, totalPages } = paginate(svatSales)
-    const totalSvat = svatSales.reduce((sum, s) => sum + s.tax_amount, 0)
+    const filtered = reportSearch
+      ? svatSales.filter(
+          (s) =>
+            s.invoice_no.toLowerCase().includes(reportSearch.toLowerCase()) ||
+            (s.customer_name ?? "").toLowerCase().includes(reportSearch.toLowerCase()),
+        )
+      : svatSales
+    const { paged, totalPages } = paginate(filtered)
+    const totalSvat = filtered.reduce((sum, s) => sum + s.tax_amount, 0)
     const headers = [
       t("sales.invoice_no"),
       t("sales.customer"),
@@ -531,7 +562,7 @@ export default function ReportsPage({ params }: PageProps) {
         {renderPagination(totalPages)}
         <div className="mt-4 flex items-center justify-end gap-2 rounded-lg bg-blue-50 px-4 py-3">
           <span className="text-sm font-medium text-black">Total SVAT:</span>
-          <span className="text-lg font-bold text-blue-700">
+          <span className="text-lg font-bold text-black">
             {formatCurrency(totalSvat, locale)}
           </span>
         </div>
@@ -540,6 +571,11 @@ export default function ReportsPage({ params }: PageProps) {
   }
 
   const renderAgedCredit = () => {
+    const filtered = reportSearch
+      ? agedCreditData.filter(
+          (c) => c.customer_name.toLowerCase().includes(reportSearch.toLowerCase()),
+        )
+      : agedCreditData
     const headers = [
       t("reports_aged_credit.customer"),
       t("reports_aged_credit.bucket_0_30"),
@@ -548,21 +584,21 @@ export default function ReportsPage({ params }: PageProps) {
       t("reports_aged_credit.bucket_90_plus"),
       t("reports_aged_credit.total_outstanding"),
     ]
-    const rows = agedCreditData.map((c) => [
+    const rows = filtered.map((c) => [
       c.customer_name,
       formatCurrency(c.bucket_0_30, locale),
       formatCurrency(c.bucket_31_60, locale),
       formatCurrency(c.bucket_61_90, locale),
-      <span className="font-medium text-red-600">{formatCurrency(c.bucket_90_plus, locale)}</span>,
+      <span className="font-medium text-black">{formatCurrency(c.bucket_90_plus, locale)}</span>,
       <span className="font-medium">{formatCurrency(c.total, locale)}</span>,
     ])
-    const grandTotal = agedCreditData.reduce((s, c) => s + c.total, 0)
+    const grandTotal = filtered.reduce((s, c) => s + c.total, 0)
     return (
       <div>
         {renderTable(headers, rows, t("reports_aged_credit.no_data"))}
         <div className="mt-4 flex items-center justify-end gap-2 rounded-lg bg-amber-50 px-4 py-3">
           <span className="text-sm font-medium text-black">{t("reports_aged_credit.total_outstanding")}:</span>
-          <span className="text-lg font-bold text-amber-700">{formatCurrency(grandTotal, locale)}</span>
+          <span className="text-lg font-bold text-black">{formatCurrency(grandTotal, locale)}</span>
         </div>
       </div>
     )
@@ -583,7 +619,7 @@ export default function ReportsPage({ params }: PageProps) {
           </div>
           <div className="flex items-center justify-between border-b pb-2">
             <span className="text-sm font-medium text-black">{t("reports_pl.gross_profit")}</span>
-            <span className={`font-semibold ${plData.grossProfit >= 0 ? "text-emerald-700" : "text-red-600"}`}>{formatCurrency(plData.grossProfit, locale)}</span>
+            <span className={`font-semibold ${plData.grossProfit >= 0 ? "text-black" : "text-black"}`}>{formatCurrency(plData.grossProfit, locale)}</span>
           </div>
           <div className="flex items-center justify-between border-b pb-2">
             <span className="text-sm text-black">{t("reports_pl.expenses")}</span>
@@ -591,7 +627,7 @@ export default function ReportsPage({ params }: PageProps) {
           </div>
           <div className="flex items-center justify-between pt-1">
             <span className="text-base font-bold text-black">{t("reports_pl.net_profit")}</span>
-            <span className={`text-base font-bold ${plData.netProfit >= 0 ? "text-emerald-700" : "text-red-600"}`}>{formatCurrency(plData.netProfit, locale)}</span>
+            <span className={`text-base font-bold ${plData.netProfit >= 0 ? "text-black" : "text-black"}`}>{formatCurrency(plData.netProfit, locale)}</span>
           </div>
         </div>
       </div>
@@ -624,7 +660,7 @@ export default function ReportsPage({ params }: PageProps) {
             </div>
             <div className="flex items-center justify-between pt-1">
               <span className="text-base font-bold text-black">{t("reports_balance_sheet.total_assets")}</span>
-              <span className="text-base font-bold text-emerald-700">{formatCurrency(totalAssets, locale)}</span>
+              <span className="text-base font-bold text-black">{formatCurrency(totalAssets, locale)}</span>
             </div>
           </div>
         </div>
@@ -650,7 +686,7 @@ export default function ReportsPage({ params }: PageProps) {
             </div>
             <div className="flex items-center justify-between pt-1">
               <span className="text-base font-bold text-black">{t("reports_balance_sheet.total_equity")}</span>
-              <span className="text-base font-bold text-emerald-700">{formatCurrency(totalEquity, locale)}</span>
+              <span className="text-base font-bold text-black">{formatCurrency(totalEquity, locale)}</span>
             </div>
           </div>
         </div>
@@ -733,6 +769,19 @@ export default function ReportsPage({ params }: PageProps) {
           ))}
         </div>
       </div>
+
+      {(activeTab === "daily_sales" || activeTab === "profit_report" || activeTab === "outstanding" || activeTab === "svat_report" || activeTab === "aged_credit") && (
+        <div className="relative mb-4 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-black" size={18} />
+          <input
+            type="text"
+            placeholder={t("common.search")}
+            value={reportSearch}
+            onChange={(e) => { setReportSearch(e.target.value); setPage(1) }}
+            className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          />
+        </div>
+      )}
 
       {renderContent()}
     </div>

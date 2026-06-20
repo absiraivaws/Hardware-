@@ -2,14 +2,23 @@
 
 import { use, useEffect, useMemo, useState } from "react"
 import { useTranslations } from "next-intl"
-import { useSearchParams } from "next/navigation"
-import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
+import { useSearchParams, useRouter } from "next/navigation"
+import { ArrowUpDown, ArrowUp, ArrowDown, Eye } from "lucide-react"
 import { formatCurrency, formatDate } from "@/lib/format"
 import { createClient } from "@/lib/supabase/client"
 import type { Database } from "@/types/database"
 
 type Customer = Database["public"]["Tables"]["customers"]["Row"]
-type LedgerEntry = Database["public"]["Tables"]["ledger_entries"]["Row"]
+
+interface CustomerSale {
+  id: string
+  invoice_no: string
+  created_at: string
+  grand_total: number
+  amount_paid: number
+  balance_due: number
+  status: string
+}
 
 export default function CustomerLedgerPage({
   params,
@@ -18,14 +27,13 @@ export default function CustomerLedgerPage({
 }) {
   const { locale } = use(params)
   const t = useTranslations("customers")
-  const tc = useTranslations("common")
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [selectedId, setSelectedId] = useState("")
-  const [entries, setEntries] = useState<LedgerEntry[]>([])
-  const [loading, setLoading] = useState(true)
-  const [sortKey, setSortKey] = useState("created_at")
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
+  const [sales, setSales] = useState<CustomerSale[]>([])
+  const [saleSortKey, setSaleSortKey] = useState("created_at")
+  const [saleSortDir, setSaleSortDir] = useState<"asc" | "desc">("desc")
 
   useEffect(() => {
     const supabase = createClient()
@@ -44,79 +52,56 @@ export default function CustomerLedgerPage({
 
   useEffect(() => {
     if (!selectedId) {
-      setEntries([])
-      setLoading(false)
+      setSales([])
       return
     }
-    setLoading(true)
     const supabase = createClient()
     supabase
-      .from("ledger_entries")
-      .select("*")
-      .eq("ledger_type", "customer")
-      .eq("reference_id", selectedId)
-      .order("created_at", { ascending: true })
+      .from("sales")
+      .select("id, invoice_no, created_at, grand_total, amount_paid, balance_due, status")
+      .eq("customer_id", selectedId)
+      .order("created_at", { ascending: false })
       .then(({ data }) => {
-        if (data) setEntries(data)
-        setLoading(false)
+        if (data) setSales(data as CustomerSale[])
       })
   }, [selectedId])
 
   const selectedCustomer = customers.find((c) => c.id === selectedId)
 
-  const handleSort = (key: string) => {
-    if (sortKey === key) {
-      setSortDir(sortDir === "asc" ? "desc" : "asc")
+  const handleSaleSort = (key: string) => {
+    if (saleSortKey === key) {
+      setSaleSortDir(saleSortDir === "asc" ? "desc" : "asc")
     } else {
-      setSortKey(key)
-      setSortDir("asc")
+      setSaleSortKey(key)
+      setSaleSortDir("asc")
     }
   }
 
-  const sortedEntries = useMemo(() => {
-    const sorted = [...entries].sort((a, b) => {
+  const sortedSales = useMemo(() => {
+    const sorted = [...sales].sort((a, b) => {
       let cmp = 0
-      if (sortKey === "created_at") {
+      if (saleSortKey === "created_at") {
         cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      } else if (sortKey === "description") {
-        cmp = (a.description || "").localeCompare(b.description || "")
-      } else if (sortKey === "debit") {
-        const aVal = a.entry_type === "debit" ? Number(a.amount) : 0
-        const bVal = b.entry_type === "debit" ? Number(b.amount) : 0
-        cmp = aVal - bVal
-      } else if (sortKey === "credit") {
-        const aVal = a.entry_type === "credit" ? Number(a.amount) : 0
-        const bVal = b.entry_type === "credit" ? Number(b.amount) : 0
-        cmp = aVal - bVal
+      } else if (saleSortKey === "invoice_no") {
+        cmp = a.invoice_no.localeCompare(b.invoice_no)
+      } else if (saleSortKey === "grand_total") {
+        cmp = Number(a.grand_total) - Number(b.grand_total)
+      } else if (saleSortKey === "amount_paid") {
+        cmp = Number(a.amount_paid) - Number(b.amount_paid)
+      } else if (saleSortKey === "balance_due") {
+        cmp = Number(a.balance_due) - Number(b.balance_due)
+      } else if (saleSortKey === "status") {
+        cmp = a.status.localeCompare(b.status)
       }
-      return sortDir === "asc" ? cmp : -cmp
+      return saleSortDir === "asc" ? cmp : -cmp
     })
     return sorted
-  }, [entries, sortKey, sortDir])
+  }, [sales, saleSortKey, saleSortDir])
 
-  const totalDebit = useMemo(
-    () => entries.reduce((s, e) => s + (e.entry_type === "debit" ? Number(e.amount) : 0), 0),
-    [entries],
-  )
-  const totalCredit = useMemo(
-    () => entries.reduce((s, e) => s + (e.entry_type === "credit" ? Number(e.amount) : 0), 0),
-    [entries],
-  )
-  const netBalance = totalDebit - totalCredit
-
-  const SortIcon = (col: string) => {
-    if (sortKey !== col) return ArrowUpDown
-    return sortDir === "asc" ? ArrowUp : ArrowDown
+  const SaleSortIcon = (col: string) => {
+    if (saleSortKey !== col) return ArrowUpDown
+    return saleSortDir === "asc" ? ArrowUp : ArrowDown
   }
-
-  const sortedColumns = [
-    { key: "created_at", label: t("date"), align: "text-left" },
-    { key: "description", label: t("description"), align: "text-left" },
-    { key: "debit", label: t("debit"), align: "text-right" },
-    { key: "credit", label: t("credit"), align: "text-right" },
-  ]
-
-  let runningBalance = 0
 
   return (
     <div>
@@ -136,93 +121,97 @@ export default function CustomerLedgerPage({
           <option value="">{t("select_customer")}</option>
           {customers.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.name} — {c.phone ?? ""}
+              {c.name} — {c.code ?? c.phone ?? ""}
             </option>
           ))}
         </select>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              {sortedColumns.map((col) => {
-                const active = sortKey === col.key
-                const Icon = SortIcon(col.key)
-                return (
-                  <th
-                    key={col.key}
-                    onClick={() => handleSort(col.key)}
-                    className={`cursor-pointer select-none px-4 py-3 ${col.align} text-xs font-medium uppercase tracking-wider ${active ? "text-emerald-700" : "text-black"}`}
-                  >
-                    <span className="inline-flex items-center gap-1">
-                      {col.label}
-                      <Icon size={12} className="shrink-0" />
-                    </span>
-                  </th>
-                )
-              })}
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-black">
-                {t("balance")}
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 bg-white">
-            {loading ? (
-              <tr>
-                <td colSpan={5} className="px-4 py-12 text-center text-sm text-black">{tc("loading")}</td>
-              </tr>
-            ) : sortedEntries.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-4 py-12 text-center text-sm text-black">{tc("no_results")}</td>
-              </tr>
-            ) : (
-              sortedEntries.map((e) => {
-                runningBalance =
-                  e.entry_type === "debit"
-                    ? runningBalance + Number(e.amount)
-                    : runningBalance - Number(e.amount)
-                return (
-                  <tr key={e.id} className="hover:bg-gray-50">
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-black">
-                      {formatDate(e.created_at)}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-black">
-                      {e.description ?? "—"}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-black">
-                      {e.entry_type === "debit" ? formatCurrency(Number(e.amount), locale) : "—"}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-black">
-                      {e.entry_type === "credit" ? formatCurrency(Number(e.amount), locale) : "—"}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium text-black">
-                      {formatCurrency(runningBalance, locale)}
-                    </td>
-                  </tr>
-                )
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {sortedEntries.length > 0 && (
-        <div className="mt-4 grid grid-cols-3 gap-4">
-          <div className="rounded-lg border bg-red-50 p-4 text-center">
-            <div className="text-xs font-medium uppercase tracking-wider text-red-700">{t("total_debit")}</div>
-            <div className="mt-1 text-lg font-bold text-red-700">{formatCurrency(totalDebit, locale)}</div>
+      {/* Sale History */}
+      {selectedId && (
+        <div className="mb-6">
+          <h2 className="mb-3 text-base font-semibold text-black">Sale History</h2>
+          <div className="overflow-x-auto rounded-lg border">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  {[
+                    { key: "created_at", label: "Date", align: "text-left" },
+                    { key: "invoice_no", label: "Invoice", align: "text-left" },
+                    { key: "grand_total", label: "Total", align: "text-right" },
+                    { key: "amount_paid", label: "Paid", align: "text-right" },
+                    { key: "balance_due", label: "Pending", align: "text-right" },
+                    { key: "status", label: "Status", align: "text-center" },
+                  ].map((col) => {
+                    const active = saleSortKey === col.key
+                    const Icon = SaleSortIcon(col.key)
+                    return (
+                      <th
+                        key={col.key}
+                        onClick={() => handleSaleSort(col.key)}
+                        className={`cursor-pointer select-none px-4 py-3 ${col.align} text-xs font-medium uppercase tracking-wider text-black`}
+                      >
+                        <span className="inline-flex items-center gap-1">
+                          {col.label}
+                          <Icon size={12} className="shrink-0" />
+                        </span>
+                      </th>
+                    )
+                  })}
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-black">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {sortedSales.length === 0 ? (
+                  <tr><td colSpan={7} className="px-4 py-6 text-center text-sm text-black">No sales found</td></tr>
+                ) : (
+                  sortedSales.map((s) => (
+                    <tr key={s.id} className="hover:bg-gray-50">
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-black">{formatDate(s.created_at)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-black">{s.invoice_no}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-black">{formatCurrency(s.grand_total, locale)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-black">{formatCurrency(s.amount_paid, locale)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-black">{formatCurrency(s.balance_due, locale)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-center">
+                        <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium text-black ${s.status === "completed" ? "bg-emerald-100" : "bg-amber-100"}`}>
+                          {s.status}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right">
+                        <button
+                          onClick={() => router.push(`/${locale}/sales/history?sale_id=${s.id}`)}
+                          className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium text-black hover:bg-gray-50"
+                        >
+                          <Eye size={14} />
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
-          <div className="rounded-lg border bg-green-50 p-4 text-center">
-            <div className="text-xs font-medium uppercase tracking-wider text-green-700">{t("total_credit")}</div>
-            <div className="mt-1 text-lg font-bold text-green-700">{formatCurrency(totalCredit, locale)}</div>
-          </div>
-          <div className="rounded-lg border bg-blue-50 p-4 text-center">
-            <div className="text-xs font-medium uppercase tracking-wider text-blue-700">{t("net_balance")}</div>
-            <div className="mt-1 text-lg font-bold text-blue-700">{formatCurrency(netBalance, locale)}</div>
-          </div>
+          {sortedSales.length > 0 && (
+            <div className="mt-3 grid grid-cols-3 gap-4">
+              <div className="rounded-lg border bg-blue-50 p-3 text-center">
+                <p className="text-xs font-medium text-black">Total Sales</p>
+                <p className="text-lg font-bold text-black">{formatCurrency(sortedSales.reduce((s, x) => s + Number(x.grand_total), 0), locale)}</p>
+              </div>
+              <div className="rounded-lg border bg-emerald-50 p-3 text-center">
+                <p className="text-xs font-medium text-black">Total Paid</p>
+                <p className="text-lg font-bold text-black">{formatCurrency(sortedSales.reduce((s, x) => s + Number(x.amount_paid), 0), locale)}</p>
+              </div>
+              <div className="rounded-lg border bg-amber-50 p-3 text-center">
+                <p className="text-xs font-medium text-black">Total Pending</p>
+                <p className="text-lg font-bold text-black">{formatCurrency(sortedSales.reduce((s, x) => s + Number(x.balance_due), 0), locale)}</p>
+              </div>
+            </div>
+          )}
         </div>
       )}
+
+
     </div>
   )
 }

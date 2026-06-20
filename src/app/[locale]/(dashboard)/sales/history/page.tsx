@@ -6,6 +6,7 @@ import { DataTable } from "@/components/shared/data-table"
 import { PageHeader } from "@/components/shared/page-header"
 import { formatCurrency, formatDate } from "@/lib/format"
 import { use, useEffect, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { Banknote, DollarSign, Eye, X } from "lucide-react"
 import { CompanyFooter } from "@/components/shared/company-info"
 import type { CompanySettings } from "@/components/shared/company-info"
@@ -23,6 +24,7 @@ const paymentDetailLabels: Record<string, string> = {
 interface SaleRow {
   id: string
   invoice_no: string
+  customer_id: string | null
   customer_name: string | null
   created_at: string
   grand_total: number
@@ -67,6 +69,7 @@ interface PaymentRecord {
   amount: number
   description: string | null
   created_at: string
+  ledger_type: string
 }
 
 export default function SaleHistoryPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -74,11 +77,13 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
   const t = useTranslations()
   const [sales, setSales] = useState<SaleRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [customerCodes, setCustomerCodes] = useState<Record<string, string>>({})
   const [viewId, setViewId] = useState<string | null>(null)
   const [detail, setDetail] = useState<SaleDetail | null>(null)
   const [detailItems, setDetailItems] = useState<SaleItem[]>([])
   const [detailLoading, setDetailLoading] = useState(false)
   const [paymentHistory, setPaymentHistory] = useState<PaymentRecord[]>([])
+  const [customerCode, setCustomerCode] = useState<string | null>(null)
   const [showPaymentForm, setShowPaymentForm] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState(0)
   const [paymentType, setPaymentType] = useState("cash")
@@ -102,13 +107,20 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
     setLoading(true)
     const { data } = await supabase
       .from("sales")
-      .select("id, invoice_no, customer_name, created_at, grand_total, amount_paid, status, payment_type")
+      .select("id, invoice_no, customer_id, customer_name, created_at, grand_total, amount_paid, status, payment_type")
       .order("created_at", { ascending: false })
       .limit(200)
 
     if (data) {
       setSales(data as SaleRow[])
       setCache(cacheKey, data as SaleRow[])
+      const ids = [...new Set((data as SaleRow[]).map((s) => s.customer_id).filter(Boolean))]
+      if (ids.length > 0) {
+        const { data: customers } = await supabase.from("customers").select("id, code").in("id", ids)
+        const map: Record<string, string> = {}
+        customers?.forEach((c) => { map[c.id] = c.code })
+        setCustomerCodes(map)
+      }
     }
     setLoading(false)
   }
@@ -119,11 +131,20 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
     loadSales(supabase)
   }, [])
 
+  // Auto-open detail from ?sale_id query param
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    const saleId = searchParams.get("sale_id")
+    if (saleId) openDetail(saleId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
   async function openDetail(id: string) {
     setViewId(id)
     setDetail(null)
     setDetailItems([])
     setPaymentHistory([])
+    setCustomerCode(null)
     setDetailLoading(true)
 
     const supabase = createClient()
@@ -132,9 +153,9 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
       supabase.from("sale_items").select("*").eq("sale_id", id).order("product_name"),
       supabase
         .from("ledger_entries")
-        .select("id, amount, description, created_at")
+        .select("id, amount, description, created_at, ledger_type")
+        .in("ledger_type", ["cash", "bank"])
         .eq("reference_type", "payment")
-        .ilike("description", `%Payment received%`)
         .order("created_at", { ascending: true }),
     ])
 
@@ -142,6 +163,15 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
     if (saleData) setDetail(saleData as SaleDetail)
 
     if (itemsRes.data) setDetailItems(itemsRes.data as SaleItem[])
+
+    if (saleData?.customer_id) {
+      const { data: cust } = await supabase
+        .from("customers")
+        .select("code")
+        .eq("id", saleData.customer_id)
+        .single()
+      if (cust) setCustomerCode(cust.code)
+    }
 
     if (ledgerRes.data) {
       const filtered = ledgerRes.data.filter(
@@ -268,9 +298,9 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
 
   const statusBadge = (status: string) => {
     const colors: Record<string, string> = {
-      completed: "bg-emerald-100 text-emerald-700",
-      pending: "bg-amber-100 text-amber-700",
-      cancelled: "bg-red-100 text-red-700",
+      completed: "bg-emerald-100 text-black",
+      pending: "bg-amber-100 text-black",
+      cancelled: "bg-red-100 text-black",
     }
     return (
       <span
@@ -310,6 +340,15 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
       render: (row: SaleRow) => row.customer_name || "Walk-in Customer",
     },
     {
+      key: "customer_code",
+      label: "Customer ID",
+      render: (row: SaleRow) => (
+        <span className="font-mono text-xs text-black">
+          {row.customer_id ? (customerCodes[row.customer_id] ?? "—") : "CUS-9999"}
+        </span>
+      ),
+    },
+    {
       key: "grand_total",
       label: t("common.total"),
       render: (row: SaleRow) => formatCurrency(row.grand_total, locale),
@@ -330,7 +369,7 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
       render: (row: SaleRow) => {
         const fullyPaid = Number(row.amount_paid ?? 0) >= Number(row.grand_total ?? 0)
         const label = fullyPaid ? "Complete" : "Partial"
-        const color = fullyPaid ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+        const color = fullyPaid ? "bg-emerald-100 text-black" : "bg-amber-100 text-black"
         return (
           <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${color}`}>
             {label}
@@ -344,7 +383,7 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
       render: (row: SaleRow) => {
         const due = Math.max(0, Number(row.grand_total ?? 0) - Number(row.amount_paid ?? 0))
         return (
-          <span className={`font-medium ${due > 0 ? "text-amber-700" : "text-black"}`}>
+          <span className={`font-medium ${due > 0 ? "text-black" : "text-black"}`}>
             {formatCurrency(due, locale)}
           </span>
         )
@@ -413,7 +452,10 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
                 <h2 className="text-base font-semibold text-black">
                   {detail?.invoice_no || ""}
                 </h2>
-                <p className="text-sm text-black">{detail?.customer_name || "Walk-in Customer"}</p>
+                <p className="text-sm text-black">
+                  {detail?.customer_name || "Walk-in Customer"}
+                  {customerCode && <span className="ml-2 font-mono text-xs text-black">({customerCode})</span>}
+                </p>
               </div>
               <div className="flex items-center gap-4 text-sm text-black">
                 <span>{t("common.date")}: {detail && formatDate(detail.created_at)}</span>
@@ -440,10 +482,10 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
                   <div className="rounded-lg border bg-gray-50 p-3">
                     <p className="text-xs font-medium uppercase tracking-wider text-black">{t("sales.payment_type")}</p>
                     <span className={`mt-1 inline-block rounded-lg border px-2.5 py-1 text-xs font-medium ${
-                      detail.payment_type === "cash" ? "border-emerald-500 bg-emerald-50 text-emerald-700" :
-                      detail.payment_type === "credit" ? "border-blue-500 bg-blue-50 text-blue-700" :
-                      detail.payment_type === "bank_transfer" ? "border-purple-500 bg-purple-50 text-purple-700" :
-                      detail.payment_type === "cheque" ? "border-amber-500 bg-amber-50 text-amber-700" :
+                      detail.payment_type === "cash" ? "border-emerald-500 bg-emerald-50 text-black" :
+                      detail.payment_type === "credit" ? "border-blue-500 bg-blue-50 text-black" :
+                      detail.payment_type === "bank_transfer" ? "border-purple-500 bg-purple-50 text-black" :
+                      detail.payment_type === "cheque" ? "border-amber-500 bg-amber-50 text-black" :
                       "border-gray-300 bg-white text-black"
                     }`}>
                       {paymentLabels[detail.payment_type] || detail.payment_type}
@@ -501,12 +543,12 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
                   )}
                   <div className="flex justify-between border-t pt-1.5 text-base font-bold">
                     <span className="text-black">{t("common.grand_total")}</span>
-                    <span className="text-emerald-600">{formatCurrency(detail.grand_total, locale)}</span>
+                    <span className="text-black">{formatCurrency(detail.grand_total, locale)}</span>
                   </div>
                   {detail.discount > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-red-600">{t("common.discount")}</span>
-                      <span className="text-red-600">-{formatCurrency(detail.discount, locale)}</span>
+                      <span className="text-black">{t("common.discount")}</span>
+                      <span className="text-black">-{formatCurrency(detail.discount, locale)}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-sm">
@@ -532,7 +574,8 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
                       {paymentHistory.map((p) => (
                         <div key={p.id} className="flex items-center justify-between text-sm">
                           <span className="text-black">{formatDate(p.created_at)}</span>
-                          <span className="font-medium text-emerald-600">+{formatCurrency(p.amount, locale)}</span>
+                          <span className="text-xs font-medium uppercase text-black px-1.5 py-0.5 rounded bg-gray-100">{p.ledger_type === "cash" ? "Cash" : "Bank"}</span>
+                          <span className="font-medium text-black">+{formatCurrency(p.amount, locale)}</span>
                         </div>
                       ))}
                     </div>
@@ -562,9 +605,9 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
                     <p className="text-xs font-semibold uppercase tracking-wider text-black mb-2">Cheque Status</p>
                     <div className="flex items-center gap-2">
                       <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        detail.cheque_status === "cleared" ? "bg-green-100 text-green-700" :
-                        detail.cheque_status === "bounced" ? "bg-red-100 text-red-700" :
-                        "bg-yellow-100 text-yellow-700"
+                        detail.cheque_status === "cleared" ? "bg-green-100 text-black" :
+                        detail.cheque_status === "bounced" ? "bg-red-100 text-black" :
+                        "bg-yellow-100 text-black"
                       }`}>
                         {(detail.cheque_status || "pending").toUpperCase()}
                       </span>
@@ -576,7 +619,7 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
                               await supabase.from("sales").update({ cheque_status: "cleared" }).eq("id", detail.id)
                               loadSales()
                             }}
-                            className="rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 hover:bg-green-200"
+                            className="rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-black hover:bg-green-200"
                           >
                             Clear
                           </button>
@@ -586,7 +629,7 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
                               await supabase.from("sales").update({ cheque_status: "bounced" }).eq("id", detail.id)
                               loadSales()
                             }}
-                            className="rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 hover:bg-red-200"
+                            className="rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-black hover:bg-red-200"
                           >
                             Bounce
                           </button>
@@ -649,7 +692,7 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
                               onClick={() => setPaymentType(pt)}
                               className={`rounded-lg border px-2 py-1.5 text-xs font-medium transition ${
                                 paymentType === pt
-                                  ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                                  ? "border-emerald-500 bg-emerald-50 text-black"
                                   : "border-gray-300 bg-white text-black hover:bg-gray-50"
                               }`}
                             >
