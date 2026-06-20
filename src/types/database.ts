@@ -774,6 +774,8 @@ export interface Database {
           facebook_link: string
           tiktok_link: string
           youtube_link: string
+          google_drive_refresh_token: string
+          google_drive_email: string
           cash_opening_balance: number
           bank_opening_balance: number
           updated_at: string
@@ -796,6 +798,8 @@ export interface Database {
           facebook_link?: string
           tiktok_link?: string
           youtube_link?: string
+          google_drive_refresh_token?: string
+          google_drive_email?: string
           cash_opening_balance?: number
           bank_opening_balance?: number
           updated_at?: string
@@ -818,6 +822,8 @@ export interface Database {
           facebook_link?: string
           tiktok_link?: string
           youtube_link?: string
+          google_drive_refresh_token?: string
+          google_drive_email?: string
           cash_opening_balance?: number
           bank_opening_balance?: number
           updated_at?: string

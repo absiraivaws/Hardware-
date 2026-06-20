@@ -20,19 +20,21 @@ export default function SupplierLedgerPage({
   const t = useTranslations("suppliers")
   const tc = useTranslations("common")
   const searchParams = useSearchParams()
+  const supabase = createClient()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [selectedId, setSelectedId] = useState("")
   const [entries, setEntries] = useState<LedgerEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [sortKey, setSortKey] = useState("created_at")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
+  const [exporting, setExporting] = useState(false)
+  const [exportMsg, setExportMsg] = useState<string | null>(null)
 
   useEffect(() => {
-    const supabase = createClient()
     supabase.from("suppliers").select("*").order("name").then(({ data }) => {
       if (data) setSuppliers(data)
     })
-  }, [])
+  }, [supabase])
 
   const supplierIdParam = searchParams.get("supplier_id")
 
@@ -49,7 +51,6 @@ export default function SupplierLedgerPage({
       return
     }
     setLoading(true)
-    const supabase = createClient()
     supabase
       .from("ledger_entries")
       .select("*")
@@ -60,7 +61,7 @@ export default function SupplierLedgerPage({
         if (data) setEntries(data)
         setLoading(false)
       })
-  }, [selectedId])
+  }, [selectedId, supabase])
 
   const selectedSupplier = suppliers.find((s) => s.id === selectedId)
 
@@ -103,6 +104,105 @@ export default function SupplierLedgerPage({
     [entries],
   )
   const netBalance = totalCredit - totalDebit
+
+  const handleExportDrive = async () => {
+    setExporting(true)
+    setExportMsg(null)
+    try {
+      const { data: company } = await supabase
+        .from("company_settings")
+        .select("google_drive_refresh_token, google_drive_email")
+        .limit(1)
+        .maybeSingle()
+
+      if (!company?.google_drive_refresh_token) {
+        setExportMsg("Drive not connected. Ask owner to connect in Settings.")
+        return
+      }
+
+      const { refreshAccessToken, ensureFolder, uploadToDrive, findFile } = await import("@/lib/google/drive")
+      const token = await refreshAccessToken(company.google_drive_refresh_token)
+
+      const { data: allSuppliers } = await supabase
+        .from("suppliers")
+        .select("id, name, contact_person")
+        .order("name")
+
+      if (!allSuppliers?.length) {
+        setExportMsg("No suppliers found")
+        return
+      }
+
+      const XLSX = await import("xlsx")
+      const workbook = XLSX.utils.book_new()
+
+      for (const supplier of allSuppliers) {
+        const { data: entries } = await supabase
+          .from("ledger_entries")
+          .select("created_at, description, entry_type, amount")
+          .eq("ledger_type", "supplier")
+          .eq("reference_id", supplier.id)
+          .order("created_at", { ascending: true })
+
+        const rows: Record<string, unknown>[] = []
+        let runningBalance = 0
+
+        for (const e of entries ?? []) {
+          const amt = Number(e.amount)
+          if (e.entry_type === "debit") runningBalance += amt
+          else runningBalance -= amt
+          rows.push({
+            Date: e.created_at ? new Date(e.created_at).toISOString().split("T")[0] : "",
+            Description: e.description ?? "",
+            Debit: e.entry_type === "debit" ? amt : "",
+            Credit: e.entry_type === "credit" ? amt : "",
+            "Running Balance": runningBalance,
+          })
+        }
+
+        const totalDebit = (entries ?? [])
+          .filter((e) => e.entry_type === "debit")
+          .reduce((s, e) => s + Number(e.amount), 0)
+        const totalCredit = (entries ?? [])
+          .filter((e) => e.entry_type === "credit")
+          .reduce((s, e) => s + Number(e.amount), 0)
+
+        rows.push({ Date: "", Description: "--- Summary ---", Debit: "", Credit: "", "Running Balance": "" })
+        rows.push({ Date: "", Description: "Total Debit", Debit: totalDebit, Credit: "", "Running Balance": "" })
+        rows.push({ Date: "", Description: "Total Credit", Debit: "", Credit: totalCredit, "Running Balance": "" })
+        rows.push({ Date: "", Description: "Net Balance", Debit: "", Credit: "", "Running Balance": totalDebit - totalCredit })
+
+        const sheet = XLSX.utils.json_to_sheet(rows)
+
+        const colKeys = ["Date", "Description", "Debit", "Credit", "Running Balance"]
+        const colWidths = colKeys.map((k) => {
+          let max = k.length
+          for (const r of rows) {
+            const val = String(r[k] ?? "")
+            if (val.length > max) max = val.length
+          }
+          return { wch: max + 3 }
+        })
+        sheet["!cols"] = colWidths
+
+        const sheetName = (supplier.name ?? "Unknown").slice(0, 31)
+        XLSX.utils.book_append_sheet(workbook, sheet, sheetName)
+      }
+
+      const wbout = XLSX.write(workbook, { bookType: "xlsx", type: "array" })
+      const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+
+      const folderId = await ensureFolder(token.access_token, "HardPro ERP")
+      const existingId = await findFile(token.access_token, "Supplier_Ledgers.xlsx", folderId)
+      await uploadToDrive(token.access_token, "Supplier_Ledgers.xlsx", folderId, blob, existingId)
+
+      setExportMsg("Uploaded to Google Drive successfully!")
+    } catch {
+      setExportMsg("Export failed. Check Drive connection.")
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const SortIcon = (col: string) => {
     if (sortKey !== col) return ArrowUpDown
@@ -223,6 +323,21 @@ export default function SupplierLedgerPage({
           </div>
         </div>
       )}
+
+      <div className="mt-6 flex items-center gap-3">
+        <button
+          onClick={handleExportDrive}
+          disabled={exporting}
+          className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+        >
+          {exporting ? "Exporting..." : "Export & Upload to Drive"}
+        </button>
+        {exportMsg && (
+          <span className={`text-sm ${exportMsg.includes("success") ? "text-green-700" : "text-red-700"}`}>
+            {exportMsg}
+          </span>
+        )}
+      </div>
     </div>
   )
 }

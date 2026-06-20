@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl"
 import { use, useEffect, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { PageHeader } from "@/components/shared/page-header"
 import { createClient } from "@/lib/supabase/client"
 import { Globe, Bell, Shield, Database as DatabaseIcon, Building2, Share2, MessageCircle, Smartphone, Upload, X } from "lucide-react"
@@ -53,6 +54,8 @@ export default function SettingsPage({
   const t = useTranslations()
   const { companySettings: contextCompany, updateCompanySettings } = useData()
   const supabase = createClient()
+  const urlParams = useSearchParams()
+  const [driveToast, setDriveToast] = useState<string | null>(null)
   const [companyName, setCompanyName] = useState("")
   const [address, setAddress] = useState("")
   const [contactNumber, setContactNumber] = useState("")
@@ -71,6 +74,37 @@ export default function SettingsPage({
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [userRole, setUserRole] = useState<string>("")
+  const [driveEmail, setDriveEmail] = useState("")
+  const [driveConnected, setDriveConnected] = useState(false)
+  const [disconnecting, setDisconnecting] = useState(false)
+
+  useEffect(() => {
+    const init = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single()
+        if (profile) setUserRole(profile.role)
+      }
+
+      const { data: company } = await supabase
+        .from("company_settings")
+        .select("google_drive_refresh_token, google_drive_email")
+        .limit(1)
+        .maybeSingle()
+      if (company) {
+        setDriveConnected(!!company.google_drive_refresh_token)
+        setDriveEmail(company.google_drive_email)
+      }
+    }
+    init()
+  }, [supabase])
 
   useEffect(() => {
     if (contextCompany) {
@@ -90,8 +124,20 @@ export default function SettingsPage({
       setTiktokLink(contextCompany.tiktok_link)
       setYoutubeLink(contextCompany.youtube_link)
       setLogoUrl(contextCompany.logo_url)
+      setDriveConnected(!!contextCompany.google_drive_refresh_token)
+      setDriveEmail(contextCompany.google_drive_email)
     }
   }, [contextCompany])
+
+  useEffect(() => {
+    const driveParam = urlParams.get("drive")
+    if (driveParam === "connected") setDriveToast("Google Drive connected successfully!")
+    else if (driveParam === "error") setDriveToast("Failed to connect Google Drive.")
+    if (driveParam) {
+      const timer = setTimeout(() => setDriveToast(null), 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [urlParams])
 
   async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -166,6 +212,12 @@ export default function SettingsPage({
   return (
     <div>
       <PageHeader titleKey="nav.settings" />
+
+      {driveToast && (
+        <div className={`mb-4 rounded-lg p-4 text-sm font-medium ${driveToast.includes("successfully") ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+          {driveToast}
+        </div>
+      )}
 
       <div className="space-y-6">
         {/* Company Information */}
@@ -418,6 +470,68 @@ export default function SettingsPage({
             </div>
           </div>
         </div>
+
+        {/* Google Drive */}
+        {userRole === "owner" && (
+          <div className="rounded-lg border bg-white">
+            <div className="flex items-center gap-3 border-b px-6 py-4">
+              <svg className="h-5 w-5 text-emerald-600" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+              </svg>
+              <h2 className="text-base font-semibold text-black">Google Drive</h2>
+            </div>
+            <div className="px-6 py-4">
+              {driveConnected ? (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-emerald-700 flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" />
+                      Connected as {driveEmail}
+                    </p>
+                    <p className="mt-1 text-xs text-black">
+                      Customer ledgers will be synced daily at 11:59 PM
+                    </p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      setDisconnecting(true)
+                      const { data: settings } = await supabase
+                        .from("company_settings")
+                        .select("id")
+                        .limit(1)
+                        .maybeSingle()
+                      if (settings?.id) {
+                        await supabase
+                          .from("company_settings")
+                          .update({ google_drive_refresh_token: "", google_drive_email: "" })
+                          .eq("id", settings.id)
+                      }
+                      setDriveConnected(false)
+                      setDriveEmail("")
+                      setDisconnecting(false)
+                    }}
+                    disabled={disconnecting}
+                    className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    {disconnecting ? "Disconnecting..." : "Disconnect"}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-black">
+                    Connect Google Drive to automatically export customer ledgers
+                  </p>
+                  <a
+                    href="/api/auth/google-drive"
+                    className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+                  >
+                    Connect Google Drive
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Existing settings sections */}
         {sections.map((section) => (
