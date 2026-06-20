@@ -343,7 +343,10 @@ export default function QuotationDetailPage() {
     if (!user) { setConverting(false); return }
 
     const today = new Date()
-    const invPrefix = `INV-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}-`
+    const dd = String(today.getDate()).padStart(2, "0")
+    const mm = String(today.getMonth() + 1).padStart(2, "0")
+    const yy = String(today.getFullYear()).slice(-2)
+    const invPrefix = `INV-${dd}${mm}${yy}-`
     const { data: lastInv } = await supabase
       .from("sales")
       .select("invoice_no")

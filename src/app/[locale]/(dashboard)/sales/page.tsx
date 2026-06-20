@@ -30,10 +30,6 @@ interface ProfileRow {
   branch_id: string | null
 }
 
-interface BranchRow {
-  code: string
-}
-
 interface SaleRow {
   id: string
   invoice_no: string
@@ -93,6 +89,8 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
     items: { product_name: string; quantity: number; unit_price: number; total_price: number }[]
   } | null>(null)
 
+  const [nextInvoiceNo, setNextInvoiceNo] = useState("")
+
   const barcodeRef = useRef<HTMLInputElement>(null)
   const serialRef = useRef<HTMLInputElement>(null)
   const customerRef = useRef<HTMLDivElement>(null)
@@ -150,6 +148,31 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
     }
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  useEffect(() => {
+    const computeNextInvoice = async () => {
+      const supabase = createClient()
+      const today = new Date()
+      const dd = String(today.getDate()).padStart(2, "0")
+      const mm = String(today.getMonth() + 1).padStart(2, "0")
+      const yy = String(today.getFullYear()).slice(-2)
+      const prefix = `INV-${dd}${mm}${yy}-`
+      const { data: lastSale } = await supabase
+        .from("sales")
+        .select("invoice_no")
+        .like("invoice_no", `${prefix}%`)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      let seq = 1
+      if (lastSale) {
+        const parts = (lastSale as { invoice_no: string }).invoice_no.split("-")
+        seq = parseInt(parts[parts.length - 1], 10) + 1
+      }
+      setNextInvoiceNo(`${prefix}${String(seq).padStart(5, "0")}`)
+    }
+    computeNextInvoice()
   }, [])
 
   const handleSort = (key: string) => {
@@ -272,28 +295,16 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
 
       const profileData = profile as ProfileRow | null
 
-      let branchCode = "XX"
-      if (profileData?.branch_id) {
-        const { data: branch } = await supabase
-          .from("branches")
-          .select("code")
-          .eq("id", profileData.branch_id)
-          .single()
-
-        const branchData = branch as BranchRow | null
-        if (branchData) branchCode = branchData.code
-      }
-
       const today = new Date()
-      const y = today.getFullYear()
-      const m = String(today.getMonth() + 1).padStart(2, "0")
-      const d = String(today.getDate()).padStart(2, "0")
-      const dateStr = `${y}${m}${d}`
+      const dd = String(today.getDate()).padStart(2, "0")
+      const mm = String(today.getMonth() + 1).padStart(2, "0")
+      const yy = String(today.getFullYear()).slice(-2)
+      const invPrefix = `INV-${dd}${mm}${yy}-`
 
       const { data: lastSale } = await supabase
         .from("sales")
         .select("invoice_no")
-        .like("invoice_no", `INV-${branchCode}-${dateStr}-%`)
+        .like("invoice_no", `${invPrefix}%`)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle()
@@ -304,7 +315,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
         const parts = lastSaleData.invoice_no.split("-")
         seq = parseInt(parts[parts.length - 1], 10) + 1
       }
-      const invoiceNo = `INV-${branchCode}-${dateStr}-${String(seq).padStart(4, "0")}`
+      const invoiceNo = `${invPrefix}${String(seq).padStart(5, "0")}`
 
       const customerId = selectedCustomer?.id || null
       const customerName = selectedCustomer?.name || "Walk-in Customer"
@@ -688,6 +699,11 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
             <div className="flex items-center gap-2 border-b px-4 py-3">
               <ShoppingCart size={18} className="text-black" />
               <span className="font-semibold text-black">{t("sales.cart")}</span>
+              {nextInvoiceNo && (
+                <span className="ml-2 rounded bg-gray-100 px-2 py-0.5 text-xs font-mono text-black">
+                  {nextInvoiceNo}
+                </span>
+              )}
               <span className="ml-auto rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-black">
                 {cart.length}
               </span>

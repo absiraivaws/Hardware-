@@ -123,7 +123,7 @@ export default function PurchasesPage({
       label: t("sales.balance_due"),
       render: (item: PurchaseOrder) => {
         const bd = Number(item.balance_due)
-        if (bd <= 0) return <span className="text-black">—</span>
+        if (bd <= 0) return <span className="text-black">Payment complete</span>
         return <span className="text-black font-medium">{formatCurrency(bd, locale)}</span>
       },
     },
@@ -148,7 +148,7 @@ export default function PurchasesPage({
     },
     {
       key: "status",
-      label: t("common.status"),
+      label: "Item delivery status",
       render: (item: PurchaseOrder) => (
         <span
           className={cn(

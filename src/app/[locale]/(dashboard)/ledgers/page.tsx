@@ -416,7 +416,7 @@ export default function FinancialLedgerPage({
         }
       } else {
         // Try purchase (payment entries from purchases use po.id as reference_id)
-        const { data: purchase } = await supabase.from("purchases").select("id, grand_total").eq("id", saleId).maybeSingle()
+        const { data: purchase } = await supabase.from("purchase_orders").select("id, grand_total").eq("id", saleId).maybeSingle()
         if (purchase) {
           const { data: allEntries } = await supabase
             .from("ledger_entries")
@@ -428,7 +428,7 @@ export default function FinancialLedgerPage({
             return entry.entry_type === "credit" ? sum + Number(entry.amount) : sum
           }, 0)
           const newDue = Math.max(0, Number(purchase.grand_total) - totalPaid)
-          await supabase.from("purchases").update({ amount_paid: totalPaid, balance_due: newDue } as never).eq("id", purchase.id)
+          await supabase.from("purchase_orders").update({ amount_paid: totalPaid, balance_due: newDue } as never).eq("id", purchase.id)
         }
       }
     }
@@ -476,11 +476,11 @@ export default function FinancialLedgerPage({
       const netDebit = (supplierEntries ?? []).reduce((sum: number, entry: { amount: number; entry_type: string }) => {
         return entry.entry_type === "debit" ? sum + Number(entry.amount) : sum - Number(entry.amount)
       }, 0)
-      const { data: purchases } = await supabase.from("purchases").select("id, grand_total").eq("supplier_id", e.reference_id)
+      const { data: purchases } = await supabase.from("purchase_orders").select("id, grand_total").eq("supplier_id", e.reference_id)
       for (const purchase of (purchases ?? [])) {
         const amountPaid = netDebit // total credited to supplier = what we've paid
         const newDue = Math.max(0, Number((purchase as { grand_total: number }).grand_total) - amountPaid)
-        await supabase.from("purchases").update({ amount_paid: amountPaid, balance_due: newDue } as never).eq("id", (purchase as { id: string }).id)
+        await supabase.from("purchase_orders").update({ amount_paid: amountPaid, balance_due: newDue } as never).eq("id", (purchase as { id: string }).id)
       }
     }
 

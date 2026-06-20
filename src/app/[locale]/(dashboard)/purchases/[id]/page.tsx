@@ -16,6 +16,16 @@ interface PurchaseItem {
   received_qty: number
   unit_price: number
   total_price: number
+  product_code?: string
+  serial_no?: string
+}
+
+interface PaymentRecord {
+  id: string
+  amount: number
+  description: string | null
+  created_at: string
+  ledger_type: string
 }
 
 interface PurchaseOrder {
@@ -103,6 +113,7 @@ export default function PurchaseOrderDetailPage({
   const [returnReason, setReturnReason] = useState("")
   const [returning, setReturning] = useState(false)
   const [supplierCode, setSupplierCode] = useState<string | null>(null)
+  const [paymentHistory, setPaymentHistory] = useState<PaymentRecord[]>([])
 
   function generateReturnNo(): string {
     const now = new Date()
@@ -144,12 +155,46 @@ export default function PurchaseOrderDetailPage({
         .order("product_name")
 
       if (itemsData) {
-        setItems(itemsData as PurchaseItem[])
+        const items = itemsData as PurchaseItem[]
+        // Fetch product codes and serial numbers
+        const productIds = [...new Set(items.map(i => i.product_id))]
+        if (productIds.length > 0) {
+          const { data: products } = await supabase
+            .from("products")
+            .select("id, code, serial_no")
+            .in("id", productIds)
+          if (products) {
+            const productMap = Object.fromEntries(
+              products.map(p => [p.id, { code: p.code, serial_no: p.serial_no }])
+            )
+            for (const item of items) {
+              const p = productMap[item.product_id]
+              if (p) {
+                item.product_code = p.code
+                item.serial_no = p.serial_no
+              }
+            }
+          }
+        }
+        setItems(items)
         const initial: Record<string, number> = {}
         for (const item of itemsData) {
           initial[item.id] = item.quantity - item.received_qty
         }
         setReceivingQtys(initial)
+      }
+
+      // Fetch payment history
+      const { data: ledgerEntries } = await supabase
+        .from("ledger_entries")
+        .select("id, amount, description, created_at, ledger_type")
+        .in("ledger_type", ["cash", "bank"])
+        .eq("reference_type", "payment")
+        .eq("reference_id", id)
+        .order("created_at", { ascending: true })
+
+      if (ledgerEntries) {
+        setPaymentHistory(ledgerEntries as PaymentRecord[])
       }
 
       setLoading(false)
@@ -606,8 +651,8 @@ export default function PurchaseOrderDetailPage({
         </div>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
-        <div className="rounded-lg border bg-white p-4">
+      <div className="mb-6 flex items-center justify-between rounded-lg border bg-white p-4">
+        <div>
           <p className="text-xs font-medium uppercase tracking-wider text-black">
             {t("purchases.supplier")}
           </p>
@@ -616,79 +661,16 @@ export default function PurchaseOrderDetailPage({
             {supplierCode && <span className="ml-2 font-mono text-xs text-black">({supplierCode})</span>}
           </p>
         </div>
-        <div className="rounded-lg border bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-black">
-            {t("purchases.expected_date")}
-          </p>
-          <p className="mt-1 text-sm font-medium text-black">
-            {po.expected_date
-              ? formatDate(po.expected_date)
-              : "-"}
-          </p>
-        </div>
-        <div className="rounded-lg border bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-black">
-            {t("common.grand_total")}
-          </p>
-          <p className="mt-1 text-sm font-medium text-black">
-            {formatCurrency(po.grand_total, locale)}
-          </p>
-        </div>
-        <div className="rounded-lg border bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-black">
-            {t("sales.amount_paid")}
-          </p>
-          <p className="mt-1 text-sm font-medium text-black">
-            {formatCurrency(Number(po.amount_paid ?? 0), locale)}
-          </p>
-        </div>
+        {Number(po.balance_due ?? 0) > 0 && po.status !== "cancelled" && (
+          <button
+            onClick={() => { setPaymentAmount(Number(po.balance_due ?? 0)); setShowPayment(true) }}
+            className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+          >
+            <DollarSign size={16} />
+            Pay {formatCurrency(po.balance_due ?? 0, locale)}
+          </button>
+        )}
       </div>
-
-      {Number(po.balance_due ?? 0) > 0 && po.status !== "cancelled" && (
-        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="rounded-lg border bg-amber-50 p-4">
-            <p className="text-xs font-medium uppercase tracking-wider text-black">
-              {t("sales.balance_due")}
-            </p>
-            <p className="mt-1 text-lg font-bold text-black">
-              {formatCurrency(po.balance_due ?? 0, locale)}
-            </p>
-          </div>
-          {po.payment_type != null && (
-            <div className="rounded-lg border bg-white p-4">
-              <p className="text-xs font-medium uppercase tracking-wider text-black">
-                Payment Type
-              </p>
-              <p className="mt-1 text-sm font-medium text-black">
-                {paymentTypeLabels[po.payment_type] ?? po.payment_type}
-              </p>
-            </div>
-          )}
-          {po.payment_details && Object.keys(po.payment_details ?? {}).length > 0 && (
-            <div className="rounded-lg border bg-white p-4">
-              <p className="text-xs font-medium uppercase tracking-wider text-black">
-                Payment Details
-              </p>
-              <div className="mt-1 space-y-0.5">
-                {Object.entries(po.payment_details).map(([key, val]) => (
-                  <p key={key} className="text-sm text-black">
-                    <span className="font-medium capitalize">{key.replace(/_/g, " ")}:</span> {val}
-                  </p>
-                ))}
-              </div>
-            </div>
-          )}
-          <div className="flex items-end">
-            <button
-              onClick={() => { setPaymentAmount(Number(po.balance_due ?? 0)); setShowPayment(true) }}
-              className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-            >
-              <DollarSign size={16} />
-              Pay {formatCurrency(po.balance_due ?? 0, locale)}
-            </button>
-          </div>
-        </div>
-      )}
 
       <div className="overflow-x-auto rounded-lg border">
         <table className="min-w-full divide-y divide-gray-200">
@@ -696,6 +678,12 @@ export default function PurchaseOrderDetailPage({
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">
                 {t("inventory.product_name")}
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">
+                Serial No
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">
+                Product ID
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black">
                 Ordered
@@ -722,6 +710,12 @@ export default function PurchaseOrderDetailPage({
                 <tr key={item.id}>
                   <td className="px-4 py-3 text-sm text-black">
                     {item.product_name}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-black">
+                    {item.serial_no || "—"}
+                  </td>
+                  <td className="px-4 py-3 text-sm font-mono text-black">
+                    {item.product_code || "—"}
                   </td>
                   <td className="px-4 py-3 text-sm text-black">
                     {editMode ? (
@@ -755,7 +749,7 @@ export default function PurchaseOrderDetailPage({
                         max={remaining}
                         value={receivingQtys[item.id] ?? 0}
                         onChange={(e) => setReceivingQtys((prev) => ({ ...prev, [item.id]: Math.min(Number(e.target.value), remaining) }))}
-                        className="w-20 rounded border border-gray-300 px-2 py-1 text-sm text-black"
+                        className="w-20 rounded border border-yellow-300 bg-yellow-50 px-2 py-1 text-sm text-black"
                       />
                     ) : (
                       <span className="text-black">—</span>
@@ -778,26 +772,42 @@ export default function PurchaseOrderDetailPage({
           </tbody>
           <tfoot className="bg-gray-50">
             {(() => {
-              const computedSubtotal = editMode
-                ? items.reduce((sum, item) => sum + (editingQtys[item.id] ?? item.quantity) * (editingPrices[item.id] ?? item.unit_price), 0)
-                : po.subtotal
+              const balanceDue = Number(po.balance_due ?? 0)
               return (
                 <>
                   <tr>
-                    <td colSpan={4} className="px-4 py-3 text-right text-sm font-medium text-black">
-                      {t("common.subtotal")}
+                    <td colSpan={6} className="px-4 py-3 text-right text-sm font-medium text-black">
+                      Expected Date
                     </td>
                     <td className="px-4 py-3 text-sm font-medium text-black">
-                      {formatCurrency(computedSubtotal, locale)}
+                      {po.expected_date ? formatDate(po.expected_date) : "-"}
                     </td>
                     <td />
                   </tr>
                   <tr>
-                    <td colSpan={4} className="px-4 py-3 text-right text-sm font-medium text-black">
-                      {t("common.grand_total")}
+                    <td colSpan={6} className="px-4 py-3 text-right text-sm font-medium text-black">
+                      Grand Total
                     </td>
                     <td className="px-4 py-3 text-sm font-semibold text-black">
-                      {formatCurrency(computedSubtotal, locale)}
+                      {formatCurrency(po.grand_total, locale)}
+                    </td>
+                    <td />
+                  </tr>
+                  <tr>
+                    <td colSpan={6} className="px-4 py-3 text-right text-sm font-medium text-black">
+                      Amount Paid
+                    </td>
+                    <td className="px-4 py-3 text-sm font-medium text-black">
+                      {formatCurrency(Number(po.amount_paid ?? 0), locale)}
+                    </td>
+                    <td />
+                  </tr>
+                  <tr>
+                    <td colSpan={6} className="px-4 py-3 text-right text-sm font-medium text-black">
+                      Balance Due
+                    </td>
+                    <td className="px-4 py-3 text-sm font-medium text-black">
+                      {balanceDue <= 0 ? "Payment complete" : formatCurrency(balanceDue, locale)}
                     </td>
                     <td />
                   </tr>
@@ -814,6 +824,25 @@ export default function PurchaseOrderDetailPage({
             {t("common.notes")}
           </p>
           <p className="mt-1 text-sm text-black">{po.notes}</p>
+        </div>
+      )}
+
+      {paymentHistory.length > 0 && (
+        <div className="mt-6 w-full max-w-sm rounded-lg border bg-white p-4">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-black">
+            Payment History
+          </p>
+          <div className="space-y-2">
+            {paymentHistory.map((p) => (
+              <div key={p.id} className="flex items-center justify-between text-sm">
+                <span className="text-black">{formatDate(p.created_at)}</span>
+                <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium uppercase text-black">
+                  {p.ledger_type === "cash" ? "Cash" : "Bank"}
+                </span>
+                <span className="font-medium text-black">-{formatCurrency(p.amount, locale)}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

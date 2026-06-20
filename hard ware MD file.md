@@ -517,7 +517,76 @@ Monthly maintenance after Phase 1: 30k – 60k LKR
 
 ---
 
-# 26. Recommended SaaS Pricing for Sri Lanka
+# 26. Backup & Disaster Recovery Strategy
+
+## Supabase Database Backup (Recommended)
+
+Use Supabase's built-in database backup:
+
+```bash
+pg_dump --dbname=postgresql://postgres:[PASSWORD]@db.maltdmkjsrnnvwtnblvr.supabase.co:5432/postgres > backup.sql
+```
+
+Or from the Supabase dashboard: **Database → Backups → Download Backup**.
+
+---
+
+## Excel/CSV Backup Files (Manual Export)
+
+If Supabase data is lost, the following CSV exports are needed for a full restore. Listed in restore dependency order.
+
+### Tier 1 — Reference Data (restore first, no dependencies)
+
+| File | Tables |
+|---|---|
+| `categories.csv` | categories |
+| `brands.csv` | brands |
+| `units.csv` | units |
+| `branches.csv` | branches |
+| `expense_categories.csv` | expense_categories |
+| `profiles.csv` | profiles (users + roles) |
+| `company_settings.csv` | company_settings |
+| `drivers.csv`, `vehicles.csv` | drivers, vehicles |
+
+### Tier 2 — Master Data (depends on Tier 1)
+
+| File | Tables |
+|---|---|
+| `products.csv` | products |
+| `customers.csv` | customers |
+| `suppliers.csv` | suppliers |
+
+### Tier 3 — Transactions (depends on Tier 2)
+
+| File | Tables |
+|---|---|
+| `sales.csv` + `sale_items.csv` | sales + sale_items |
+| `purchase_orders.csv` + `purchase_items.csv` | purchase_orders + purchase_items |
+| `goods_received_notes.csv` | goods_received_notes |
+| `purchase_returns.csv` + `purchase_return_items.csv` | purchase_returns + purchase_return_items |
+| `stock_movements.csv` | stock_movements |
+| `stock_transfers.csv` + `stock_transfer_items.csv` | stock_transfers + stock_transfer_items |
+| `quotations.csv` + `quotation_items.csv` | quotations + quotation_items |
+| `branch_stock.csv` | branch_stock |
+| `deliveries.csv` + `delivery_items.csv` | deliveries + delivery_items |
+| `rentals.csv` + `rental_items.csv` | rentals + rental_items |
+| `ledger_entries.csv` | ledger_entries |
+
+### Most Critical Files for Offline Backup
+
+If you only keep a few files for emergency records:
+- `products.csv` — inventory master list
+- `customers.csv` — customer records + credit balances
+- `suppliers.csv` — supplier records
+- `sales.csv` + `sale_items.csv` — all invoices
+- `ledger_entries.csv` — the financial spine (cannot reconstruct from other tables)
+- `stock_movements.csv` — inventory audit trail
+
+Export these from Supabase Table Editor: click **Export → Download as CSV** for each table.
+
+---
+
+# 27. Recommended SaaS Pricing for Sri Lanka
 
 | Plan | Price per month (per branch) |
 |---|---|
