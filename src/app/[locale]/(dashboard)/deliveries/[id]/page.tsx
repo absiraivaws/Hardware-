@@ -2,9 +2,10 @@
 
 import { use, useEffect, useState } from "react"
 import { useTranslations } from "next-intl"
+import { useRouter } from "next/navigation"
 import { PageHeader } from "@/components/shared/page-header"
 import { createClient } from "@/lib/supabase/client"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, X } from "lucide-react"
 import { formatDate, formatCurrency } from "@/lib/format"
 import Link from "next/link"
 
@@ -34,6 +35,7 @@ const statusColors: Record<string, string> = {
 export default function DeliveryDetailPage({ params }: { params: Promise<{ locale: string; id: string }> }) {
   const { locale, id } = use(params)
   const t = useTranslations()
+  const router = useRouter()
   const supabase = createClient()
   const [delivery, setDelivery] = useState<Delivery | null>(null)
   const [driver, setDriver] = useState<Driver | null>(null)
@@ -75,10 +77,16 @@ export default function DeliveryDetailPage({ params }: { params: Promise<{ local
 
   return (
     <div>
-      <div className="mb-4">
-        <Link href={`/${locale}/deliveries`} className="inline-flex items-center gap-1 text-sm text-black hover:text-black">
-          <ArrowLeft size={16} /> {t("deliveries.title")}
+      <div className="mb-6 flex items-center justify-between">
+        <Link href={`/${locale}/deliveries`} className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50">
+          <ArrowLeft size={16} className="text-emerald-600" /> {t("deliveries.title")}
         </Link>
+        <button
+          onClick={() => router.push(`/${locale}/deliveries`)}
+          className="rounded-lg border border-red-300 p-2 hover:bg-red-50"
+        >
+          <X size={18} className="text-red-600" />
+        </button>
       </div>
 
       <div className="rounded-lg border bg-white p-6">

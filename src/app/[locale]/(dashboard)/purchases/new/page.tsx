@@ -13,6 +13,7 @@ import { createClient } from "@/lib/supabase/client"
 interface Supplier {
   id: string
   name: string
+  code: string
 }
 
 interface Product {
@@ -67,6 +68,10 @@ export default function NewPurchaseOrderPage({
   const [error, setError] = useState<string | null>(null)
   const [pickerSortKey, setPickerSortKey] = useState("name")
   const [pickerSortDir, setPickerSortDir] = useState<"asc" | "desc">("asc")
+  const [showSupplierPicker, setShowSupplierPicker] = useState(false)
+  const [supplierSearch, setSupplierSearch] = useState("")
+  const [supplierSortKey, setSupplierSortKey] = useState("name")
+  const [supplierSortDir, setSupplierSortDir] = useState<"asc" | "desc">("asc")
 
   const handlePickerSort = (key: string) => {
     if (pickerSortKey === key) {
@@ -92,6 +97,30 @@ export default function NewPurchaseOrderPage({
     })
   }, [products, pickerSortKey, pickerSortDir])
 
+  const handleSupplierSort = (key: string) => {
+    if (supplierSortKey === key) {
+      setSupplierSortDir(supplierSortDir === "asc" ? "desc" : "asc")
+    } else {
+      setSupplierSortKey(key)
+      setSupplierSortDir("asc")
+    }
+  }
+
+  const filteredSuppliers = useMemo(() => {
+    const q = supplierSearch.toLowerCase()
+    const filtered = q
+      ? suppliers.filter((s) => s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q))
+      : suppliers
+    return [...filtered].sort((a, b) => {
+      const getVal = (s: Supplier, key: string) => {
+        if (key === "code") return s.code
+        return s.name
+      }
+      const cmp = getVal(a, supplierSortKey).localeCompare(getVal(b, supplierSortKey))
+      return supplierSortDir === "asc" ? cmp : -cmp
+    })
+  }, [suppliers, supplierSearch, supplierSortKey, supplierSortDir])
+
   useEffect(() => {
     params.then((p) => setLocale(p.locale))
   }, [params])
@@ -102,6 +131,7 @@ export default function NewPurchaseOrderPage({
     handleSubmit,
     watch,
     getValues,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -126,7 +156,7 @@ export default function NewPurchaseOrderPage({
     const supabase = createClient()
     supabase
       .from("suppliers")
-      .select("id, name")
+      .select("id, name, code")
       .eq("status", "active")
       .order("name")
       .then(({ data }) => {
@@ -263,19 +293,88 @@ export default function NewPurchaseOrderPage({
               <label className="mb-1 block text-sm font-medium text-black">
                 {t("purchases.supplier")}
               </label>
-              <select
-                {...register("supplier_id")}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              >
-                <option value="">Select supplier</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+              {(() => {
+                const selected = suppliers.find((s) => s.id === getValues("supplier_id"))
+                return (
+                  <>
+                    <input type="hidden" {...register("supplier_id")} />
+                    <button
+                      type="button"
+                      onClick={() => setShowSupplierPicker(true)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-left text-black hover:bg-gray-50 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    >
+                      {selected ? `${selected.name} (${selected.code})` : "Select supplier"}
+                    </button>
+                  </>
+                )
+              })()}
               {errors.supplier_id && (
                 <p className="mt-1 text-xs text-red-500">{errors.supplier_id.message}</p>
+              )}
+
+              {showSupplierPicker && (
+                <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-black" size={18} />
+                    <input
+                      type="text"
+                      placeholder={t("common.search")}
+                      value={supplierSearch}
+                      onChange={(e) => setSupplierSearch(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div className="mt-2 max-h-60 overflow-y-auto rounded-lg border bg-white">
+                    <table className="w-full text-xs">
+                      <thead className="sticky top-0 bg-gray-100">
+                        <tr>
+                          {[
+                            { key: "code", label: "Supplier ID", align: "text-left" },
+                            { key: "name", label: "Name", align: "text-left" },
+                          ].map((col) => {
+                            const active = supplierSortKey === col.key
+                            const Icon = active ? (supplierSortDir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown
+                            return (
+                              <th
+                                key={col.key}
+                                onClick={() => handleSupplierSort(col.key)}
+                                className={`cursor-pointer select-none px-3 py-2 ${col.align} font-medium text-black`}
+                              >
+                                <span className="inline-flex items-center gap-1">
+                                  {col.label}
+                                  <Icon size={11} className="shrink-0" />
+                                </span>
+                              </th>
+                            )
+                          })}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredSuppliers.map((s) => (
+                          <tr
+                            key={s.id}
+                            onClick={() => {
+                              setValue("supplier_id", s.id)
+                              setShowSupplierPicker(false)
+                              setSupplierSearch("")
+                            }}
+                            className="cursor-pointer border-b last:border-0 hover:bg-emerald-50"
+                          >
+                            <td className="px-3 py-2 font-mono text-black">{s.code}</td>
+                            <td className="px-3 py-2 text-black">{s.name}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setShowSupplierPicker(false); setSupplierSearch("") }}
+                    className="mt-2 text-xs text-black hover:text-black"
+                  >
+                    {t("common.cancel")}
+                  </button>
+                </div>
               )}
             </div>
             <div>

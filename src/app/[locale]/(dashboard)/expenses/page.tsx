@@ -79,12 +79,34 @@ export default function ExpensesPage({ params }: { params: Promise<{ locale: str
 
   async function handleSave(type: "expense" | "income") {
     if (!amount || Number(amount) <= 0) return
+
+    // Generate reference number
+    const today = new Date()
+    const dd = String(today.getDate()).padStart(2, "0")
+    const mm = String(today.getMonth() + 1).padStart(2, "0")
+    const yy = String(today.getFullYear()).slice(-2)
+    const prefix = type === "expense" ? "EX" : "IN"
+    const refPattern = `${prefix}-${yy}${mm}${dd}-`
+    const { data: lastRef } = await supabase
+      .from("ledger_entries")
+      .select("description")
+      .like("description", `${refPattern}%`)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    let seq = 1
+    if (lastRef) {
+      const m = (lastRef as { description: string }).description.match(/-(\d{5})/)
+      if (m) seq = parseInt(m[1], 10) + 1
+    }
+    const refNo = `${refPattern}${String(seq).padStart(5, "0")}`
+
     const catLabel = category.startsWith("custom_")
       ? category.replace("custom_", "")
       : category
         ? t(`expenses.categories.${category}`)
         : ""
-    const desc = `${catLabel}${description ? ` - ${description}` : ""}` || type
+    const desc = `${refNo} ${catLabel}${description ? ` - ${description}` : ""}` || `${refNo} ${type}`
     const now = new Date()
     const pad2 = (n: number) => String(n).padStart(2, "0")
     const offset = -now.getTimezoneOffset()
@@ -139,16 +161,18 @@ export default function ExpensesPage({ params }: { params: Promise<{ locale: str
   const allTotalIncome = entries.filter(e => e.ledger_type === "income").reduce((s, e) => s + e.amount, 0)
 
   function renderRow(e: Entry, showDate = false) {
+    const ref = e.description?.match(/(EX-\S+|IN-\S+)/)?.[1] || "—"
     return (
       <tr key={e.id} className="border-b last:border-0">
         {showDate && <td className="px-4 py-3 text-black whitespace-nowrap">{formatDate(e.created_at)}</td>}
+        <td className="px-4 py-3 font-mono text-xs text-black">{ref}</td>
         <td className="px-4 py-3">
           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${e.ledger_type === "expense" ? "bg-red-100 text-black" : "bg-emerald-100 text-black"}`}>
             {e.ledger_type === "expense" ? <TrendingDown size={12} /> : <TrendingUp size={12} />}
             {e.ledger_type === "expense" ? t("expenses.expense") : t("expenses.income")}
           </span>
         </td>
-        <td className="px-4 py-3 text-black">{e.description || "-"}</td>
+        <td className="px-4 py-3 text-black">{e.description?.replace(/(EX-\S+|IN-\S+)\s*/, "") || "-"}</td>
         <td className={`px-4 py-3 text-right font-medium ${e.ledger_type === "expense" ? "text-black" : "text-black"}`}>
           {e.ledger_type === "expense" ? "-" : "+"}{formatCurrency(e.amount, locale)}
         </td>
@@ -275,13 +299,14 @@ export default function ExpensesPage({ params }: { params: Promise<{ locale: str
             <thead>
               <tr className="border-b text-xs font-medium uppercase text-black">
                 <th className="px-4 py-3">{t("expenses.type")}</th>
+                <th className="px-4 py-3">Ref #</th>
                 <th className="px-4 py-3">{t("expenses.description")}</th>
                 <th className="px-4 py-3 text-right">{t("expenses.amount")}</th>
               </tr>
             </thead>
             <tbody>
               {todayEntries.length === 0 ? (
-                <tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-black">{t("expenses.no_entries")}</td></tr>
+                <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-black">{t("expenses.no_entries")}</td></tr>
               ) : (
                 todayEntries.map(e => renderRow(e))
               )}
@@ -297,6 +322,7 @@ export default function ExpensesPage({ params }: { params: Promise<{ locale: str
             <thead>
               <tr className="border-b text-xs font-medium uppercase text-black">
                 <th className="px-4 py-3">{t("expenses.date")}</th>
+                <th className="px-4 py-3">Ref #</th>
                 <th className="px-4 py-3">{t("expenses.type")}</th>
                 <th className="px-4 py-3">{t("expenses.description")}</th>
                 <th className="px-4 py-3 text-right">{t("expenses.amount")}</th>
@@ -306,7 +332,7 @@ export default function ExpensesPage({ params }: { params: Promise<{ locale: str
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => <tr key={i}><td colSpan={4} className="px-4 py-3"><div className="h-4 animate-pulse rounded bg-gray-100" /></td></tr>)
               ) : entries.length === 0 ? (
-                <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-black">{t("expenses.no_entries")}</td></tr>
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-black">{t("expenses.no_entries")}</td></tr>
               ) : (
                 entries.map(e => renderRow(e, true))
               )}

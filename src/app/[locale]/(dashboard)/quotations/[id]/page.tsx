@@ -346,7 +346,7 @@ export default function QuotationDetailPage() {
     const dd = String(today.getDate()).padStart(2, "0")
     const mm = String(today.getMonth() + 1).padStart(2, "0")
     const yy = String(today.getFullYear()).slice(-2)
-    const invPrefix = `INV-${dd}${mm}${yy}-`
+    const invPrefix = `INV-${yy}${mm}${dd}-`
     const { data: lastInv } = await supabase
       .from("sales")
       .select("invoice_no")
@@ -477,9 +477,9 @@ export default function QuotationDetailPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.push(`/${locale}/quotations`)}
-            className="rounded-lg p-1.5 text-black hover:bg-gray-100"
+            className="rounded-lg border border-emerald-300 p-1.5 hover:bg-emerald-50"
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft size={20} className="text-emerald-600" />
           </button>
           <div>
             <h1 className="text-2xl font-semibold text-black">{quotation.q_no}</h1>
@@ -488,11 +488,19 @@ export default function QuotationDetailPage() {
             </p>
           </div>
         </div>
-        <span
-          className={`rounded-full px-3 py-1 text-xs font-medium ${statusStyles[quotation.status] || "bg-gray-100 text-black"}`}
-        >
-          {statusLabels[quotation.status] || quotation.status}
-        </span>
+        <div className="flex items-center gap-3">
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-medium ${statusStyles[quotation.status] || "bg-gray-100 text-black"}`}
+          >
+            {statusLabels[quotation.status] || quotation.status}
+          </span>
+          <button
+            onClick={() => router.push(`/${locale}/quotations`)}
+            className="rounded-lg border border-red-300 p-1.5 hover:bg-red-50"
+          >
+            <X size={18} className="text-red-600" />
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-4">

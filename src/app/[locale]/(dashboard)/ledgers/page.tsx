@@ -144,10 +144,13 @@ export default function FinancialLedgerPage({
     const custIds = new Set<string>()
     const supIds = new Set<string>()
     const saleIds = new Set<string>()
+    const poIds = new Set<string>()
     for (const e of entries) {
       if (e.ledger_type === "customer" && e.reference_id) custIds.add(e.reference_id)
       if (e.ledger_type === "supplier" && e.reference_id) supIds.add(e.reference_id)
-      if ((e.reference_type === "sale" || e.reference_type === "payment") && e.reference_id) saleIds.add(e.reference_id)
+      if (e.reference_id && (e.reference_type === "sale" || (e.reference_type === "payment" && (e.ledger_type === "cash" || e.ledger_type === "bank")))) {
+        saleIds.add(e.reference_id)
+      }
     }
     const fetchCodes = async () => {
       const map: Record<string, string> = {}
@@ -159,6 +162,7 @@ export default function FinancialLedgerPage({
         const { data } = await supabase.from("suppliers").select("id, code").in("id", [...supIds])
         data?.forEach((s) => { map[s.id] = s.code })
       }
+      // Resolve customer code for sale/payment entries by sale → customer join
       if (saleIds.size > 0) {
         const { data } = await supabase.from("sales").select("id, customer_id").in("id", [...saleIds])
         const custFromSales = [...new Set(data?.map((s) => s.customer_id).filter(Boolean))]
@@ -166,6 +170,22 @@ export default function FinancialLedgerPage({
           const { data: custs } = await supabase.from("customers").select("id, code").in("id", custFromSales)
           custs?.forEach((c) => {
             data?.filter((s) => s.customer_id === c.id).forEach((s) => { map[s.id] = c.code })
+          })
+        }
+        // Collect remaining IDs that are not sales (purchase orders)
+        const saleIdSet = new Set(data?.map((s) => s.id) ?? [])
+        for (const id of saleIds) {
+          if (!saleIdSet.has(id)) poIds.add(id)
+        }
+      }
+      // Resolve supplier code for purchase order entries
+      if (poIds.size > 0) {
+        const { data: pos } = await supabase.from("purchase_orders").select("id, supplier_id").in("id", [...poIds])
+        const supFromPOs = [...new Set(pos?.map((p) => p.supplier_id).filter(Boolean))]
+        if (supFromPOs.length > 0) {
+          const { data: sups } = await supabase.from("suppliers").select("id, code").in("id", supFromPOs)
+          sups?.forEach((s) => {
+            pos?.filter((p) => p.supplier_id === s.id).forEach((p) => { map[p.id] = s.code })
           })
         }
       }
@@ -287,7 +307,7 @@ export default function FinancialLedgerPage({
   }
 
   const refNo = (e: LedgerEntry) => {
-    const m = e.description?.match(/(INV-\S+|PO-\S+|GRN-\S+|RET-\S+)/)
+    const m = e.description?.match(/(INV-\S+|PO-\S+|GRN-\S+|RET-\S+|EX-\S+|IN-\S+)/)
     return m ? m[1] : "—"
   }
 
@@ -295,7 +315,7 @@ export default function FinancialLedgerPage({
     if (!e.description) return "—"
     return e.description
       .replace(/^(Sale |Payment received |Payment for |Purchase )/, "")
-      .replace(/\s+(INV-\S+|PO-\S+|GRN-\S+|RET-\S+).*$/, "")
+      .replace(/\s+(INV-\S+|PO-\S+|GRN-\S+|RET-\S+|EX-\S+|IN-\S+).*$/, "")
       .trim() || "—"
   }
 
@@ -468,19 +488,57 @@ export default function FinancialLedgerPage({
 
     // Cascade to purchases: recalculate from supplier entries
     if (e.ledger_type === "supplier") {
+      // For payment entries, also cascade to cash/bank ledger
+      if (e.reference_type === "payment" && e.description) {
+        const poMatch = e.description.match(/(PO-\S+)/)
+        if (poMatch) {
+          const { data: po } = await supabase
+            .from("purchase_orders")
+            .select("id, grand_total")
+            .eq("po_no", poMatch[1])
+            .maybeSingle()
+          const poData = po as { id: string; grand_total: number } | null
+          if (poData) {
+            // Update matching cash/bank entry for this PO
+            await supabase
+              .from("ledger_entries")
+              .update({ amount: val, description: editDescription })
+              .in("ledger_type", ["cash", "bank"])
+              .eq("reference_id", poData.id)
+              .eq("reference_type", "payment")
+
+            // Recalculate PO amount_paid from all cash/bank entries
+            const { data: allEntries } = await supabase
+              .from("ledger_entries")
+              .select("amount, entry_type")
+              .in("ledger_type", ["cash", "bank"])
+              .eq("reference_id", poData.id)
+              .eq("reference_type", "payment")
+            const totalPaid = (allEntries ?? []).reduce((sum: number, entry: { amount: number; entry_type: string }) => {
+              return entry.entry_type === "credit" ? sum + Number(entry.amount) : sum
+            }, 0)
+            const newDue = Math.max(0, poData.grand_total - totalPaid)
+            await supabase
+              .from("purchase_orders")
+              .update({ amount_paid: totalPaid, balance_due: newDue } as never)
+              .eq("id", poData.id)
+          }
+        }
+      }
+
+      // Cascade to all POs for this supplier from supplier ledger entries
       const { data: supplierEntries } = await supabase
         .from("ledger_entries")
         .select("amount, entry_type")
         .eq("ledger_type", "supplier")
         .eq("reference_id", e.reference_id)
-      const netDebit = (supplierEntries ?? []).reduce((sum: number, entry: { amount: number; entry_type: string }) => {
-        return entry.entry_type === "debit" ? sum + Number(entry.amount) : sum - Number(entry.amount)
+      const totalCredited = (supplierEntries ?? []).reduce((sum: number, entry: { amount: number; entry_type: string }) => {
+        return entry.entry_type === "credit" ? sum + Number(entry.amount) : sum
       }, 0)
       const { data: purchases } = await supabase.from("purchase_orders").select("id, grand_total").eq("supplier_id", e.reference_id)
       for (const purchase of (purchases ?? [])) {
-        const amountPaid = netDebit // total credited to supplier = what we've paid
-        const newDue = Math.max(0, Number((purchase as { grand_total: number }).grand_total) - amountPaid)
-        await supabase.from("purchase_orders").update({ amount_paid: amountPaid, balance_due: newDue } as never).eq("id", (purchase as { id: string }).id)
+        const newDue = Math.max(0, Number((purchase as { grand_total: number }).grand_total) - totalCredited)
+        await supabase.from("purchase_orders").update({ amount_paid: totalCredited, balance_due: newDue } as never).eq("id", (purchase as { id: string }).id)
       }
     }
 

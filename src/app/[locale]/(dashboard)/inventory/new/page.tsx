@@ -343,9 +343,9 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
       <PageHeader titleKey={isEdit ? "inventory.edit_product" : "inventory.add_product"}>
         <Link
           href={`/${locale}/inventory`}
-          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-black hover:bg-gray-50"
+          className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50"
         >
-          <ArrowLeft size={18} />
+          <ArrowLeft size={18} className="text-emerald-600" />
           {t("common.cancel")}
         </Link>
       </PageHeader>

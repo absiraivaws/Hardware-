@@ -322,7 +322,7 @@ export default function PurchaseOrderDetailPage({
         reference_type: "purchase",
         entry_type: "debit",
         amount: poTotal,
-        description: `PO ${po.po_no}`,
+        description: `PO ${po.po_no} (${supplierCode || po.supplier_id})`,
         balance_after: prevBalance + poTotal,
       })
       if (ledgerErr) { setError("Ledger entry failed: " + ledgerErr.message); setReceiving(false); return }
@@ -388,7 +388,7 @@ export default function PurchaseOrderDetailPage({
   }
 
   const handleRecordPayment = async () => {
-    if (!po || paymentAmount <= 0 || paymentAmount > Number(po.balance_due ?? 0)) return
+    if (!po || paymentAmount <= 0 || paymentAmount > Math.max(0, Number(po.grand_total) - Number(po.amount_paid ?? 0))) return
     setSubmittingPayment(true)
     setError(null)
     const supabase = createClient()
@@ -435,7 +435,7 @@ export default function PurchaseOrderDetailPage({
       reference_type: "payment",
       entry_type: "credit",
       amount: paymentAmount,
-      description: `Payment for ${po.po_no}`,
+      description: `Payment for ${po.po_no} (${supplierCode || po.supplier_id})`,
       balance_after: prevSupplierBalance - paymentAmount,
     })
     if (supplierLedgerErr) { setError("Supplier ledger failed: " + supplierLedgerErr.message); setSubmittingPayment(false); return }
@@ -456,7 +456,7 @@ export default function PurchaseOrderDetailPage({
       reference_type: "payment",
       entry_type: "credit",
       amount: paymentAmount,
-      description: `Payment for ${po.po_no}`,
+      description: `Payment for ${po.po_no} (${supplierCode || po.supplier_id})`,
       balance_after: prevFinBalance - paymentAmount,
     })
     if (finLedgerErr) { setError("Financial ledger failed: " + finLedgerErr.message); setSubmittingPayment(false); return }
@@ -576,9 +576,9 @@ export default function PurchaseOrderDetailPage({
         <div className="flex items-center gap-4">
           <button
             onClick={() => router.back()}
-            className="rounded-lg border p-2 hover:bg-gray-50"
+            className="rounded-lg border border-emerald-300 p-2 hover:bg-emerald-50"
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft size={18} className="text-emerald-600" />
           </button>
           <div>
             <h1 className="text-2xl font-bold text-black">{po.po_no}</h1>
@@ -648,6 +648,12 @@ export default function PurchaseOrderDetailPage({
               {editMode ? "Save Changes" : "Edit"}
             </button>
           )}
+          <button
+            onClick={() => router.push(`/${locale}/purchases`)}
+            className="rounded-lg border border-red-300 p-2 hover:bg-red-50"
+          >
+            <X size={18} className="text-red-600" />
+          </button>
         </div>
       </div>
 
@@ -661,15 +667,18 @@ export default function PurchaseOrderDetailPage({
             {supplierCode && <span className="ml-2 font-mono text-xs text-black">({supplierCode})</span>}
           </p>
         </div>
-        {Number(po.balance_due ?? 0) > 0 && po.status !== "cancelled" && (
-          <button
-            onClick={() => { setPaymentAmount(Number(po.balance_due ?? 0)); setShowPayment(true) }}
-            className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-          >
-            <DollarSign size={16} />
-            Pay {formatCurrency(po.balance_due ?? 0, locale)}
-          </button>
-        )}
+        {(() => {
+          const effBalanceDue = Math.max(0, Number(po.grand_total) - Number(po.amount_paid ?? 0))
+          return effBalanceDue > 0 && po.status !== "cancelled" ? (
+            <button
+              onClick={() => { setPaymentAmount(effBalanceDue); setShowPayment(true) }}
+              className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+            >
+              <DollarSign size={16} />
+              Pay {formatCurrency(effBalanceDue, locale)}
+            </button>
+          ) : null
+        })()}
       </div>
 
       <div className="overflow-x-auto rounded-lg border">
@@ -772,7 +781,7 @@ export default function PurchaseOrderDetailPage({
           </tbody>
           <tfoot className="bg-gray-50">
             {(() => {
-              const balanceDue = Number(po.balance_due ?? 0)
+              const balanceDue = Math.max(0, Number(po.grand_total) - Number(po.amount_paid ?? 0))
               return (
                 <>
                   <tr>
@@ -857,9 +866,14 @@ export default function PurchaseOrderDetailPage({
               </button>
             </div>
 
-            <div className="mb-4 rounded-lg bg-gray-50 p-3">
-              <p className="text-xs text-black">{t("sales.balance_due")}: <span className="font-semibold">{formatCurrency(po.balance_due ?? 0, locale)}</span></p>
-            </div>
+            {(() => {
+              const effBalanceDue = Math.max(0, Number(po.grand_total) - Number(po.amount_paid ?? 0))
+              return (
+                <div className="mb-4 rounded-lg bg-gray-50 p-3">
+                  <p className="text-xs text-black">{t("sales.balance_due")}: <span className="font-semibold">{formatCurrency(effBalanceDue, locale)}</span></p>
+                </div>
+              )
+            })()}
 
             <div className="space-y-4">
               <div>
@@ -869,10 +883,10 @@ export default function PurchaseOrderDetailPage({
                 <input
                   type="number"
                   min={0}
-                  max={po.balance_due}
+                  max={Math.max(0, Number(po.grand_total) - Number(po.amount_paid ?? 0))}
                   step="0.01"
                   value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(Math.min(Number(e.target.value), Number(po.balance_due ?? 0)))}
+                  onChange={(e) => setPaymentAmount(Math.min(Number(e.target.value), Math.max(0, Number(po.grand_total) - Number(po.amount_paid ?? 0))))}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 />
               </div>

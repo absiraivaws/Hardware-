@@ -122,16 +122,16 @@ export default function PurchasesPage({
       key: "balance_due",
       label: t("sales.balance_due"),
       render: (item: PurchaseOrder) => {
-        const bd = Number(item.balance_due)
+        const bd = Math.max(0, Number(item.grand_total) - Number(item.amount_paid ?? 0))
         if (bd <= 0) return <span className="text-black">Payment complete</span>
-        return <span className="text-black font-medium">{formatCurrency(bd, locale)}</span>
+        return <span className="text-red-600 font-medium">{formatCurrency(bd, locale)}</span>
       },
     },
     {
       key: "overdue",
       label: "Overdue",
       render: (item: PurchaseOrder) => {
-        const bd = Number(item.balance_due)
+        const bd = Math.max(0, Number(item.grand_total) - Number(item.amount_paid ?? 0))
         if (bd <= 0) return <span className="text-black">—</span>
         const dueDate = item.payment_due_date || item.expected_date
         if (!dueDate) return <span className="text-black">—</span>

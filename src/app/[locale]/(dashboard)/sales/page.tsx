@@ -157,7 +157,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       const dd = String(today.getDate()).padStart(2, "0")
       const mm = String(today.getMonth() + 1).padStart(2, "0")
       const yy = String(today.getFullYear()).slice(-2)
-      const prefix = `INV-${dd}${mm}${yy}-`
+      const prefix = `INV-${yy}${mm}${dd}-`
       const { data: lastSale } = await supabase
         .from("sales")
         .select("invoice_no")
@@ -299,7 +299,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       const dd = String(today.getDate()).padStart(2, "0")
       const mm = String(today.getMonth() + 1).padStart(2, "0")
       const yy = String(today.getFullYear()).slice(-2)
-      const invPrefix = `INV-${dd}${mm}${yy}-`
+      const invPrefix = `INV-${yy}${mm}${dd}-`
 
       const { data: lastSale } = await supabase
         .from("sales")
