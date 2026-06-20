@@ -62,10 +62,9 @@ export async function uploadToDrive(
   blob: Blob,
   existingFileId: string | null,
 ): Promise<string> {
-  const metadata = {
-    name: fileName,
-    parents: [parentId],
-  }
+  const metadata = existingFileId
+    ? { name: fileName }
+    : { name: fileName, parents: [parentId] }
 
   const form = new FormData()
   form.append(

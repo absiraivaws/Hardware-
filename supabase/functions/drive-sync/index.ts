@@ -53,7 +53,7 @@ Deno.serve(async () => {
       .select("id, name, phone")
       .order("name")
 
-    const customerBook = buildWorkbook(
+    const customerBook = await buildWorkbook(
       customers ?? [],
       (c) => c.name ?? "Unknown",
       async (id) => {
@@ -76,7 +76,7 @@ Deno.serve(async () => {
       .select("id, name, contact_person")
       .order("name")
 
-    const supplierBook = buildWorkbook(
+    const supplierBook = await buildWorkbook(
       suppliers ?? [],
       (s) => s.name ?? "Unknown",
       async (id) => {
@@ -157,12 +157,12 @@ async function buildWorkbook<T extends { id: string; name?: string | null }>(
     sheet["!cols"] = colWidths
 
     const sheetName = getName(entity).slice(0, 31)
-    XLSX.utils.book_append_sheet(workbook, sheetName, sheet)
+    XLSX.utils.book_append_sheet(workbook, sheet, sheetName)
   }
 
   if (entities.length === 0) {
     const sheet = XLSX.utils.json_to_sheet([{ Note: "No data available" }])
-    XLSX.utils.book_append_sheet(workbook, "No Data", sheet)
+    XLSX.utils.book_append_sheet(workbook, sheet, "No Data")
   }
 
   return workbook
@@ -206,7 +206,9 @@ async function uploadFile(
   existingFileId: string | null,
 ): Promise<string> {
   const boundary = "boundary123"
-  const metadata = JSON.stringify({ name: fileName, parents: [parentId] })
+  const metadata = existingFileId
+    ? JSON.stringify({ name: fileName })
+    : JSON.stringify({ name: fileName, parents: [parentId] })
   const encoder = new TextEncoder()
 
   const parts: Uint8Array[] = [

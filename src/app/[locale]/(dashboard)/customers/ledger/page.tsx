@@ -71,93 +71,9 @@ export default function CustomerLedgerPage({
     setExporting(true)
     setExportMsg(null)
     try {
-      const { data: company } = await supabase
-        .from("company_settings")
-        .select("google_drive_refresh_token, google_drive_email")
-        .limit(1)
-        .maybeSingle()
-
-      if (!company?.google_drive_refresh_token) {
-        setExportMsg("Drive not connected. Ask owner to connect in Settings.")
-        return
-      }
-
-      const { refreshAccessToken, ensureFolder, uploadToDrive, findFile } = await import("@/lib/google/drive")
-      const token = await refreshAccessToken(company.google_drive_refresh_token)
-
-      const { data: allCustomers } = await supabase
-        .from("customers")
-        .select("id, name, phone")
-        .order("name")
-
-      if (!allCustomers?.length) {
-        setExportMsg("No customers found")
-        return
-      }
-
-      const XLSX = await import("xlsx")
-      const workbook = XLSX.utils.book_new()
-
-      for (const customer of allCustomers) {
-        const { data: entries } = await supabase
-          .from("ledger_entries")
-          .select("created_at, description, entry_type, amount")
-          .eq("ledger_type", "customer")
-          .eq("reference_id", customer.id)
-          .order("created_at", { ascending: true })
-
-        const rows: Record<string, unknown>[] = []
-        let runningBalance = 0
-
-        for (const e of entries ?? []) {
-          const amt = Number(e.amount)
-          if (e.entry_type === "debit") runningBalance += amt
-          else runningBalance -= amt
-          rows.push({
-            Date: e.created_at ? new Date(e.created_at).toISOString().split("T")[0] : "",
-            Description: e.description ?? "",
-            Debit: e.entry_type === "debit" ? amt : "",
-            Credit: e.entry_type === "credit" ? amt : "",
-            "Running Balance": runningBalance,
-          })
-        }
-
-        const totalDebit = (entries ?? [])
-          .filter((e) => e.entry_type === "debit")
-          .reduce((s, e) => s + Number(e.amount), 0)
-        const totalCredit = (entries ?? [])
-          .filter((e) => e.entry_type === "credit")
-          .reduce((s, e) => s + Number(e.amount), 0)
-
-        rows.push({ Date: "", Description: "--- Summary ---", Debit: "", Credit: "", "Running Balance": "" })
-        rows.push({ Date: "", Description: "Total Debit", Debit: totalDebit, Credit: "", "Running Balance": "" })
-        rows.push({ Date: "", Description: "Total Credit", Debit: "", Credit: totalCredit, "Running Balance": "" })
-        rows.push({ Date: "", Description: "Net Balance", Debit: "", Credit: "", "Running Balance": totalDebit - totalCredit })
-
-        const sheet = XLSX.utils.json_to_sheet(rows)
-
-        const colKeys = ["Date", "Description", "Debit", "Credit", "Running Balance"]
-        const colWidths = colKeys.map((k, i) => {
-          let max = k.length
-          for (const r of rows) {
-            const val = String(r[k] ?? "")
-            if (val.length > max) max = val.length
-          }
-          return { wch: max + 3 }
-        })
-        sheet["!cols"] = colWidths
-
-        const sheetName = (customer.name ?? "Unknown").slice(0, 31)
-        XLSX.utils.book_append_sheet(workbook, sheet, sheetName)
-      }
-
-      const wbout = XLSX.write(workbook, { bookType: "xlsx", type: "array" })
-      const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
-
-      const folderId = await ensureFolder(token.access_token, "HardPro ERP")
-      const existingId = await findFile(token.access_token, "Customer_Ledgers.xlsx", folderId)
-      await uploadToDrive(token.access_token, "Customer_Ledgers.xlsx", folderId, blob, existingId)
-
+      const res = await fetch("/api/drive-sync", { method: "POST" })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
       setExportMsg("Uploaded to Google Drive successfully!")
     } catch {
       setExportMsg("Export failed. Check Drive connection.")
