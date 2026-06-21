@@ -864,16 +864,16 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       if (event.data?.event === "lankaqr_payment_complete") {
         console.log("[QR] payment_complete ref:", event.data.reference)
         setQrStatus("paid")
+        setShowQrPanel(false)
         finalizePendingSale(event.data.reference)
-      }
-      if (event.data?.event === "lankaqr_play_tts" && event.data?.audio) {
-        console.log("[QR] TTS received, len:", event.data.audio.length, "ctx state:", audioCtxRef.current?.state)
-        const ctx = audioCtxRef.current
-        async function playTts() {
-          const audioBase64 = event.data.audio
-          if (ctx && ctx.state === "running") {
-            try {
-              var binary = atob(audioBase64)
+        if (event.data?.session_id) {
+          const sid = event.data.session_id as string
+          const ctx = audioCtxRef.current
+          fetch("https://qr-checkout.qr4pos.workers.dev/tts/" + sid)
+            .then(function(r) { return r.json() })
+            .then(function(data) {
+              if (!data.audio || !ctx) return
+              var binary = atob(data.audio as string)
               var bytes = new Uint8Array(binary.length)
               for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
               ctx.decodeAudioData(bytes.buffer).then(function(buffer) {
@@ -886,43 +886,11 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                 source.start(0)
               }).catch(function(e: unknown) {
                 console.error("[QR] decode/play failed:", (e as Error).message)
-                fallbackPlay(audioBase64)
               })
-              return
-            } catch(e) {
-              console.error("[QR] AudioContext play error:", (e as Error).message)
-            }
-          }
-          if (ctx && ctx.state === "suspended") {
-            try {
-              const timeout = new Promise(function(_, reject) {
-                setTimeout(function() { reject(new Error("timeout")) }, 2000)
-              })
-              await Promise.race([ctx.resume(), timeout])
-            } catch(e) {
-              console.warn("[QR] resume failed/timed out:", e)
-            }
-          }
-          if (ctx && ctx.state === "running") {
-            playTts()
-            return
-          }
-          fallbackPlay(audioBase64)
+            }).catch(function(e) {
+              console.warn("[QR] TTS fetch failed:", e)
+            })
         }
-        async function fallbackPlay(audioBase64: string) {
-          console.log("[QR] trying new Audio fallback")
-          try {
-            var audio = new Audio("data:audio/mpeg;base64," + audioBase64)
-            audio.volume = 1
-            audio.playbackRate = 1.2
-            audio.onended = function() { setShowQrPanel(false) }
-            await audio.play()
-            console.log("[QR] Audio fallback playing...")
-          } catch(e) {
-            console.warn("[QR] Audio fallback failed:", e)
-          }
-        }
-        playTts()
       }
     }
     window.addEventListener("message", handleQrMessage)
