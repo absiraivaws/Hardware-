@@ -97,6 +97,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
   const [pendingSaleId, setPendingSaleId] = useState<string | null>(null)
   const [qrStatus, setQrStatus] = useState<"loading" | "ready" | "paid">("loading")
   const pendingSaleIdRef = useRef<string | null>(null)
+  const audioCtxRef = useRef<AudioContext | null>(null)
 
   const [completedSale, setCompletedSale] = useState<{
     invoice_no: string
@@ -561,6 +562,14 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
     const supabase = createClient()
     setSubmitting(true)
 
+    if (!audioCtxRef.current) {
+      audioCtxRef.current = new AudioContext()
+    }
+    if (audioCtxRef.current.state === "suspended") {
+      await audioCtxRef.current.resume()
+    }
+    console.log("[QR] AudioCtx state:", audioCtxRef.current?.state)
+
     try {
       const {
         data: { user },
@@ -837,7 +846,8 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       setShowApprovalPrompt(false)
       setSelectedCustomer(null)
       setCustomerSearch("")
-      setShowQrPanel(false)
+      // Keep QR panel open for TTS audio to arrive; close after timeout or when TTS plays
+      setTimeout(() => setShowQrPanel(false), 15000)
 
       invalidateCache("sales")
       invalidateCache("products")
@@ -852,16 +862,34 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
   useEffect(() => {
     function handleQrMessage(event: MessageEvent) {
       if (event.data?.event === "lankaqr_payment_complete") {
+        console.log("[QR] payment_complete ref:", event.data.reference)
         setQrStatus("paid")
         finalizePendingSale(event.data.reference)
       }
       if (event.data?.event === "lankaqr_play_tts" && event.data?.audio) {
-        try {
-          var audio = new Audio("data:audio/mpeg;base64," + event.data.audio)
-          audio.playbackRate = 1.2
-          audio.play()
-        } catch(e) {
-          console.warn("TTS playback on parent failed:", e)
+        console.log("[QR] TTS received, len:", event.data.audio.length, "ctx state:", audioCtxRef.current?.state)
+        const ctx = audioCtxRef.current
+        if (ctx && ctx.state === "running") {
+          try {
+            var binary = atob(event.data.audio)
+            var bytes = new Uint8Array(binary.length)
+            for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+            ctx.decodeAudioData(bytes.buffer).then(function(buffer) {
+              console.log("[QR] Audio decode OK, playing...")
+              var source = ctx.createBufferSource()
+              source.buffer = buffer
+              source.playbackRate.value = 1.2
+              source.connect(ctx.destination)
+              source.onended = function() { setShowQrPanel(false) }
+              source.start(0)
+            }).catch(function(e: unknown) {
+              console.error("[QR] decode/play failed:", (e as Error).message)
+            })
+          } catch(e) {
+            console.error("[QR] AudioContext play error:", (e as Error).message)
+          }
+        } else {
+          console.warn("[QR] AudioCtx not ready for playback")
         }
       }
     }
@@ -1741,7 +1769,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                     width="100%"
                     height="100%"
                     style={{ border: "none" }}
-                    allow="payment autoplay"
+                    allow="payment"
                   />
                 </div>
                 <p className="mt-2 text-xs text-gray-400 text-center">
