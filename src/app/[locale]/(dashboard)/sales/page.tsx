@@ -869,24 +869,29 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       if (event.data?.event === "lankaqr_play_tts" && event.data?.audio) {
         console.log("[QR] TTS received, len:", event.data.audio.length, "ctx state:", audioCtxRef.current?.state)
         const ctx = audioCtxRef.current
-        if (ctx && ctx.state === "running") {
-          try {
-            var binary = atob(event.data.audio)
-            var bytes = new Uint8Array(binary.length)
-            for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-            ctx.decodeAudioData(bytes.buffer).then(function(buffer) {
-              console.log("[QR] Audio decode OK, playing...")
-              var source = ctx.createBufferSource()
-              source.buffer = buffer
-              source.playbackRate.value = 1.2
-              source.connect(ctx.destination)
-              source.onended = function() { setShowQrPanel(false) }
-              source.start(0)
-            }).catch(function(e: unknown) {
-              console.error("[QR] decode/play failed:", (e as Error).message)
-            })
-          } catch(e) {
-            console.error("[QR] AudioContext play error:", (e as Error).message)
+        if (ctx) {
+          if (ctx.state === "suspended") {
+            try { ctx.resume() } catch(e) { console.warn("[QR] resume failed:", e) }
+          }
+          if (ctx.state === "running") {
+            try {
+              var binary = atob(event.data.audio)
+              var bytes = new Uint8Array(binary.length)
+              for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+              ctx.decodeAudioData(bytes.buffer).then(function(buffer) {
+                console.log("[QR] Audio decode OK, playing...")
+                var source = ctx.createBufferSource()
+                source.buffer = buffer
+                source.playbackRate.value = 1.2
+                source.connect(ctx.destination)
+                source.onended = function() { setShowQrPanel(false) }
+                source.start(0)
+              }).catch(function(e: unknown) {
+                console.error("[QR] decode/play failed:", (e as Error).message)
+              })
+            } catch(e) {
+              console.error("[QR] AudioContext play error:", (e as Error).message)
+            }
           }
         } else {
           console.warn("[QR] AudioCtx not ready for playback")
