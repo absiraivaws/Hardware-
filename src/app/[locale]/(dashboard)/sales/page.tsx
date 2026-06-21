@@ -864,18 +864,17 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       if (event.data?.event === "lankaqr_payment_complete") {
         console.log("[QR] payment_complete ref:", event.data.reference)
         setQrStatus("paid")
+        setShowQrPanel(false)
         finalizePendingSale(event.data.reference)
       }
       if (event.data?.event === "lankaqr_play_tts" && event.data?.audio) {
         console.log("[QR] TTS received, len:", event.data.audio.length, "ctx state:", audioCtxRef.current?.state)
         const ctx = audioCtxRef.current
-        if (ctx) {
-          if (ctx.state === "suspended") {
-            try { ctx.resume() } catch(e) { console.warn("[QR] resume failed:", e) }
-          }
-          if (ctx.state === "running") {
+        async function playTts() {
+          const audioBase64 = event.data.audio
+          if (ctx && ctx.state === "running") {
             try {
-              var binary = atob(event.data.audio)
+              var binary = atob(audioBase64)
               var bytes = new Uint8Array(binary.length)
               for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
               ctx.decodeAudioData(bytes.buffer).then(function(buffer) {
@@ -888,14 +887,43 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                 source.start(0)
               }).catch(function(e: unknown) {
                 console.error("[QR] decode/play failed:", (e as Error).message)
+                fallbackPlay(audioBase64)
               })
+              return
             } catch(e) {
               console.error("[QR] AudioContext play error:", (e as Error).message)
             }
           }
-        } else {
-          console.warn("[QR] AudioCtx not ready for playback")
+          if (ctx && ctx.state === "suspended") {
+            try {
+              const timeout = new Promise(function(_, reject) {
+                setTimeout(function() { reject(new Error("timeout")) }, 2000)
+              })
+              await Promise.race([ctx.resume(), timeout])
+              if (ctx.state === "running") {
+                playTts()
+                return
+              }
+            } catch(e) {
+              console.warn("[QR] resume failed/timed out:", e)
+            }
+          }
+          fallbackPlay(audioBase64)
         }
+        async function fallbackPlay(audioBase64: string) {
+          console.log("[QR] trying new Audio fallback")
+          try {
+            var audio = new Audio("data:audio/mpeg;base64," + audioBase64)
+            audio.volume = 1
+            audio.playbackRate = 1.2
+            audio.onended = function() { setShowQrPanel(false) }
+            await audio.play()
+            console.log("[QR] Audio fallback playing...")
+          } catch(e) {
+            console.warn("[QR] Audio fallback failed:", e)
+          }
+        }
+        playTts()
       }
     }
     window.addEventListener("message", handleQrMessage)
@@ -1769,12 +1797,12 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                 <div
                   style={{ width: "100%", height: 500, borderRadius: 12, overflow: "hidden", border: "1px solid #e5e7eb" }}
                 >
-                  <iframe
+                   <iframe
                     src={qrCheckoutUrl}
                     width="100%"
                     height="100%"
                     style={{ border: "none" }}
-                    allow="payment"
+                    allow="payment; autoplay"
                   />
                 </div>
                 <p className="mt-2 text-xs text-gray-400 text-center">
