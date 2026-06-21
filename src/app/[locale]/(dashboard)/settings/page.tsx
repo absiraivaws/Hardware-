@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl"
 import { use, useEffect, useState } from "react"
 import { PageHeader } from "@/components/shared/page-header"
 import { createClient } from "@/lib/supabase/client"
-import { Globe, Bell, Shield, Database as DatabaseIcon, Building2, Share2, MessageCircle, Smartphone, FileText, Upload, X } from "lucide-react"
+import { Globe, Bell, Shield, Database as DatabaseIcon, Building2, Share2, MessageCircle, Smartphone, FileText, Upload, X, QrCode } from "lucide-react"
 import { useData } from "@/providers/data-provider"
 
 const sections = [
@@ -71,6 +71,14 @@ export default function SettingsPage({
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [quotationValidDays, setQuotationValidDays] = useState(7)
+  const [lankaQrMerchantId, setLankaQrMerchantId] = useState("")
+  const [lankaQrTerminalId, setLankaQrTerminalId] = useState("")
+  const [lankaQrMcc, setLankaQrMcc] = useState("")
+  const [lankaQrBankCode, setLankaQrBankCode] = useState("")
+  const [lankaQrMerchantName, setLankaQrMerchantName] = useState("")
+  const [lankaQrMerchantCity, setLankaQrMerchantCity] = useState("")
+  const [lankaQrCurrencyCode, setLankaQrCurrencyCode] = useState("144")
+  const [lankaQrCountryCode, setLankaQrCountryCode] = useState("LK")
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
@@ -92,6 +100,14 @@ export default function SettingsPage({
       setYoutubeLink(contextCompany.youtube_link)
       setLogoUrl(contextCompany.logo_url)
       setQuotationValidDays(contextCompany.quotation_valid_days ?? 7)
+      setLankaQrMerchantId(contextCompany.lanka_qr_merchant_id ?? "")
+      setLankaQrTerminalId(contextCompany.lanka_qr_terminal_id ?? "")
+      setLankaQrMcc(contextCompany.lanka_qr_mcc ?? "")
+      setLankaQrBankCode(contextCompany.lanka_qr_bank_code ?? "")
+      setLankaQrMerchantName(contextCompany.lanka_qr_merchant_name ?? "")
+      setLankaQrMerchantCity(contextCompany.lanka_qr_merchant_city ?? "")
+      setLankaQrCurrencyCode(contextCompany.lanka_qr_currency_code ?? "144")
+      setLankaQrCountryCode(contextCompany.lanka_qr_country_code ?? "LK")
     }
   }, [contextCompany])
 
@@ -146,6 +162,14 @@ export default function SettingsPage({
       tiktok_link: tiktokLink,
       youtube_link: youtubeLink,
       quotation_valid_days: quotationValidDays,
+      lanka_qr_merchant_id: lankaQrMerchantId,
+      lanka_qr_terminal_id: lankaQrTerminalId,
+      lanka_qr_mcc: lankaQrMcc,
+      lanka_qr_bank_code: lankaQrBankCode,
+      lanka_qr_merchant_name: lankaQrMerchantName,
+      lanka_qr_merchant_city: lankaQrMerchantCity,
+      lanka_qr_currency_code: lankaQrCurrencyCode,
+      lanka_qr_country_code: lankaQrCountryCode,
     }
 
     if (contextCompany?.id) {
@@ -440,6 +464,98 @@ export default function SettingsPage({
                   value={smsApiSecret}
                   onChange={(e) => setSmsApiSecret(e.target.value)}
                   placeholder="API secret from provider"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Lanka QR */}
+        <div className="rounded-lg border bg-white">
+          <div className="flex items-center gap-3 border-b px-6 py-4">
+            <QrCode className="h-5 w-5 text-emerald-600" />
+            <h2 className="text-base font-semibold text-black">Lanka QR</h2>
+          </div>
+          <div className="px-6 py-4">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">Merchant ID</label>
+                <input
+                  type="text"
+                  value={lankaQrMerchantId}
+                  onChange={(e) => setLankaQrMerchantId(e.target.value)}
+                  placeholder="Assigned by acquirer"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">Terminal ID</label>
+                <input
+                  type="text"
+                  value={lankaQrTerminalId}
+                  onChange={(e) => setLankaQrTerminalId(e.target.value)}
+                  placeholder="e.g. 0001"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">MCC</label>
+                <input
+                  type="text"
+                  value={lankaQrMcc}
+                  onChange={(e) => setLankaQrMcc(e.target.value)}
+                  placeholder="e.g. 5999"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">Bank Code</label>
+                <input
+                  type="text"
+                  value={lankaQrBankCode}
+                  onChange={(e) => setLankaQrBankCode(e.target.value)}
+                  placeholder="e.g. 16135"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">Merchant Name</label>
+                <input
+                  type="text"
+                  value={lankaQrMerchantName}
+                  onChange={(e) => setLankaQrMerchantName(e.target.value)}
+                  placeholder="Displayed on QR"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">Merchant City</label>
+                <input
+                  type="text"
+                  value={lankaQrMerchantCity}
+                  onChange={(e) => setLankaQrMerchantCity(e.target.value)}
+                  placeholder="e.g. COLOMBO"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">Currency Code</label>
+                <input
+                  type="text"
+                  value={lankaQrCurrencyCode}
+                  onChange={(e) => setLankaQrCurrencyCode(e.target.value)}
+                  placeholder="144 (LKR)"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">Country Code</label>
+                <input
+                  type="text"
+                  value={lankaQrCountryCode}
+                  onChange={(e) => setLankaQrCountryCode(e.target.value)}
+                  placeholder="LK"
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
                 />
               </div>

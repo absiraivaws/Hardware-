@@ -795,6 +795,14 @@ export interface Database {
           cash_opening_balance: number
           bank_opening_balance: number
           quotation_valid_days: number
+          lanka_qr_merchant_id: string
+          lanka_qr_terminal_id: string
+          lanka_qr_mcc: string
+          lanka_qr_bank_code: string
+          lanka_qr_merchant_name: string
+          lanka_qr_merchant_city: string
+          lanka_qr_currency_code: string
+          lanka_qr_country_code: string
           updated_at: string
         }
         Insert: {
@@ -818,6 +826,14 @@ export interface Database {
           cash_opening_balance?: number
           bank_opening_balance?: number
           quotation_valid_days?: number
+          lanka_qr_merchant_id?: string
+          lanka_qr_terminal_id?: string
+          lanka_qr_mcc?: string
+          lanka_qr_bank_code?: string
+          lanka_qr_merchant_name?: string
+          lanka_qr_merchant_city?: string
+          lanka_qr_currency_code?: string
+          lanka_qr_country_code?: string
           updated_at?: string
         }
         Update: {
@@ -841,6 +857,14 @@ export interface Database {
           cash_opening_balance?: number
           bank_opening_balance?: number
           quotation_valid_days?: number
+          lanka_qr_merchant_id?: string
+          lanka_qr_terminal_id?: string
+          lanka_qr_mcc?: string
+          lanka_qr_bank_code?: string
+          lanka_qr_merchant_name?: string
+          lanka_qr_merchant_city?: string
+          lanka_qr_currency_code?: string
+          lanka_qr_country_code?: string
           updated_at?: string
         }
       }

@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl"
 import { createClient } from "@/lib/supabase/client"
 import { usePOSStore } from "@/stores/pos-store"
 import { formatCurrency } from "@/lib/format"
-import { Search, Trash2, ShoppingCart, User, Smartphone, ArrowUpDown, ArrowUp, ArrowDown, Plus, X } from "lucide-react"
+import { Search, Trash2, ShoppingCart, User, Smartphone, ArrowUpDown, ArrowUp, ArrowDown, Plus, X, QrCode, Loader2 } from "lucide-react"
 import { use, useEffect, useMemo, useState, useRef, useCallback } from "react"
 import type { Database } from "@/types/database"
 import { CompanyFooter } from "@/components/shared/company-info"
@@ -86,6 +86,15 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
   const [toAccount, setToAccount] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const { companySettings } = useData()
+
+  // Lanka QR checkout state
+  const [showQrPanel, setShowQrPanel] = useState(false)
+  const [qrCheckoutUrl, setQrCheckoutUrl] = useState("")
+  const [qrReference, setQrReference] = useState("")
+  const [pendingSaleId, setPendingSaleId] = useState<string | null>(null)
+  const [qrStatus, setQrStatus] = useState<"loading" | "ready" | "paid">("loading")
+  const pendingSaleIdRef = useRef<string | null>(null)
+
   const [completedSale, setCompletedSale] = useState<{
     invoice_no: string
     grand_total: number
@@ -294,6 +303,12 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
 
   const handleCompleteSale = async () => {
     if (cart.length === 0) return
+
+    if (paymentType === "lanka_qr") {
+      await handleLankaQrCheckout()
+      return
+    }
+
     const supabase = createClient()
     setSubmitting(true)
 
@@ -514,6 +529,318 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       setSubmitting(false)
     }
   }
+
+  const handleLankaQrCheckout = async () => {
+    const supabase = createClient()
+    setSubmitting(true)
+
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) throw new Error("Not authenticated")
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("branch_id")
+        .eq("id", user.id)
+        .single()
+      const profileData = profile as ProfileRow | null
+
+      const today = new Date()
+      const dd = String(today.getDate()).padStart(2, "0")
+      const mm = String(today.getMonth() + 1).padStart(2, "0")
+      const yy = String(today.getFullYear()).slice(-2)
+      const invPrefix = `INV-${yy}${mm}${dd}-`
+
+      const { data: lastSale } = await supabase
+        .from("sales")
+        .select("invoice_no")
+        .like("invoice_no", `${invPrefix}%`)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      let seq = 1
+      if (lastSale) {
+        const parts = (lastSale as SaleRow).invoice_no.split("-")
+        seq = parseInt(parts[parts.length - 1], 10) + 1
+      }
+      const invoiceNo = `${invPrefix}${String(seq).padStart(5, "0")}`
+
+      const customerId = selectedCustomer?.id || null
+      const customerName = selectedCustomer?.name || "Walk-in Customer"
+
+      // Auto-set amount_paid to grand_total for QR payments
+      const qrAmountPaid = ap > 0 ? ap : netAmount
+      const qrBalanceDue = Math.max(0, netAmount - qrAmountPaid)
+
+      const baseUrl = process.env.NEXT_PUBLIC_QR_CHECKOUT_URL || "http://localhost:8791"
+
+      const res = await fetch("/api/qr-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: netAmount.toFixed(2),
+          reference_number: invoiceNo,
+          language: locale,
+          merchant_id: companySettings?.lanka_qr_merchant_id || "",
+          terminal_id: companySettings?.lanka_qr_terminal_id || "",
+          mcc: companySettings?.lanka_qr_mcc || "",
+          bank_code: companySettings?.lanka_qr_bank_code || "",
+          merchant_name: companySettings?.lanka_qr_merchant_name || "",
+          merchant_city: companySettings?.lanka_qr_merchant_city || "",
+          currency_code: companySettings?.lanka_qr_currency_code || "144",
+          country_code: companySettings?.lanka_qr_country_code || "LK",
+        }),
+      })
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}))
+        throw new Error((errBody as { error?: string }).error || "QR checkout failed")
+      }
+
+      const data = (await res.json()) as { checkout_url: string; reference_number: string }
+      const checkoutFullUrl = `${baseUrl}${data.checkout_url}`
+
+      // Insert sale as pending
+      const { data: sale, error: saleError } = await supabase
+        .from("sales")
+        .insert({
+          invoice_no: invoiceNo,
+          customer_id: customerId,
+          customer_name: customerName,
+          branch_id: profileData?.branch_id || null,
+          user_id: user.id,
+          subtotal,
+          discount: d,
+          labour_charge: lc,
+          transport_charge: tc,
+          tax_type: taxType,
+          tax_amount: taxAmount,
+          grand_total: netAmount,
+          payment_type: "lanka_qr",
+          amount_paid: qrAmountPaid,
+          balance_due: qrBalanceDue,
+          status: "pending",
+          payment_details: { qr_reference: data.reference_number },
+        } as never)
+        .select()
+        .single()
+
+      if (saleError) throw saleError
+      const saleData = sale as SaleRow
+
+      // Insert sale items immediately
+      const saleItems = cart.map((item) => ({
+        sale_id: saleData.id,
+        product_id: item.product_id,
+        product_name: item.product_name,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        total_price: item.total_price,
+      }))
+      const { error: itemsError } = await supabase.from("sale_items").insert(saleItems as never)
+      if (itemsError) throw itemsError
+
+      // Show QR panel
+      pendingSaleIdRef.current = saleData.id
+      setPendingSaleId(saleData.id)
+      setQrCheckoutUrl(checkoutFullUrl)
+      setQrReference(data.reference_number)
+      setQrStatus("ready")
+      setShowQrPanel(true)
+    } catch (err) {
+      console.error("Lanka QR error:", err)
+      alert("Failed to initiate QR checkout. Please try again.")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const finalizePendingSale = async (reference: string) => {
+    const saleId = pendingSaleIdRef.current
+    if (!saleId) {
+      console.error("No pending sale to finalize")
+      return
+    }
+
+    const supabase = createClient()
+
+    try {
+      // Fetch the pending sale data
+      const { data: sale } = await supabase
+        .from("sales")
+        .select("*, sale_items(*)")
+        .eq("id", saleId)
+        .single()
+
+      if (!sale) throw new Error("Sale not found")
+
+      const saleData = sale as SaleRow & {
+        invoice_no: string
+        grand_total: number
+        amount_paid: number
+        balance_due: number
+        customer_id: string | null
+        customer_name: string
+        branch_id: string | null
+        user_id: string
+        subtotal: number
+        discount: number
+        labour_charge: number
+        transport_charge: number
+        tax_type: string
+        tax_amount: number
+        payment_type: string
+        sale_items: { product_id: string; quantity: number; product_name: string; unit_price: number; total_price: number }[]
+      }
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) throw new Error("Not authenticated")
+
+      // Update sale status to completed
+      await supabase
+        .from("sales")
+        .update({ status: "completed" } as never)
+        .eq("id", saleId)
+
+      // Deduct stock
+      const productIds = saleData.sale_items.map((i: { product_id: string }) => i.product_id)
+      const { data: products } = await supabase
+        .from("products")
+        .select("id, current_stock")
+        .in("id", productIds)
+      if (products) {
+        for (const p of products) {
+          const qty = saleData.sale_items.find((i: { product_id: string }) => i.product_id === p.id)?.quantity || 0
+          await supabase.from("products").update({ current_stock: Number(p.current_stock) - qty } as never).eq("id", p.id)
+        }
+      }
+
+      // Branch stock updates
+      if (saleData.branch_id) {
+        const { data: branchStocks } = await supabase
+          .from("branch_stock")
+          .select("product_id, current_stock")
+          .in("product_id", productIds)
+          .eq("branch_id", saleData.branch_id)
+        if (branchStocks) {
+          for (const bs of branchStocks) {
+            const qty = saleData.sale_items.find((i: { product_id: string }) => i.product_id === bs.product_id)?.quantity || 0
+            await supabase.from("branch_stock").update({ current_stock: Number(bs.current_stock) - qty }).eq("product_id", bs.product_id).eq("branch_id", saleData.branch_id)
+          }
+        }
+      }
+
+      // Stock movements
+      const movements = saleData.sale_items.map((item: { product_id: string; quantity: number; product_name: string }) => ({
+        product_id: item.product_id,
+        type: "out" as const,
+        quantity: item.quantity,
+        reference_type: "sale" as const,
+        reference_id: saleId,
+        notes: `${saleData.customer_name || "Walk-in Customer"} - ${saleData.invoice_no}`,
+        branch_id: saleData.branch_id || null,
+        user_id: user.id,
+      }))
+      await supabase.from("stock_movements").insert(movements as never)
+
+      // Customer credit update
+      if (saleData.customer_id && saleData.balance_due > 0) {
+        const { data: cust } = await supabase
+          .from("customers")
+          .select("credit_balance")
+          .eq("id", saleData.customer_id)
+          .single()
+        if (cust) {
+          await supabase
+            .from("customers")
+            .update({ credit_balance: (cust as CustomerCreditRow).credit_balance + saleData.balance_due } as never)
+            .eq("id", saleData.customer_id)
+        }
+      }
+
+      // Ledger entry
+      if (saleData.amount_paid > 0) {
+        const { data: lastEntry } = await supabase
+          .from("ledger_entries")
+          .select("balance_after")
+          .eq("ledger_type", "bank")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        const prevBalance = (lastEntry as { balance_after: number } | null)?.balance_after ?? 0
+        await supabase.from("ledger_entries").insert({
+          ledger_type: "bank",
+          reference_id: saleId,
+          reference_type: "payment",
+          entry_type: "debit",
+          amount: saleData.amount_paid,
+          description: `Sale ${saleData.invoice_no} (Lanka QR: ${reference})`,
+          balance_after: prevBalance + saleData.amount_paid,
+        } as never)
+      }
+
+      // Show receipt
+      const receiptItems = saleData.sale_items.map((i: { product_name: string; quantity: number; unit_price: number; total_price: number }) => ({
+        product_name: i.product_name,
+        quantity: i.quantity,
+        unit_price: i.unit_price,
+        total_price: i.total_price,
+      }))
+      setCompletedSale({
+        invoice_no: saleData.invoice_no,
+        grand_total: saleData.grand_total,
+        amount_paid: saleData.amount_paid,
+        balance_due: saleData.balance_due,
+        items: receiptItems,
+      })
+
+      clearCart()
+      setDiscount("")
+      setLabourCharge("")
+      setTransportCharge("")
+      setTaxType("non_vat")
+      setPaymentType("cash")
+      setAmountPaid("")
+      setApprovalPin("")
+      setShowApprovalPrompt(false)
+      setSelectedCustomer(null)
+      setCustomerSearch("")
+      setShowQrPanel(false)
+
+      invalidateCache("sales")
+      invalidateCache("products")
+      invalidateCache("customers")
+    } catch (err) {
+      console.error("Finalize sale error:", err)
+      alert("Payment was received but failed to finalize the sale. Please check pending sales.")
+    }
+  }
+
+  // Listen for Lanka QR payment completion from iframe
+  useEffect(() => {
+    function handleQrMessage(event: MessageEvent) {
+      if (event.data?.event === "lankaqr_payment_complete") {
+        setQrStatus("paid")
+        finalizePendingSale(event.data.reference)
+      }
+      if (event.data?.event === "lankaqr_play_tts" && event.data?.audio) {
+        try {
+          var audio = new Audio("data:audio/mpeg;base64," + event.data.audio)
+          audio.playbackRate = 1.2
+          audio.play()
+        } catch(e) {
+          console.warn("TTS playback on parent failed:", e)
+        }
+      }
+    }
+    window.addEventListener("message", handleQrMessage)
+    return () => window.removeEventListener("message", handleQrMessage)
+  }, [])
 
   const handleCreateNewCustomer = async () => {
     if (!newCustomerName.trim()) return
@@ -1329,6 +1656,65 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
           .no-print, .no-print * { display: none !important; }
         }
       `}</style>
+
+      {/* ===== Lanka QR Panel ===== */}
+      {showQrPanel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <QrCode className="h-5 w-5 text-emerald-600" />
+                <h3 className="text-lg font-semibold text-black">
+                  {qrStatus === "paid" ? "Payment Received" : "Lanka QR Payment"}
+                </h3>
+              </div>
+              {qrStatus !== "paid" && (
+                <button
+                  onClick={() => {
+                    setShowQrPanel(false)
+                    setPendingSaleId(null)
+                    pendingSaleIdRef.current = null
+                  }}
+                  className="rounded p-1 text-sm text-gray-500 hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+
+            {qrStatus === "ready" && (
+              <>
+                <p className="mb-3 text-sm text-gray-600">
+                  Ask the customer to scan the QR code with their banking app.
+                </p>
+                <div
+                  style={{ width: "100%", height: 500, borderRadius: 12, overflow: "hidden", border: "1px solid #e5e7eb" }}
+                >
+                  <iframe
+                    src={qrCheckoutUrl}
+                    width="100%"
+                    height="100%"
+                    style={{ border: "none" }}
+                    allow="payment autoplay"
+                  />
+                </div>
+                <p className="mt-2 text-xs text-gray-400 text-center">
+                  Ref: {qrReference}
+                </p>
+              </>
+            )}
+
+            {qrStatus === "paid" && (
+              <div className="flex flex-col items-center gap-3 py-8">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
+                  <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+                </div>
+                <p className="text-sm text-gray-600">Finalizing sale...</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ===== New Customer Modal ===== */}
       {showNewCustomerForm && (
