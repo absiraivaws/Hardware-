@@ -14,10 +14,14 @@ export interface Database {
           id: string
           email: string
           full_name: string | null
-          role: "owner" | "branch_manager" | "cashier" | "store_keeper" | "accountant" | "sales_executive"
+          role: "super_admin" | "owner" | "branch_manager" | "cashier" | "store_keeper" | "accountant" | "sales_executive"
           branch_id: string | null
           phone: string | null
           avatar_url: string | null
+          staff_code: string
+          status: "active" | "inactive" | "suspended" | "pending"
+          date_of_birth: string | null
+          last_login: string | null
           created_at: string
           updated_at: string
         }
@@ -25,10 +29,14 @@ export interface Database {
           id: string
           email: string
           full_name?: string | null
-          role?: "owner" | "branch_manager" | "cashier" | "store_keeper" | "accountant" | "sales_executive"
+          role?: "super_admin" | "owner" | "branch_manager" | "cashier" | "store_keeper" | "accountant" | "sales_executive"
           branch_id?: string | null
           phone?: string | null
           avatar_url?: string | null
+          staff_code?: string
+          status?: "active" | "inactive" | "suspended" | "pending"
+          date_of_birth?: string | null
+          last_login?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -36,10 +44,14 @@ export interface Database {
           id?: string
           email?: string
           full_name?: string | null
-          role?: "owner" | "branch_manager" | "cashier" | "store_keeper" | "accountant" | "sales_executive"
+          role?: "super_admin" | "owner" | "branch_manager" | "cashier" | "store_keeper" | "accountant" | "sales_executive"
           branch_id?: string | null
           phone?: string | null
           avatar_url?: string | null
+          staff_code?: string
+          status?: "active" | "inactive" | "suspended" | "pending"
+          date_of_birth?: string | null
+          last_login?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -795,6 +807,7 @@ export interface Database {
           cash_opening_balance: number
           bank_opening_balance: number
           quotation_valid_days: number
+          max_discount_percent: number
           updated_at: string
         }
         Insert: {
@@ -818,6 +831,7 @@ export interface Database {
           cash_opening_balance?: number
           bank_opening_balance?: number
           quotation_valid_days?: number
+          max_discount_percent?: number
           updated_at?: string
         }
         Update: {
@@ -841,6 +855,7 @@ export interface Database {
           cash_opening_balance?: number
           bank_opening_balance?: number
           quotation_valid_days?: number
+          max_discount_percent?: number
           updated_at?: string
         }
       }
@@ -1149,9 +1164,109 @@ export interface Database {
           created_at?: string
         }
       }
+      permissions: {
+        Row: {
+          id: string
+          module: string
+          action: string
+          label: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          module: string
+          action: string
+          label: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          module?: string
+          action?: string
+          label?: string
+          created_at?: string
+        }
+      }
+      role_permissions: {
+        Row: {
+          id: string
+          role: "super_admin" | "owner" | "branch_manager" | "cashier" | "store_keeper" | "accountant" | "sales_executive"
+          permission_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          role: "super_admin" | "owner" | "branch_manager" | "cashier" | "store_keeper" | "accountant" | "sales_executive"
+          permission_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          role?: "super_admin" | "owner" | "branch_manager" | "cashier" | "store_keeper" | "accountant" | "sales_executive"
+          permission_id?: string
+          created_at?: string
+        }
+      }
+      audit_log: {
+        Row: {
+          id: string
+          user_id: string
+          action: string
+          entity_type: string
+          entity_id: string | null
+          metadata: Json | null
+          ip_address: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          action: string
+          entity_type: string
+          entity_id?: string | null
+          metadata?: Json | null
+          ip_address?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          action?: string
+          entity_type?: string
+          entity_id?: string | null
+          metadata?: Json | null
+          ip_address?: string | null
+          created_at?: string
+        }
+      }
+      role_sidebar_items: {
+        Row: {
+          id: string
+          role: "super_admin" | "owner" | "branch_manager" | "cashier" | "store_keeper" | "accountant" | "sales_executive"
+          module: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          role: "super_admin" | "owner" | "branch_manager" | "cashier" | "store_keeper" | "accountant" | "sales_executive"
+          module: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          role?: "super_admin" | "owner" | "branch_manager" | "cashier" | "store_keeper" | "accountant" | "sales_executive"
+          module?: string
+          created_at?: string
+        }
+      }
     }
     Views: Record<string, never>
-    Functions: Record<string, never>
+    Functions: {
+      get_role_sidebar_modules: {
+        Args: { p_role: "super_admin" | "owner" | "branch_manager" | "cashier" | "store_keeper" | "accountant" | "sales_executive" }
+        Returns: string[]
+      }
+    }
     Enums: Record<string, never>
   }
 }

@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl"
 import { createClient } from "@/lib/supabase/client"
 import { usePOSStore } from "@/stores/pos-store"
 import { formatCurrency } from "@/lib/format"
-import { Search, Trash2, ShoppingCart, User, Smartphone, ArrowUpDown, ArrowUp, ArrowDown, Plus, X } from "lucide-react"
+import { Search, Trash2, ShoppingCart, User, Smartphone, ArrowUpDown, ArrowUp, ArrowDown, Plus, X, ShieldAlert } from "lucide-react"
 import { use, useEffect, useMemo, useState, useRef, useCallback } from "react"
 import type { Database } from "@/types/database"
 import { CompanyFooter } from "@/components/shared/company-info"
@@ -12,6 +12,8 @@ import type { CompanySettings } from "@/components/shared/company-info"
 import { getCached, setCache, invalidateCache } from "@/lib/query-cache"
 import { generateNextCode } from "@/lib/code-gen"
 import { useData } from "@/providers/data-provider"
+import { useAuth } from "@/providers/auth-provider"
+import { logAudit } from "@/lib/audit"
 
 type Product = Database["public"]["Tables"]["products"]["Row"]
 type PaymentType = Database["public"]["Tables"]["sales"]["Row"]["payment_type"]
@@ -46,6 +48,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
   const { locale } = use(params)
   const t = useTranslations()
   const { cart, addToCart, removeFromCart, updateQuantity, clearCart } = usePOSStore()
+  const { hasPermission, profile } = useAuth()
 
   const [products, setProducts] = useState<Product[]>([])
   const [customers, setCustomers] = useState<CustomerOption[]>([])
@@ -283,6 +286,23 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
   const changeDue = ap > netAmount ? ap - netAmount : 0
   const balanceDue = Math.max(0, netAmount - ap)
 
+  const maxDiscountPercent = useMemo(() => {
+    const roleMax = hasPermission("pos", "discount_up_to_25") ? 25
+      : hasPermission("pos", "discount_up_to_10") ? 10
+      : 0
+    if (roleMax === 0) return 0
+    const companyMax = companySettings?.max_discount_percent ?? 25
+    return Math.min(roleMax, companyMax)
+  }, [hasPermission, companySettings])
+
+  const maxDiscount = (taxableAmount * maxDiscountPercent) / 100
+  const hasCreditPermission = hasPermission("pos", "approve_credit")
+
+  const allowedPaymentTypes = useMemo(
+    () => PAYMENT_TYPES.filter((pt) => (pt === "credit" ? hasCreditPermission : true)),
+    [hasCreditPermission],
+  )
+
   const isCreditOverLimit = useMemo(() => {
     if (paymentType !== "credit" || !selectedCustomer) return false
     const cust = customers.find((c) => c.id === selectedCustomer.id)
@@ -503,6 +523,13 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       }
 
       setCompletedSale(completedSaleData)
+
+      logAudit({
+        action: "create_sale",
+        entity_type: "sale",
+        entity_id: saleData.id,
+        metadata: { invoice_no: invoiceNo, grand_total: netAmount, amount_paid: ap, balance_due: balanceDue },
+      })
 
       invalidateCache("sales")
       invalidateCache("products")
@@ -891,21 +918,40 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                 <span className="text-black">{formatCurrency(grandTotal, locale)}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-black">{t("common.discount")}</span>
+                <span className="flex items-center gap-1 text-black">
+                  {t("common.discount")}
+                  {maxDiscountPercent > 0 && (
+                    <span className="text-xs text-black/50">(max {maxDiscountPercent}%)</span>
+                  )}
+                  {maxDiscountPercent === 0 && (
+                    <ShieldAlert size={12} className="text-amber-500" />
+                  )}
+                </span>
                 <input
                   ref={discountRef}
                   type="number"
                   min={0}
+                  max={maxDiscount}
                   value={discount}
-                  onChange={(e) => setDiscount(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    if (maxDiscountPercent === 0) { setDiscount("0"); return }
+                    if (Number(val) > maxDiscount) { setDiscount(String(maxDiscount)); return }
+                    setDiscount(val)
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === "Tab") {
                       e.preventDefault()
                       amountPaidRef.current?.focus()
                     }
                   }}
-                  className="w-28 rounded border border-gray-300 px-2 py-1 text-right text-sm text-black focus:border-emerald-500 focus:outline-none"
+                  className={`w-28 rounded border px-2 py-1 text-right text-sm text-black focus:outline-none ${
+                    maxDiscountPercent === 0
+                      ? "border-gray-200 bg-gray-100 text-black/50 cursor-not-allowed"
+                      : "border-gray-300 focus:border-emerald-500"
+                  }`}
                   autoComplete="off"
+                  disabled={maxDiscountPercent === 0}
                 />
               </div>
               <div className="flex items-center justify-between border-t pt-2 text-base font-bold">

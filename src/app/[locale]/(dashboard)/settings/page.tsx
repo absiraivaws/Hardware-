@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl"
 import { use, useEffect, useState } from "react"
 import { PageHeader } from "@/components/shared/page-header"
 import { createClient } from "@/lib/supabase/client"
-import { Globe, Bell, Shield, Database as DatabaseIcon, Building2, Share2, MessageCircle, Smartphone, FileText, Upload, X } from "lucide-react"
+import { Globe, Bell, Shield, Database as DatabaseIcon, Building2, Share2, MessageCircle, Smartphone, FileText, Upload, X, ShoppingCart } from "lucide-react"
 import { useData } from "@/providers/data-provider"
 
 const sections = [
@@ -71,6 +71,7 @@ export default function SettingsPage({
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [quotationValidDays, setQuotationValidDays] = useState(7)
+  const [maxDiscountPercent, setMaxDiscountPercent] = useState(25)
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
@@ -92,6 +93,7 @@ export default function SettingsPage({
       setYoutubeLink(contextCompany.youtube_link)
       setLogoUrl(contextCompany.logo_url)
       setQuotationValidDays(contextCompany.quotation_valid_days ?? 7)
+      setMaxDiscountPercent(contextCompany.max_discount_percent ?? 25)
     }
   }, [contextCompany])
 
@@ -146,6 +148,7 @@ export default function SettingsPage({
       tiktok_link: tiktokLink,
       youtube_link: youtubeLink,
       quotation_valid_days: quotationValidDays,
+      max_discount_percent: maxDiscountPercent,
     }
 
     if (contextCompany?.id) {
@@ -356,6 +359,30 @@ export default function SettingsPage({
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
                 />
                 <p className="mt-1 text-xs text-black">Auto-calculates valid until date in new quotations</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* POS Settings */}
+        <div className="rounded-lg border bg-white">
+          <div className="flex items-center gap-3 border-b px-6 py-4">
+            <ShoppingCart className="h-5 w-5 text-emerald-600" />
+            <h2 className="text-base font-semibold text-black">POS</h2>
+          </div>
+          <div className="px-6 py-4">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">Max Discount %</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={maxDiscountPercent}
+                  onChange={(e) => setMaxDiscountPercent(Number(e.target.value))}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+                <p className="mt-1 text-xs text-black">Global maximum discount percentage allowed in POS</p>
               </div>
             </div>
           </div>

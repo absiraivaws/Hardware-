@@ -9,6 +9,7 @@ import { Plus, Trash2, Search, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from "
 import { useEffect, useMemo, useState } from "react"
 import { formatCurrency } from "@/lib/format"
 import { createClient } from "@/lib/supabase/client"
+import { logAudit } from "@/lib/audit"
 
 interface Supplier {
   id: string
@@ -271,6 +272,13 @@ export default function NewPurchaseOrderPage({
       setSaving(false)
       return
     }
+
+    logAudit({
+      action: "create_purchase",
+      entity_type: "purchase_order",
+      entity_id: po.id,
+      metadata: { po_no: poNo, supplier: supplier?.name, grand_total: subtotal },
+    })
 
     setSaving(false)
     router.push(`/${locale}/purchases`)

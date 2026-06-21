@@ -7,11 +7,13 @@ import { PageHeader } from "@/components/shared/page-header"
 import { formatCurrency, formatDate } from "@/lib/format"
 import { use, useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { Banknote, DollarSign, Eye, X } from "lucide-react"
+import { Banknote, DollarSign, Eye, X, Ban } from "lucide-react"
 import { CompanyFooter } from "@/components/shared/company-info"
 import type { CompanySettings } from "@/components/shared/company-info"
 import { getCached, setCache, invalidateCache } from "@/lib/query-cache"
 import { useData } from "@/providers/data-provider"
+import { useAuth } from "@/providers/auth-provider"
+import { logAudit } from "@/lib/audit"
 
 const paymentDetailLabels: Record<string, string> = {
   cheque_number: "Cheque Number",
@@ -94,6 +96,7 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
   const [fromAccount, setFromAccount] = useState("")
   const [toAccount, setToAccount] = useState("")
   const { companySettings } = useData()
+  const { hasPermission } = useAuth()
 
   async function loadSales(supabaseClient?: ReturnType<typeof createClient>) {
     const supabase = supabaseClient ?? createClient()
@@ -278,6 +281,13 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
         balance_due: newBalanceDue,
         status: newStatus,
       })
+      logAudit({
+        action: "record_payment",
+        entity_type: "sale",
+        entity_id: detail.id,
+        metadata: { invoice_no: detail.invoice_no, amount: paymentAmount, payment_type: paymentType },
+      })
+
       setShowPaymentForm(false)
       setPaymentAmount(0)
       setPaymentType("cash")
@@ -293,6 +303,30 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
       alert("Failed to record payment. Please try again.")
     } finally {
       setPaymentSubmitting(false)
+    }
+  }
+
+  async function handleVoidSale() {
+    if (!detail) return
+    if (!confirm("Are you sure you want to void this sale? This action cannot be undone.")) return
+    const supabase = createClient()
+    try {
+      await supabase.from("sales").update({ status: "cancelled" } as never).eq("id", detail.id)
+
+      await logAudit({
+        action: "void_sale",
+        entity_type: "sale",
+        entity_id: detail.id,
+        metadata: { invoice_no: detail.invoice_no, grand_total: detail.grand_total },
+      })
+
+      invalidateCache("sales")
+      loadSales()
+      setViewId(null)
+      setDetail(null)
+    } catch (err) {
+      console.error("Void error:", err)
+      alert("Failed to void sale.")
     }
   }
 
@@ -658,6 +692,17 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
                   >
                     <DollarSign size={16} />
                     {t("sales.record_payment")}
+                  </button>
+                )}
+
+                {/* Void Sale */}
+                {detail.status !== "cancelled" && hasPermission("pos", "void_sale") && (
+                  <button
+                    onClick={handleVoidSale}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-300 bg-white px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-red-50"
+                  >
+                    <Ban size={16} className="text-red-500" />
+                    Void Sale
                   </button>
                 )}
 

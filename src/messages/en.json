@@ -31,6 +31,7 @@
     "dashboard": "Dashboard",
     "pos": "POS",
     "sales": "Sales",
+    "staff": "Staff",
     "purchases": "Purchases",
     "inventory": "Inventory",
     "customers": "Customers",
@@ -43,6 +44,7 @@
     "expenses": "Income & Expenses",
     "reports": "Reports",
     "ledgers": "Ledgers",
+    "audit_log": "Audit Log",
     "settings": "Settings",
     "logout": "Logout"
   },

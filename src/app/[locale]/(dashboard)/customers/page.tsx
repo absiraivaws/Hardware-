@@ -8,6 +8,7 @@ import { formatCurrency } from "@/lib/format"
 import { createClient } from "@/lib/supabase/client"
 import { getCached, setCache } from "@/lib/query-cache"
 import { generateNextCode } from "@/lib/code-gen"
+import { logAudit } from "@/lib/audit"
 
 interface Customer {
   id: string
@@ -91,14 +92,19 @@ export default function CustomersPage({
     if (!form.name) return
     const supabase = createClient()
     const code = await generateNextCode("customers")
-    await supabase.from("customers").insert([{
+    const { data: newCust } = await supabase.from("customers").insert([{
       ...form,
       code,
       credit_limit: Number(form.credit_limit),
       whatsapp: form.whatsapp || form.handphone || null,
       handphone: form.handphone || form.phone || null,
       date_of_birth: form.date_of_birth || null,
-    }])
+    }]).select("id").single()
+
+    if (newCust) {
+      logAudit({ action: "create_customer", entity_type: "customer", entity_id: newCust.id, metadata: { code } })
+    }
+
     setShowForm(false)
     setForm({ name: "", phone: "", email: "", address: "", nic: "", whatsapp: "", handphone: "", date_of_birth: "", credit_limit: 0 })
     fetchCustomers()
@@ -113,6 +119,14 @@ export default function CustomersPage({
     if (!statusConfirm) return
     const supabase = createClient()
     await supabase.from("customers").update({ status: statusConfirm.newStatus }).eq("id", statusConfirm.customer.id)
+
+    logAudit({
+      action: "edit_customer",
+      entity_type: "customer",
+      entity_id: statusConfirm.customer.id,
+      metadata: { status: statusConfirm.newStatus, code: statusConfirm.customer.code },
+    })
+
     const newStatus = statusConfirm.newStatus
     setStatusConfirm(null)
     setEditForm((prev) => ({ ...prev, status: newStatus }))
@@ -150,6 +164,14 @@ export default function CustomersPage({
       status: editForm.status,
       date_of_birth: editForm.date_of_birth || null,
     }).eq("id", editCustomer.id)
+
+    logAudit({
+      action: "edit_customer",
+      entity_type: "customer",
+      entity_id: editCustomer.id,
+      metadata: { code: editCustomer.code },
+    })
+
     setEditCustomer(null)
     fetchCustomers()
   }
