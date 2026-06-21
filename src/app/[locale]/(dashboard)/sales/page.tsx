@@ -900,13 +900,13 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                 setTimeout(function() { reject(new Error("timeout")) }, 2000)
               })
               await Promise.race([ctx.resume(), timeout])
-              if (ctx.state === "running") {
-                playTts()
-                return
-              }
             } catch(e) {
               console.warn("[QR] resume failed/timed out:", e)
             }
+          }
+          if (ctx && ctx.state === "running") {
+            playTts()
+            return
           }
           fallbackPlay(audioBase64)
         }
