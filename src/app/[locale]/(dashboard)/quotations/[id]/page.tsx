@@ -7,7 +7,6 @@ import { ArrowLeft, FileText, Share2, Replace, X } from "lucide-react"
 import { formatCurrency, formatDate } from "@/lib/format"
 import { createClient } from "@/lib/supabase/client"
 import { jsPDF } from "jspdf"
-import { CompanyHeader, CompanyFooter } from "@/components/shared/company-info"
 import type { CompanySettings } from "@/components/shared/company-info"
 import { useData } from "@/providers/data-provider"
 
@@ -471,8 +470,6 @@ export default function QuotationDetailPage() {
 
   return (
     <div>
-      <CompanyHeader settings={companySettings} />
-
       <div className="mb-6 flex items-center justify-between border-b pb-4">
         <div className="flex items-center gap-3">
           <button
@@ -590,8 +587,6 @@ export default function QuotationDetailPage() {
           <p className="mt-1 text-sm text-black">{quotation.notes}</p>
         </div>
       )}
-
-      <CompanyFooter settings={companySettings} />
 
       {/* Actions */}
       <div className="mt-6 flex items-center gap-3">

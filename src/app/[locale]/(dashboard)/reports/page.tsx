@@ -11,6 +11,9 @@ import {
   ChevronRight,
   Loader2,
   CalendarDays,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react"
 
 type ReportTab = "daily_sales" | "stock_report" | "profit_report" | "outstanding" | "svat_report" | "aged_credit" | "profit_loss" | "balance_sheet"
@@ -29,6 +32,8 @@ const TABS: { key: ReportTab; labelKey: string }[] = [
 interface DailySale {
   id: string
   invoice_no: string
+  customer_id: string | null
+  customer_code: string | null
   customer_name: string | null
   created_at: string
   grand_total: number
@@ -39,6 +44,7 @@ interface DailySale {
 interface StockItem {
   id: string
   code: string
+  serial_no: string | null
   name: string
   category_name: string | null
   current_stock: number
@@ -48,6 +54,7 @@ interface StockItem {
 
 interface ProfitItem {
   product_id: string
+  product_code: string
   product_name: string
   qty_sold: number
   avg_cost: number
@@ -58,6 +65,7 @@ interface ProfitItem {
 
 interface OutstandingCustomer {
   id: string
+  code: string
   name: string
   phone: string | null
   credit_limit: number
@@ -69,6 +77,8 @@ interface OutstandingCustomer {
 interface SvatSale {
   id: string
   invoice_no: string
+  customer_id: string | null
+  customer_code: string | null
   customer_name: string | null
   subtotal: number
   tax_amount: number
@@ -99,11 +109,34 @@ export default function ReportsPage({ params }: PageProps) {
   const [profitItems, setProfitItems] = useState<ProfitItem[]>([])
   const [outstandingCustomers, setOutstandingCustomers] = useState<OutstandingCustomer[]>([])
   const [svatSales, setSvatSales] = useState<SvatSale[]>([])
-  const [agedCreditData, setAgedCreditData] = useState<{ customer_name: string; phone: string | null; bucket_0_30: number; bucket_31_60: number; bucket_61_90: number; bucket_90_plus: number; total: number }[]>([])
+  const [agedCreditData, setAgedCreditData] = useState<{ customer_name: string; customer_code: string | null; bucket_0_30: number; bucket_31_60: number; bucket_61_90: number; bucket_90_plus: number; total: number }[]>([])
   const [plData, setPlData] = useState({ revenue: 0, cogs: 0, grossProfit: 0, expenses: 0, netProfit: 0 })
   const [bsData, setBsData] = useState({ cashInHand: 0, bankBalance: 0, inventoryValue: 0, receivables: 0, payables: 0 })
   const [stockSearch, setStockSearch] = useState("")
   const [reportSearch, setReportSearch] = useState("")
+  const [sortKey, setSortKey] = useState<string | null>(null)
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc")
+    } else {
+      setSortKey(key)
+      setSortDir("asc")
+    }
+  }
+
+  const SortHeader = ({ label, sortable }: { label: string; sortable?: string }) => {
+    if (!sortable) return <>{label}</>
+    const active = sortKey === sortable
+    const Icon = active ? (sortDir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown
+    return (
+      <button onClick={() => handleSort(sortable)} className="inline-flex items-center gap-1 hover:text-black">
+        {label}
+        <Icon size={12} className="shrink-0" />
+      </button>
+    )
+  }
 
   const perPage = 20
 
@@ -117,22 +150,29 @@ export default function ReportsPage({ params }: PageProps) {
           case "daily_sales": {
             const { data } = await supabase
               .from("sales")
-              .select("id, invoice_no, customer_name, created_at, grand_total, payment_type, status")
+              .select("id, invoice_no, customer_id, customer_name, created_at, grand_total, payment_type, status, customers!left(code)")
               .gte("created_at", `${fromDate}T00:00:00`)
               .lte("created_at", `${toDate}T23:59:59`)
               .order("created_at", { ascending: false })
-            if (data) setDailySales(data as DailySale[])
+            if (data) {
+              const enriched = data.map((s: Record<string, unknown>) => {
+                const cust = s.customers as { code?: string } | null
+                return { ...s, customer_code: cust?.code ?? null } as DailySale
+              })
+              setDailySales(enriched as DailySale[])
+            }
             break
           }
           case "stock_report": {
             const { data } = await supabase
               .from("products")
-              .select("id, code, name, current_stock, min_stock, categories(name)")
+              .select("id, code, serial_no, name, current_stock, min_stock, categories(name)")
               .order("name", { ascending: true })
             if (data) {
               const items: StockItem[] = data.map((p) => ({
                 id: p.id,
                 code: p.code,
+                serial_no: (p as any).serial_no ?? null,
                 name: p.name,
                 category_name: (p.categories as unknown as { name: string } | null)?.name ?? null,
                 current_stock: p.current_stock,
@@ -151,11 +191,12 @@ export default function ReportsPage({ params }: PageProps) {
           case "profit_report": {
             const { data } = await supabase
               .from("sale_items")
-              .select("product_id, product_name, quantity, unit_price, products(cost_price)")
+              .select("product_id, product_name, quantity, unit_price, products(cost_price, code)")
             if (data) {
               const map = new Map<string, ProfitItem>()
               for (const item of data) {
                 const costPrice = (item.products as unknown as { cost_price: number } | null)?.cost_price ?? 0
+                const prodCode = (item.products as unknown as { code: string } | null)?.code ?? ""
                 const profit = (item.unit_price - costPrice) * item.quantity
                 const existing = map.get(item.product_id)
                 if (existing) {
@@ -166,6 +207,7 @@ export default function ReportsPage({ params }: PageProps) {
                 } else {
                   map.set(item.product_id, {
                     product_id: item.product_id,
+                    product_code: prodCode,
                     product_name: item.product_name,
                     qty_sold: item.quantity,
                     avg_cost: costPrice,
@@ -182,12 +224,13 @@ export default function ReportsPage({ params }: PageProps) {
           case "outstanding": {
             const { data } = await supabase
               .from("customers")
-              .select("id, name, phone, credit_limit, credit_balance")
+              .select("id, code, name, phone, credit_limit, credit_balance")
               .gt("credit_balance", 0)
               .order("name", { ascending: true })
             if (data) {
               const items: OutstandingCustomer[] = data.map((c) => ({
                 id: c.id,
+                code: c.code,
                 name: c.name,
                 phone: c.phone,
                 credit_limit: c.credit_limit,
@@ -202,27 +245,36 @@ export default function ReportsPage({ params }: PageProps) {
           case "svat_report": {
             const { data } = await supabase
               .from("sales")
-              .select("id, invoice_no, customer_name, subtotal, tax_amount, grand_total, created_at")
+              .select("id, invoice_no, customer_id, customer_name, subtotal, tax_amount, grand_total, created_at, customers!left(code)")
               .eq("tax_type", "svat")
               .gte("created_at", `${fromDate}T00:00:00`)
               .lte("created_at", `${toDate}T23:59:59`)
               .order("created_at", { ascending: false })
-            if (data) setSvatSales(data as SvatSale[])
+            if (data) {
+              const enriched = data.map((s: Record<string, unknown>) => {
+                const cust = s.customers as { code?: string } | null
+                return { ...s, customer_code: cust?.code ?? null } as SvatSale
+              })
+              setSvatSales(enriched as SvatSale[])
+            }
             break
           }
           case "aged_credit": {
             const { data: salesData } = await supabase
               .from("sales")
-              .select("id, customer_name, grand_total, balance_due, created_at")
+              .select("id, customer_id, customer_name, grand_total, balance_due, created_at, customers!left(code)")
               .eq("status", "completed")
               .gt("balance_due", 0)
               .order("customer_name")
             if (salesData) {
               const now = new Date()
-              const buckets = new Map<string, { customer_name: string; phone: string | null; bucket_0_30: number; bucket_31_60: number; bucket_61_90: number; bucket_90_plus: number; total: number }>()
+              const buckets = new Map<string, { customer_name: string; customer_code: string | null; bucket_0_30: number; bucket_31_60: number; bucket_61_90: number; bucket_90_plus: number; total: number }>()
               for (const s of salesData) {
                 const key = s.customer_name ?? "Unknown"
-                const existing = buckets.get(key) ?? { customer_name: key, phone: null, bucket_0_30: 0, bucket_31_60: 0, bucket_61_90: 0, bucket_90_plus: 0, total: 0 }
+                const cust = s.customers as { code?: string } | null
+                const code = cust?.code ?? null
+                const existing = buckets.get(key) ?? { customer_name: key, customer_code: code, bucket_0_30: 0, bucket_31_60: 0, bucket_61_90: 0, bucket_90_plus: 0, total: 0 }
+                if (!existing.customer_code && code) existing.customer_code = code
                 const days = Math.floor((now.getTime() - new Date(s.created_at).getTime()) / (1000 * 60 * 60 * 24))
                 const balance = s.balance_due
                 if (days <= 30) existing.bucket_0_30 += balance
@@ -287,6 +339,18 @@ export default function ReportsPage({ params }: PageProps) {
     return { paged, totalPages }
   }
 
+  const sortItems = <T,>(items: T[], key: string, dir: "asc" | "desc"): T[] => {
+    if (!key) return items
+    return [...items].sort((a: unknown, b: unknown) => {
+      const aVal = (a as Record<string, unknown>)[key]
+      const bVal = (b as Record<string, unknown>)[key]
+      if (aVal == null) return 1
+      if (bVal == null) return -1
+      const cmp = typeof aVal === "number" ? aVal - (bVal as number) : String(aVal).localeCompare(String(bVal))
+      return dir === "asc" ? cmp : -cmp
+    })
+  }
+
   const renderPagination = (totalPages: number) => {
     if (totalPages <= 1) return null
     return (
@@ -314,20 +378,24 @@ export default function ReportsPage({ params }: PageProps) {
     )
   }
 
-  const renderTable = (headers: string[], rows: React.ReactNode[][], empty = t("common.no_results")) => {
+  const renderTable = (headers: ({ label: string; sortable?: string } | string)[], rows: React.ReactNode[][], empty = t("common.no_results")) => {
     return (
       <div className="overflow-x-auto rounded-lg border">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              {headers.map((h, i) => (
-                <th
-                  key={i}
-                  className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black"
-                >
-                  {h}
-                </th>
-              ))}
+              {headers.map((h, i) => {
+                const label = typeof h === "string" ? h : h.label
+                const sortable = typeof h === "string" ? undefined : h.sortable
+                return (
+                  <th
+                    key={i}
+                    className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-black"
+                  >
+                    <SortHeader label={label} sortable={sortable} />
+                  </th>
+                )
+              })}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 bg-white">
@@ -365,19 +433,22 @@ export default function ReportsPage({ params }: PageProps) {
             t(`sales.${s.payment_type}`).toLowerCase().includes(reportSearch.toLowerCase()),
         )
       : dailySales
-    const { paged, totalPages } = paginate(filtered)
+    const sorted = sortItems(filtered, sortKey || "", sortDir)
+    const { paged, totalPages } = paginate(sorted)
     const totalAmount = filtered.reduce((sum, s) => sum + s.grand_total, 0)
     const headers = [
-      t("common.date"),
-      t("sales.invoice_no"),
-      t("sales.customer"),
-      t("common.grand_total"),
-      t("sales.payment_type"),
-      t("common.status"),
+      { label: t("common.date"), sortable: "created_at" },
+      { label: t("sales.invoice_no"), sortable: "invoice_no" },
+      { label: "Cust ID", sortable: "customer_id" },
+      { label: t("sales.customer"), sortable: "customer_name" },
+      { label: t("common.grand_total"), sortable: "grand_total" },
+      { label: t("sales.payment_type"), sortable: "payment_type" },
+      { label: t("common.status"), sortable: "status" },
     ]
     const rows = paged.map((s) => [
       formatDate(s.created_at),
       <span className="font-medium text-black">{s.invoice_no}</span>,
+      <span className="font-mono text-xs text-black">{s.customer_code ?? "—"}</span>,
       s.customer_name ?? "-",
       <span className="text-right font-medium">{formatCurrency(s.grand_total, locale)}</span>,
       t(`sales.${s.payment_type}`),
@@ -401,18 +472,21 @@ export default function ReportsPage({ params }: PageProps) {
     const filtered = stockSearch
       ? stockItems.filter(
           (s) =>
+            (s.serial_no ?? "").toLowerCase().includes(stockSearch.toLowerCase()) ||
             s.code.toLowerCase().includes(stockSearch.toLowerCase()) ||
             s.name.toLowerCase().includes(stockSearch.toLowerCase()),
         )
       : stockItems
-    const { paged, totalPages } = paginate(filtered)
+    const sorted = sortItems(filtered, sortKey || "", sortDir)
+    const { paged, totalPages } = paginate(sorted)
     const headers = [
-      t("inventory.product_code"),
-      t("inventory.product_name"),
-      t("inventory.category"),
-      t("inventory.current_stock"),
-      t("inventory.min_stock"),
-      t("common.status"),
+      { label: "Item serial no", sortable: "serial_no" },
+      { label: t("inventory.product_code"), sortable: "code" },
+      { label: t("inventory.product_name"), sortable: "name" },
+      { label: t("inventory.category"), sortable: "category_name" },
+      { label: t("inventory.current_stock"), sortable: "current_stock" },
+      { label: t("inventory.min_stock"), sortable: "min_stock" },
+      { label: t("common.status"), sortable: "stock_status" },
     ]
     const rows = paged.map((s) => {
       const isLow = s.stock_status === "low" || s.stock_status === "out"
@@ -423,6 +497,7 @@ export default function ReportsPage({ params }: PageProps) {
             ? "Low Stock"
             : "In Stock"
       return [
+        <span className="font-mono text-xs text-black">{s.serial_no ?? "—"}</span>,
         <span className={isLow ? "text-black font-medium" : ""}>{s.code}</span>,
         <span className={isLow ? "text-black" : ""}>{s.name}</span>,
         s.category_name ?? "-",
@@ -458,17 +533,20 @@ export default function ReportsPage({ params }: PageProps) {
             p.product_name.toLowerCase().includes(reportSearch.toLowerCase()),
         )
       : profitItems
-    const { paged, totalPages } = paginate(filtered)
+    const sorted = sortItems(filtered, sortKey || "", sortDir)
+    const { paged, totalPages } = paginate(sorted)
     const grandProfit = filtered.reduce((sum, p) => sum + p.total_profit, 0)
     const headers = [
-      t("inventory.product_name"),
-      t("sales.qty"),
-      t("inventory.cost_price"),
-      t("inventory.selling_price"),
-      "Profit/Item",
-      t("common.total"),
+      { label: "Product ID", sortable: "product_id" },
+      { label: t("inventory.product_name"), sortable: "product_name" },
+      { label: t("sales.qty"), sortable: "qty_sold" },
+      { label: t("inventory.cost_price"), sortable: "avg_cost" },
+      { label: t("inventory.selling_price"), sortable: "avg_price" },
+      { label: "Profit/Item", sortable: "profit_per_item" },
+      { label: t("common.total"), sortable: "total_profit" },
     ]
     const rows = paged.map((p) => [
+      <span className="font-mono text-xs text-black">{p.product_code || p.product_id.slice(0, 8)}</span>,
       p.product_name,
       p.qty_sold,
       formatCurrency(p.avg_cost, locale),
@@ -500,17 +578,20 @@ export default function ReportsPage({ params }: PageProps) {
             (c.phone ?? "").toLowerCase().includes(reportSearch.toLowerCase()),
         )
       : outstandingCustomers
-    const { paged, totalPages } = paginate(filtered)
+    const sorted = sortItems(filtered, sortKey || "", sortDir)
+    const { paged, totalPages } = paginate(sorted)
     const totalBalance = filtered.reduce((sum, c) => sum + c.credit_balance, 0)
     const headers = [
-      t("customers.customer_name"),
-      t("customers.phone"),
-      t("customers.credit_limit"),
-      t("customers.credit_balance"),
-      "Overdue Amount",
-      "Days Overdue",
+      { label: "Cust ID", sortable: "code" },
+      { label: t("customers.customer_name"), sortable: "name" },
+      { label: t("customers.phone"), sortable: "phone" },
+      { label: t("customers.credit_limit"), sortable: "credit_limit" },
+      { label: t("customers.credit_balance"), sortable: "credit_balance" },
+      { label: "Overdue Amount", sortable: "overdue_amount" },
+      { label: "Days Overdue", sortable: "days_overdue" },
     ]
     const rows = paged.map((c) => [
+      <span className="font-mono text-xs text-black">{c.code}</span>,
       c.name,
       c.phone ?? "-",
       formatCurrency(c.credit_limit, locale),
@@ -540,17 +621,20 @@ export default function ReportsPage({ params }: PageProps) {
             (s.customer_name ?? "").toLowerCase().includes(reportSearch.toLowerCase()),
         )
       : svatSales
-    const { paged, totalPages } = paginate(filtered)
+    const sorted = sortItems(filtered, sortKey || "", sortDir)
+    const { paged, totalPages } = paginate(sorted)
     const totalSvat = filtered.reduce((sum, s) => sum + s.tax_amount, 0)
     const headers = [
-      t("sales.invoice_no"),
-      t("sales.customer"),
-      t("common.subtotal"),
-      t("common.tax"),
-      t("common.grand_total"),
+      { label: t("sales.invoice_no"), sortable: "invoice_no" },
+      { label: "Cust ID", sortable: "customer_id" },
+      { label: t("sales.customer"), sortable: "customer_name" },
+      { label: t("common.subtotal"), sortable: "subtotal" },
+      { label: t("common.tax"), sortable: "tax_amount" },
+      { label: t("common.grand_total"), sortable: "grand_total" },
     ]
     const rows = paged.map((s) => [
       <span className="font-medium text-black">{s.invoice_no}</span>,
+      <span className="font-mono text-xs text-black">{s.customer_code ?? "—"}</span>,
       s.customer_name ?? "-",
       formatCurrency(s.subtotal, locale),
       <span className="font-medium">{formatCurrency(s.tax_amount, locale)}</span>,
@@ -577,14 +661,17 @@ export default function ReportsPage({ params }: PageProps) {
         )
       : agedCreditData
     const headers = [
-      t("reports_aged_credit.customer"),
-      t("reports_aged_credit.bucket_0_30"),
-      t("reports_aged_credit.bucket_31_60"),
-      t("reports_aged_credit.bucket_61_90"),
-      t("reports_aged_credit.bucket_90_plus"),
-      t("reports_aged_credit.total_outstanding"),
+      { label: "Customer ID", sortable: "customer_code" },
+      { label: t("reports_aged_credit.customer"), sortable: "customer_name" },
+      { label: t("reports_aged_credit.bucket_0_30"), sortable: "bucket_0_30" },
+      { label: t("reports_aged_credit.bucket_31_60"), sortable: "bucket_31_60" },
+      { label: t("reports_aged_credit.bucket_61_90"), sortable: "bucket_61_90" },
+      { label: t("reports_aged_credit.bucket_90_plus"), sortable: "bucket_90_plus" },
+      { label: t("reports_aged_credit.total_outstanding"), sortable: "total" },
     ]
-    const rows = filtered.map((c) => [
+    const sorted = sortItems(filtered, sortKey || "", sortDir)
+    const rows = sorted.map((c) => [
+      <span className="font-mono text-xs text-black">{c.customer_code ?? "—"}</span>,
       c.customer_name,
       formatCurrency(c.bucket_0_30, locale),
       formatCurrency(c.bucket_31_60, locale),

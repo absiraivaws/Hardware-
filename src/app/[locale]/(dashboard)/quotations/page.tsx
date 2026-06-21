@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl"
 import { useParams, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { Plus, Eye } from "lucide-react"
+import { Plus, Eye, FileText } from "lucide-react"
 import { DataTable } from "@/components/shared/data-table"
 import { PageHeader } from "@/components/shared/page-header"
 import { formatCurrency, formatDate } from "@/lib/format"
@@ -12,6 +12,10 @@ import { getCached, setCache } from "@/lib/query-cache"
 import type { Database } from "@/types/database"
 
 type Quotation = Database["public"]["Tables"]["quotations"]["Row"]
+
+interface QuotationWithCustomer extends Quotation {
+  customer_code?: string | null
+}
 
 const statusStyles: Record<string, string> = {
   draft: "bg-gray-100 text-black",
@@ -35,12 +39,12 @@ export default function QuotationsPage() {
   const router = useRouter()
   const locale = params.locale as string
 
-  const [quotations, setQuotations] = useState<Quotation[]>([])
+  const [quotations, setQuotations] = useState<QuotationWithCustomer[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   async function fetchQuotations() {
-    const cached = getCached<Quotation[]>("quotations:all")
+    const cached = getCached<QuotationWithCustomer[]>("quotations:all")
     if (cached) {
       setQuotations(cached)
       setLoading(false)
@@ -56,13 +60,17 @@ export default function QuotationsPage() {
       }
       const { data, error } = await supabase
         .from("quotations")
-        .select("*")
+        .select("*, customers!left(code)")
         .order("created_at", { ascending: false })
       if (error) {
         setError(error.message)
       } else if (data) {
-        setQuotations(data)
-        setCache("quotations:all", data)
+        const enriched = (data as Array<Record<string, unknown>>).map((item) => {
+          const customers = item.customers as { code?: string } | null
+          return { ...item, customer_code: customers?.code ?? null } as QuotationWithCustomer
+        })
+        setQuotations(enriched)
+        setCache("quotations:all", enriched)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load quotations")
@@ -99,8 +107,15 @@ export default function QuotationsPage() {
     {
       key: "customer_name",
       label: t("sales.customer"),
-      render: (item: Quotation) => (
+      render: (item: QuotationWithCustomer) => (
         <span>{item.customer_name || "—"}</span>
+      ),
+    },
+    {
+      key: "customer_id",
+      label: "Customer ID",
+      render: (item: QuotationWithCustomer) => (
+        <span className="font-mono text-xs text-black">{item.customer_code || "—"}</span>
       ),
     },
     {
@@ -151,12 +166,12 @@ export default function QuotationsPage() {
         <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-black">{error}</div>
       )}
 
-      <DataTable<Quotation>
+      <DataTable<QuotationWithCustomer>
         columns={columns}
         data={quotations}
         loading={loading}
         searchable
-        searchKeys={["q_no", "customer_name"]}
+        searchKeys={["q_no", "customer_name", "customer_code"]}
       />
     </div>
   )

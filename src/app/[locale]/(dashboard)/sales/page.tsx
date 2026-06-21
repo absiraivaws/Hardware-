@@ -24,6 +24,7 @@ interface CustomerOption {
   phone: string | null
   credit_limit: number
   credit_balance: number
+  total_outstanding: number
 }
 
 interface ProfileRow {
@@ -63,6 +64,10 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
   const [newCustomerPhone, setNewCustomerPhone] = useState("")
   const [newCustomerEmail, setNewCustomerEmail] = useState("")
   const [newCustomerAddress, setNewCustomerAddress] = useState("")
+  const [newCustomerNIC, setNewCustomerNIC] = useState("")
+  const [newCustomerWhatsapp, setNewCustomerWhatsapp] = useState("")
+  const [newCustomerHandphone, setNewCustomerHandphone] = useState("")
+  const [newCustomerDOB, setNewCustomerDOB] = useState("")
   const [newCustomerCreditLimit, setNewCustomerCreditLimit] = useState(0)
   const [creatingCustomer, setCreatingCustomer] = useState(false)
 
@@ -116,24 +121,35 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       const cachedProducts = getCached<Product[]>("products:all")
       const cachedCustomers = getCached<CustomerOption[]>("customers:all")
 
-      if (cachedProducts && cachedCustomers) {
+      if (cachedProducts && cachedCustomers && cachedCustomers.length > 0 && "total_outstanding" in cachedCustomers[0]) {
         setProducts(cachedProducts)
         setCustomers(cachedCustomers)
         setLoading(false)
         return
       }
 
-      const [productRes, customerRes] = await Promise.all([
+      const [productRes, customerRes, salesRes] = await Promise.all([
         supabase.from("products").select("id, name, code, barcode, serial_no, selling_price, current_stock, min_stock").eq("status", "active").order("name"),
         supabase.from("customers").select("id, code, name, phone, credit_limit, credit_balance").eq("status", "active").order("name"),
+        supabase.from("sales").select("customer_id, balance_due"),
       ])
       if (productRes.data) {
         setProducts(productRes.data as Product[])
         setCache("products:all", productRes.data)
       }
       if (customerRes.data) {
-        setCustomers(customerRes.data as CustomerOption[])
-        setCache("customers:all", customerRes.data)
+        const outstandingByCustomer: Record<string, number> = {}
+        for (const s of (salesRes.data ?? []) as { customer_id: string; balance_due: number }[]) {
+          outstandingByCustomer[s.customer_id] = (outstandingByCustomer[s.customer_id] || 0) + s.balance_due
+        }
+        const filtered = (customerRes.data as CustomerOption[])
+          .map((c) => ({
+            ...c,
+            total_outstanding: outstandingByCustomer[c.id] || 0,
+          }))
+          .filter((c) => c.total_outstanding <= c.credit_limit)
+        setCustomers(filtered)
+        setCache("customers:all", filtered)
       }
       setLoading(false)
     }
@@ -512,7 +528,11 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
         phone: newCustomerPhone.trim() || null,
         email: newCustomerEmail.trim() || null,
         address: newCustomerAddress.trim() || null,
+        nic: newCustomerNIC.trim() || null,
+        whatsapp: newCustomerWhatsapp.trim() || newCustomerHandphone.trim() || null,
+        handphone: newCustomerHandphone.trim() || newCustomerPhone.trim() || null,
         credit_limit: newCustomerCreditLimit,
+        date_of_birth: newCustomerDOB.trim() || null,
         status: "active",
       } as never)
       .select("id, name, phone")
@@ -534,6 +554,10 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
     setNewCustomerPhone("")
     setNewCustomerEmail("")
     setNewCustomerAddress("")
+    setNewCustomerNIC("")
+    setNewCustomerWhatsapp("")
+    setNewCustomerHandphone("")
+    setNewCustomerDOB("")
     setNewCustomerCreditLimit(0)
     setShowCustomerDropdown(false)
     invalidateCache("customers")
@@ -542,34 +566,35 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
 
   return (
     <div className="space-y-4">
-      {/* ===== TOP ROW: Serial No + Search + Barcode ===== */}
+      {/* ===== TOP ROW: Search + Barcode + Serial No (equal size) ===== */}
       <div className="flex items-center gap-3">
-        <div className="flex items-center rounded-lg border border-gray-300 px-3 py-2.5 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500">
-          <span className="text-sm text-black font-mono mr-0.5">000</span>
-          <input
-            ref={serialRef}
-            type="text"
-            value={serialInput}
-            onChange={(e) => {
-              const v = e.target.value.replace(/\D/g, "").slice(0, 3)
-              setSerialInput(v)
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault()
-                handleSerialSearch()
-              }
-            }}
-            placeholder="—"
-            className="w-10 border-0 p-0 text-sm text-black font-mono focus:outline-none focus:ring-0"
-          />
-        </div>
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-black" size={18} />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault()
+                const q = searchQuery.trim().toLowerCase()
+                const match = products.find(
+                  (p) =>
+                    p.barcode?.toLowerCase() === q ||
+                    p.code.toLowerCase() === q ||
+                    p.name.toLowerCase() === q
+                )
+                if (match) {
+                  addToCart({
+                    product_id: match.id,
+                    product_name: match.name,
+                    quantity: 1,
+                    unit_price: match.selling_price,
+                  })
+                  setSearchQuery("")
+                }
+              }
+            }}
             placeholder={t("common.search") + "..."}
             className="w-full rounded-lg border border-gray-300 py-2.5 pl-10 pr-4 text-sm text-black placeholder-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
           />
@@ -586,8 +611,28 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
             }
           }}
           placeholder="Barcode / Code"
-          className="w-44 rounded-lg border border-gray-300 py-2.5 px-3 text-sm text-black placeholder-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          className="flex-1 rounded-lg border border-gray-300 py-2.5 px-3 text-sm text-black placeholder-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
         />
+        <div className="flex flex-1 items-center rounded-lg border border-gray-300 px-3 py-2.5 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500">
+          <span className="text-sm text-black font-mono mr-0.5">000</span>
+          <input
+            ref={serialRef}
+            type="text"
+            value={serialInput}
+            onChange={(e) => {
+              const v = e.target.value.replace(/\D/g, "").slice(0, 3)
+              setSerialInput(v)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault()
+                handleSerialSearch()
+              }
+            }}
+            placeholder="—"
+            className="w-full border-0 p-0 text-sm text-black font-mono focus:outline-none focus:ring-0"
+          />
+        </div>
       </div>
 
       {/* ===== MAIN CONTENT: Product Grid + Cart/Payment ===== */}
@@ -912,42 +957,64 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                   )}
                 </div>
                 {showCustomerDropdown && (
-                  <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-                    <button
-                      onClick={() => {
-                        setSelectedCustomer(null)
-                        setCustomerSearch("")
-                        setShowCustomerDropdown(false)
-                      }}
-                      className="w-full px-3 py-2 text-left text-sm text-black hover:bg-gray-50"
-                    >
-                      {t("sales.walk_in")}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowCustomerDropdown(false)
-                        setShowNewCustomerForm(true)
-                      }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-black hover:bg-emerald-50"
-                    >
-                      <Plus size={14} />
-                      New Customer
-                    </button>
-                    {filteredCustomers.map((c) => (
+                  <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                    <div className="sticky top-0 bg-white border-b px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <Plus size={14} className="text-black" />
+                        <button
+                          onClick={() => {
+                            setShowCustomerDropdown(false)
+                            setShowNewCustomerForm(true)
+                          }}
+                          className="text-sm font-medium text-emerald-600 hover:text-emerald-700"
+                        >
+                          New Customer
+                        </button>
+                      </div>
                       <button
-                        key={c.id}
                         onClick={() => {
-                          setSelectedCustomer(c)
-                          setCustomerSearch(c.name)
+                          setSelectedCustomer(null)
+                          setCustomerSearch("")
                           setShowCustomerDropdown(false)
                         }}
-                        className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                        className="mt-1 w-full rounded px-2 py-1 text-left text-xs text-black hover:bg-gray-50"
                       >
-                        <span className="text-black">{c.name}</span>
-                        <span className="ml-2 text-xs text-black">{c.code}</span>
-                        {c.phone && <span className="ml-2 text-xs text-black">{c.phone}</span>}
+                        Walk-in Customer
                       </button>
-                    ))}
+                    </div>
+                    <table className="w-full text-xs">
+                      <thead className="sticky top-0 bg-gray-50">
+                        <tr className="border-b">
+                          <th className="px-3 py-1.5 text-left font-medium text-black">ID</th>
+                          <th className="px-3 py-1.5 text-left font-medium text-black">Name</th>
+                          <th className="px-3 py-1.5 text-right font-medium text-black">Credit Limit</th>
+                          <th className="px-3 py-1.5 text-right font-medium text-black">Total Outstanding</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredCustomers.length === 0 && (
+                          <tr>
+                            <td colSpan={4} className="px-3 py-4 text-center text-black">No customers found</td>
+                          </tr>
+                        )}
+                        {filteredCustomers.map((c) => (
+                          <tr
+                            key={c.id}
+                            onClick={() => {
+                              setSelectedCustomer(c)
+                              setCustomerSearch(c.name)
+                              setShowCustomerDropdown(false)
+                            }}
+                            className="cursor-pointer border-b hover:bg-gray-50"
+                          >
+                            <td className="px-3 py-1.5 font-mono text-black">{c.code}</td>
+                            <td className="px-3 py-1.5 text-black">{c.name}</td>
+                            <td className="px-3 py-1.5 text-right text-black">{formatCurrency(c.credit_limit, locale)}</td>
+                            <td className="px-3 py-1.5 text-right text-black">{formatCurrency(c.total_outstanding, locale)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>
@@ -1297,24 +1364,6 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-black">Email</label>
-                <input
-                  type="text"
-                  value={newCustomerEmail}
-                  onChange={(e) => setNewCustomerEmail(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-black">Address</label>
-                <input
-                  type="text"
-                  value={newCustomerAddress}
-                  onChange={(e) => setNewCustomerAddress(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                />
-              </div>
-              <div>
                 <label className="mb-1 block text-sm font-medium text-black">Credit Limit</label>
                 <input
                   type="number"
@@ -1324,6 +1373,73 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
+              <details className="group">
+                <summary className="cursor-pointer text-sm font-medium text-emerald-600 hover:text-emerald-700">
+                  More Details
+                </summary>
+                <div className="mt-3 space-y-3">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-black">NIC Number</label>
+                    <input
+                      type="text"
+                      value={newCustomerNIC}
+                      onChange={(e) => setNewCustomerNIC(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-black">Address</label>
+                    <input
+                      type="text"
+                      value={newCustomerAddress}
+                      onChange={(e) => setNewCustomerAddress(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-black">Email</label>
+                    <input
+                      type="text"
+                      value={newCustomerEmail}
+                      onChange={(e) => setNewCustomerEmail(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-black">Handphone</label>
+                    <input
+                      type="text"
+                      value={newCustomerHandphone}
+                      onChange={(e) => {
+                        setNewCustomerHandphone(e.target.value)
+                        if (!newCustomerWhatsapp) {
+                          setNewCustomerWhatsapp(e.target.value)
+                        }
+                      }}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-black">WhatsApp Number</label>
+                    <input
+                      type="text"
+                      value={newCustomerWhatsapp}
+                      onChange={(e) => setNewCustomerWhatsapp(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      placeholder={newCustomerHandphone || "Handphone number"}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-black">Date of Birth</label>
+                    <input
+                      type="date"
+                      value={newCustomerDOB}
+                      onChange={(e) => setNewCustomerDOB(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+              </details>
               <button
                 onClick={handleCreateNewCustomer}
                 disabled={creatingCustomer || !newCustomerName.trim()}

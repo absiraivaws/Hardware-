@@ -217,6 +217,10 @@ export interface Database {
           phone: string | null
           email: string | null
           address: string | null
+          nic: string | null
+          whatsapp: string | null
+          handphone: string | null
+          date_of_birth: string | null
           credit_limit: number
           credit_balance: number
           loyalty_points: number
@@ -231,6 +235,10 @@ export interface Database {
           phone?: string | null
           email?: string | null
           address?: string | null
+          nic?: string | null
+          whatsapp?: string | null
+          handphone?: string | null
+          date_of_birth?: string | null
           credit_limit?: number
           credit_balance?: number
           loyalty_points?: number
@@ -245,6 +253,10 @@ export interface Database {
           phone?: string | null
           email?: string | null
           address?: string | null
+          nic?: string | null
+          whatsapp?: string | null
+          handphone?: string | null
+          date_of_birth?: string | null
           credit_limit?: number
           credit_balance?: number
           loyalty_points?: number
