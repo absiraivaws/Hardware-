@@ -7,6 +7,7 @@ import { useEffect, useState } from "react"
 import { formatCurrency, formatDate } from "@/lib/format"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
+import { logAudit } from "@/lib/audit"
 
 interface PurchaseItem {
   id: string
@@ -344,6 +345,13 @@ export default function PurchaseOrderDetailPage({
       setReceivingQtys(initial)
     }
 
+    logAudit({
+      action: "create_purchase",
+      entity_type: "goods_received_note",
+      entity_id: po.id,
+      metadata: { po_no: po.po_no, grn_created: true },
+    })
+
     setReceiving(false)
   }
 
@@ -380,6 +388,13 @@ export default function PurchaseOrderDetailPage({
         .select("*").eq("id", id).single()
       if (refreshedPo) setPo(refreshedPo as PurchaseOrder)
     }
+
+    logAudit({
+      action: "edit_purchase",
+      entity_type: "purchase_order",
+      entity_id: po.id,
+      metadata: { po_no: po.po_no },
+    })
 
     setEditMode(false)
     setEditingQtys({})
@@ -465,6 +480,13 @@ export default function PurchaseOrderDetailPage({
     const { data: refreshed } = await poClient.select("*").eq("id", id).single()
     if (refreshed) setPo(refreshed as PurchaseOrder)
 
+    logAudit({
+      action: "record_payment",
+      entity_type: "purchase_order",
+      entity_id: po.id,
+      metadata: { po_no: po.po_no, amount: paymentAmount, payment_type: paymentType },
+    })
+
     // Reset form
     setShowPayment(false)
     setPaymentAmount(0)
@@ -530,6 +552,13 @@ export default function PurchaseOrderDetailPage({
         await supabase.from("products").update({ current_stock: product.current_stock - qty }).eq("id", item.product_id)
       }
     }
+
+    logAudit({
+      action: "create_purchase",
+      entity_type: "purchase_return",
+      entity_id: po.id,
+      metadata: { po_no: po.po_no, total_amount: totalAmount },
+    })
 
     // Refresh data
     const { data: refreshed } = await supabase.from("purchase_orders").select("*").eq("id", id).single()

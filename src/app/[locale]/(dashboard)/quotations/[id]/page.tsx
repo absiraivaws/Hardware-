@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client"
 import { jsPDF } from "jspdf"
 import type { CompanySettings } from "@/components/shared/company-info"
 import { useData } from "@/providers/data-provider"
+import { logAudit } from "@/lib/audit"
 
 interface Quotation {
   id: string
@@ -440,6 +441,13 @@ export default function QuotationDetailPage() {
       .from("quotations")
       .update({ status: "converted" } as never)
       .eq("id", quotation.id)
+
+    logAudit({
+      action: "convert_quotation",
+      entity_type: "quotation",
+      entity_id: quotation.id,
+      metadata: { q_no: quotation.q_no, sale_id: insertedSale?.id, grand_total: convertGrandTotal },
+    })
 
     setConverting(false)
     setShowConvert(false)

@@ -198,7 +198,7 @@ export default function DeliveriesPage({ params }: { params: Promise<{ locale: s
     if (ve.data) setVehicles(ve.data as Vehicle[])
     if (sa.data) {
       const existingIds = new Set((existingDeliveries.data || []).map(d => d.sale_id))
-      setAllSales((sa.data as Sale[]).filter(s => !existingIds.has(s.id)))
+      setAllSales((sa.data as unknown as Sale[]).filter(s => !existingIds.has(s.id)))
     }
     setLoadingSales(false)
   }

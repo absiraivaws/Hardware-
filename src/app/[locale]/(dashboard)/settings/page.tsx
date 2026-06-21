@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl"
 import { use, useEffect, useState } from "react"
 import { PageHeader } from "@/components/shared/page-header"
 import { createClient } from "@/lib/supabase/client"
-import { Globe, Bell, Shield, Database as DatabaseIcon, Building2, Share2, MessageCircle, Smartphone, FileText, Upload, X, QrCode } from "lucide-react"
+import { Globe, Bell, Shield, Database as DatabaseIcon, Building2, Share2, MessageCircle, Smartphone, FileText, Upload, X, QrCode, ShoppingCart } from "lucide-react"
 import { useData } from "@/providers/data-provider"
 
 const sections = [
@@ -79,6 +79,7 @@ export default function SettingsPage({
   const [lankaQrMerchantCity, setLankaQrMerchantCity] = useState("")
   const [lankaQrCurrencyCode, setLankaQrCurrencyCode] = useState("144")
   const [lankaQrCountryCode, setLankaQrCountryCode] = useState("LK")
+  const [maxDiscountPercent, setMaxDiscountPercent] = useState(25)
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
@@ -108,6 +109,7 @@ export default function SettingsPage({
       setLankaQrMerchantCity(contextCompany.lanka_qr_merchant_city ?? "")
       setLankaQrCurrencyCode(contextCompany.lanka_qr_currency_code ?? "144")
       setLankaQrCountryCode(contextCompany.lanka_qr_country_code ?? "LK")
+      setMaxDiscountPercent(contextCompany.max_discount_percent ?? 25)
     }
   }, [contextCompany])
 
@@ -170,6 +172,7 @@ export default function SettingsPage({
       lanka_qr_merchant_city: lankaQrMerchantCity,
       lanka_qr_currency_code: lankaQrCurrencyCode,
       lanka_qr_country_code: lankaQrCountryCode,
+      max_discount_percent: maxDiscountPercent,
     }
 
     if (contextCompany?.id) {
@@ -380,6 +383,30 @@ export default function SettingsPage({
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
                 />
                 <p className="mt-1 text-xs text-black">Auto-calculates valid until date in new quotations</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* POS Settings */}
+        <div className="rounded-lg border bg-white">
+          <div className="flex items-center gap-3 border-b px-6 py-4">
+            <ShoppingCart className="h-5 w-5 text-emerald-600" />
+            <h2 className="text-base font-semibold text-black">POS</h2>
+          </div>
+          <div className="px-6 py-4">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-black">Max Discount %</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={maxDiscountPercent}
+                  onChange={(e) => setMaxDiscountPercent(Number(e.target.value))}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+                <p className="mt-1 text-xs text-black">Global maximum discount percentage allowed in POS</p>
               </div>
             </div>
           </div>

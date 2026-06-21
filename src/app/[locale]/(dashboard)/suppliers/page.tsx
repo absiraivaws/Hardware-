@@ -7,6 +7,7 @@ import { DataTable } from "@/components/shared/data-table"
 import { createClient } from "@/lib/supabase/client"
 import { getCached, setCache } from "@/lib/query-cache"
 import { generateNextCode } from "@/lib/code-gen"
+import { logAudit } from "@/lib/audit"
 interface Supplier {
   id: string
   code: string
@@ -58,7 +59,10 @@ export default function SuppliersPage({
     if (!form.name) return
     const supabase = createClient()
     const code = await generateNextCode("suppliers")
-    await supabase.from("suppliers").insert([{ ...form, code, credit_period: Number(form.credit_period), overdue_penalty_rate: Number(form.overdue_penalty_rate) }])
+    const { data: newSupp } = await supabase.from("suppliers").insert([{ ...form, code, credit_period: Number(form.credit_period), overdue_penalty_rate: Number(form.overdue_penalty_rate) }]).select("id").single()
+    if (newSupp) {
+      logAudit({ action: "create_supplier", entity_type: "supplier", entity_id: newSupp.id, metadata: { code } })
+    }
     setShowForm(false)
     setForm({ name: "", contact_person: "", phone: "", email: "", address: "", credit_period: 0, overdue_penalty_rate: 0 })
     fetchSuppliers()
@@ -68,6 +72,7 @@ export default function SuppliersPage({
     const supabase = createClient()
     const newStatus = supplier.status === "active" ? "inactive" : "active"
     await supabase.from("suppliers").update({ status: newStatus }).eq("id", supplier.id)
+    logAudit({ action: "edit_supplier", entity_type: "supplier", entity_id: supplier.id, metadata: { status: newStatus, code: supplier.code } })
     fetchSuppliers()
   }
 

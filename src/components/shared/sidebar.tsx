@@ -22,14 +22,18 @@ import {
   IdCard,
   Wallet,
   GripVertical,
+  UserCog,
+  ScrollText,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useEffect, useState, useCallback } from "react"
+import { useAuth } from "@/providers/auth-provider"
 
 const DEFAULT_ORDER = [
   "dashboard",
   "sales",
   "sales/history",
+  "staff",
   "purchases",
   "inventory",
   "customers",
@@ -42,6 +46,7 @@ const DEFAULT_ORDER = [
   "expenses",
   "reports",
   "ledgers",
+  "audit-log",
 ]
 
 const STORAGE_KEY = "sidebar_order"
@@ -50,6 +55,7 @@ const navItemConfig: Record<string, { icon: React.ComponentType<{ size?: number 
   dashboard: { icon: LayoutDashboard, labelKey: "nav.dashboard" },
   sales: { icon: ShoppingCart, labelKey: "nav.pos" },
   "sales/history": { icon: FileText, labelKey: "nav.sales" },
+  staff: { icon: UserCog, labelKey: "nav.staff" },
   purchases: { icon: Package, labelKey: "nav.purchases" },
   inventory: { icon: Warehouse, labelKey: "nav.inventory" },
   customers: { icon: Users, labelKey: "nav.customers" },
@@ -62,6 +68,7 @@ const navItemConfig: Record<string, { icon: React.ComponentType<{ size?: number 
   expenses: { icon: Wallet, labelKey: "nav.expenses" },
   reports: { icon: BarChart3, labelKey: "nav.reports" },
   ledgers: { icon: BookOpen, labelKey: "nav.ledgers" },
+  "audit-log": { icon: ScrollText, labelKey: "nav.audit_log" },
 }
 
 function loadOrder(): string[] {
@@ -70,7 +77,13 @@ function loadOrder(): string[] {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) {
       const parsed = JSON.parse(stored) as string[]
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const merged = [...parsed]
+        for (const item of DEFAULT_ORDER) {
+          if (!merged.includes(item)) merged.push(item)
+        }
+        return merged
+      }
     }
   } catch { /* ignore */ }
   return DEFAULT_ORDER
@@ -80,6 +93,7 @@ export function Sidebar() {
   const t = useTranslations()
   const pathname = usePathname()
   const locale = pathname.split("/")[1]
+  const { sidebarModules } = useAuth()
   const [collapsed, setCollapsed] = useState(false)
   const [navOrder, setNavOrder] = useState<string[]>([])
   const [dragIdx, setDragIdx] = useState<number | null>(null)
@@ -132,7 +146,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-2">
-        {navOrder.map((href, idx) => {
+        {navOrder.filter((href) => sidebarModules.includes(href)).map((href, idx) => {
           const cfg = navItemConfig[href]
           if (!cfg) return null
           const { icon: Icon, labelKey } = cfg

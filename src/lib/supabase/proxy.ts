@@ -47,5 +47,20 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  if (user && !isPublicPath && locale) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("status")
+      .eq("id", user.id)
+      .single()
+
+    if (profile && (profile.status === "inactive" || profile.status === "suspended" || profile.status === "pending")) {
+      const url = request.nextUrl.clone()
+      url.pathname = `/${locale}/login`
+      url.searchParams.set("reason", profile.status === "suspended" ? "suspended" : "inactive")
+      return NextResponse.redirect(url)
+    }
+  }
+
   return supabaseResponse
 }

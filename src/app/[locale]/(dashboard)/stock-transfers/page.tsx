@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/shared/page-header"
 import { DataTable } from "@/components/shared/data-table"
 import { formatDate } from "@/lib/format"
 import { getCached, setCache, invalidateCache } from "@/lib/query-cache"
+import { logAudit } from "@/lib/audit"
 
 interface Transfer {
   id: string
@@ -207,6 +208,14 @@ export default function StockTransfersPage({ params }: { params: Promise<{ local
         quantity: item.quantity,
       }))
     )
+
+    logAudit({
+      action: "stock_transfer",
+      entity_type: "stock_transfer",
+      entity_id: transfer.id,
+      metadata: { transfer_no: transferNo, from_branch: form.from_branch_id, to_branch: form.to_branch_id },
+    })
+
     setShowForm(false)
     setForm({ from_branch_id: "", to_branch_id: "", notes: "" })
     setTransferItems([])
