@@ -864,7 +864,6 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       if (event.data?.event === "lankaqr_payment_complete") {
         console.log("[QR] payment_complete ref:", event.data.reference)
         setQrStatus("paid")
-        setShowQrPanel(false)
         finalizePendingSale(event.data.reference)
         if (event.data?.session_id) {
           const sid = event.data.session_id as string
@@ -872,7 +871,10 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
           fetch("https://qr-checkout.qr4pos.workers.dev/tts/" + sid)
             .then(function(r) { return r.json() })
             .then(function(data) {
-              if (!data.audio || !ctx) return
+              if (!data.audio || !ctx) {
+                setTimeout(function() { setShowQrPanel(false) }, 2000)
+                return
+              }
               var binary = atob(data.audio as string)
               var bytes = new Uint8Array(binary.length)
               for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
@@ -886,9 +888,11 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                 source.start(0)
               }).catch(function(e: unknown) {
                 console.error("[QR] decode/play failed:", (e as Error).message)
+                setTimeout(function() { setShowQrPanel(false) }, 2000)
               })
             }).catch(function(e) {
               console.warn("[QR] TTS fetch failed:", e)
+              setTimeout(function() { setShowQrPanel(false) }, 2000)
             })
         }
       }
