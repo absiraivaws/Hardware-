@@ -864,7 +864,6 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       if (event.data?.event === "lankaqr_payment_complete") {
         console.log("[QR] payment_complete ref:", event.data.reference)
         setQrStatus("paid")
-        setShowQrPanel(false)
         finalizePendingSale(event.data.reference)
       }
       if (event.data?.event === "lankaqr_play_tts" && event.data?.audio) {
