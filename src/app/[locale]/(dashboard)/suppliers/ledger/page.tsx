@@ -157,7 +157,7 @@ export default function SupplierLedgerPage({
                   >
                     <span className="inline-flex items-center gap-1">
                       {col.label}
-                      <Icon size={12} className="shrink-0" />
+                      <Icon size={12} className="shrink-0 text-black" />
                     </span>
                   </th>
                 )

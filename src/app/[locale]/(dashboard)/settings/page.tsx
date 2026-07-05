@@ -4,8 +4,31 @@ import { useTranslations } from "next-intl"
 import { use, useEffect, useState } from "react"
 import { PageHeader } from "@/components/shared/page-header"
 import { createClient } from "@/lib/supabase/client"
-import { Globe, Bell, Shield, Database as DatabaseIcon, Building2, Share2, MessageCircle, Smartphone, FileText, Upload, X, QrCode, ShoppingCart } from "lucide-react"
+import { Globe, Bell, Shield, Database as DatabaseIcon, Building2, Share2, MessageCircle, Smartphone, FileText, Upload, X, QrCode, ShoppingCart, Clock } from "lucide-react"
 import { useData } from "@/providers/data-provider"
+import { useAuth } from "@/providers/auth-provider"
+
+const TIMEZONES = [
+  "Asia/Colombo",
+  "Asia/Kolkata",
+  "Asia/Dubai",
+  "Asia/Dhaka",
+  "Asia/Karachi",
+  "Asia/Bangkok",
+  "Asia/Singapore",
+  "Asia/Hong_Kong",
+  "Asia/Shanghai",
+  "Asia/Tokyo",
+  "Australia/Sydney",
+  "Europe/London",
+  "Europe/Berlin",
+  "Europe/Moscow",
+  "US/Eastern",
+  "US/Central",
+  "US/Mountain",
+  "US/Pacific",
+  "UTC",
+]
 
 const sections = [
   {
@@ -52,6 +75,7 @@ export default function SettingsPage({
   use(params)
   const t = useTranslations()
   const { companySettings: contextCompany, updateCompanySettings } = useData()
+  const { profile } = useAuth()
   const supabase = createClient()
   const [companyName, setCompanyName] = useState("")
   const [address, setAddress] = useState("")
@@ -80,6 +104,9 @@ export default function SettingsPage({
   const [lankaQrCurrencyCode, setLankaQrCurrencyCode] = useState("144")
   const [lankaQrCountryCode, setLankaQrCountryCode] = useState("LK")
   const [maxDiscountPercent, setMaxDiscountPercent] = useState(25)
+  const [businessType, setBusinessType] = useState("sale")
+  const [rentCalculation, setRentCalculation] = useState("days")
+  const [timezone, setTimezone] = useState("Asia/Colombo")
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
@@ -91,7 +118,6 @@ export default function SettingsPage({
       setWhatsappLink(contextCompany.whatsapp_link)
       setWhatsappApiKey(contextCompany.whatsapp_api_key)
       setWhatsappPhoneNumberId(contextCompany.whatsapp_phone_number_id)
-      setWhatsappBusinessAccountId(contextCompany.whatsapp_business_account_id)
       setWhatsappBusinessAccountId(contextCompany.whatsapp_business_account_id)
       setSmsProvider(contextCompany.sms_provider)
       setSmsApiKey(contextCompany.sms_api_key)
@@ -110,8 +136,13 @@ export default function SettingsPage({
       setLankaQrCurrencyCode(contextCompany.lanka_qr_currency_code ?? "144")
       setLankaQrCountryCode(contextCompany.lanka_qr_country_code ?? "LK")
       setMaxDiscountPercent(contextCompany.max_discount_percent ?? 25)
+      setBusinessType(contextCompany.business_type || "sale")
+      setRentCalculation(contextCompany.rent_calculation || "days")
+      setTimezone(contextCompany.timezone || "Asia/Colombo")
     }
   }, [contextCompany])
+
+  const isSuperAdmin = profile?.role === "super_admin"
 
   async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -147,7 +178,7 @@ export default function SettingsPage({
     setSaving(true)
     setSaved(false)
 
-    const settings = {
+    const settings: Record<string, unknown> = {
       company_name: companyName,
       logo_url: logoUrl,
       address,
@@ -173,6 +204,12 @@ export default function SettingsPage({
       lanka_qr_currency_code: lankaQrCurrencyCode,
       lanka_qr_country_code: lankaQrCountryCode,
       max_discount_percent: maxDiscountPercent,
+      business_type: businessType,
+      rent_calculation: rentCalculation,
+    }
+
+    if (isSuperAdmin) {
+      settings.timezone = timezone
     }
 
     if (contextCompany?.id) {
@@ -197,39 +234,39 @@ export default function SettingsPage({
     <div>
       <PageHeader titleKey="nav.settings" />
 
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Company Information */}
         <div className="rounded-lg border bg-white">
-          <div className="flex items-center gap-3 border-b px-6 py-4">
+          <div className="flex items-center gap-3 border-b px-4 py-3">
             <Building2 className="h-5 w-5 text-emerald-600" />
-            <h2 className="text-base font-semibold text-black">
+            <h2 className="text-sm font-semibold text-black">
               {t("settings.company")}
             </h2>
           </div>
-          <div className="px-6 py-4 space-y-4">
+          <div className="px-4 py-3 space-y-3">
             {/* Logo Upload */}
             <div>
-              <label className="mb-2 block text-sm font-medium text-black">
+              <label className="mb-1 block text-xs font-medium text-black">
                 {t("settings.company_logo")}
               </label>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
                 {logoUrl ? (
                   <div className="relative">
                     <img
                       src={logoUrl}
                       alt="Company logo"
-                      className="h-20 w-20 rounded-lg border object-cover"
+                      className="h-14 w-14 rounded-lg border object-cover"
                     />
                     <button
                       onClick={handleRemoveLogo}
-                      className="absolute -right-2 -top-2 rounded-full bg-red-500 p-0.5 text-white hover:bg-red-600"
+                      className="absolute -right-1.5 -top-1.5 rounded-full bg-red-500 p-0.5 text-white hover:bg-red-600"
                     >
-                      <X size={12} />
+                      <X size={10} />
                     </button>
                   </div>
                 ) : (
-                  <label className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-gray-300 hover:border-emerald-500">
-                    <Upload size={20} className="text-black" />
+                  <label className="flex h-14 w-14 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-gray-300 hover:border-emerald-500">
+                    <Upload size={16} className="text-black" />
                     <input
                       type="file"
                       accept="image/*"
@@ -239,7 +276,7 @@ export default function SettingsPage({
                   </label>
                 )}
                 {!logoUrl && (
-                  <label className="cursor-pointer rounded-lg border px-4 py-2 text-sm font-medium text-black hover:bg-gray-50">
+                  <label className="cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium text-black hover:bg-gray-50">
                     {t("settings.upload_logo")}
                     <input
                       type="file"
@@ -249,72 +286,71 @@ export default function SettingsPage({
                     />
                   </label>
                 )}
-                {uploading && <span className="text-sm text-black">Uploading...</span>}
+                {uploading && <span className="text-xs text-black">Uploading...</span>}
               </div>
             </div>
 
-            {/* Fields in grid */}
-            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+            <div className="grid grid-cols-3 gap-x-4 gap-y-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-black">
+                <label className="mb-0.5 block text-xs font-medium text-black">
                   {t("settings.company_name")}
                 </label>
                 <input
                   type="text"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-black">
+                <label className="mb-0.5 block text-xs font-medium text-black">
                   {t("settings.contact_number")}
                 </label>
                 <input
                   type="text"
                   value={contactNumber}
                   onChange={(e) => setContactNumber(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-black">
+                <label className="mb-0.5 block text-xs font-medium text-black">
                   {t("settings.vat_number")}
                 </label>
                 <input
                   type="text"
                   value={vatNumber}
                   onChange={(e) => setVatNumber(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
                 />
               </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-black">
+              <div className="col-span-3">
+                <label className="mb-0.5 block text-xs font-medium text-black">
                   {t("settings.address")}
                 </label>
                 <textarea
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   rows={1}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none resize-none"
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none resize-none"
                 />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Social Media */}
+        {/* Social Media + Timezone */}
         <div className="rounded-lg border bg-white">
-          <div className="flex items-center gap-3 border-b px-6 py-4">
+          <div className="flex items-center gap-3 border-b px-4 py-3">
             <Share2 className="h-5 w-5 text-emerald-600" />
-            <h2 className="text-base font-semibold text-black">
+            <h2 className="text-sm font-semibold text-black">
               {t("settings.social_media")}
             </h2>
           </div>
-          <div className="px-6 py-4">
-            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+          <div className="px-4 py-3">
+            <div className="grid grid-cols-3 gap-x-4 gap-y-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-black">
+                <label className="mb-0.5 block text-xs font-medium text-black">
                   {t("settings.whatsapp_link")}
                 </label>
                 <input
@@ -322,11 +358,11 @@ export default function SettingsPage({
                   value={whatsappLink}
                   onChange={(e) => setWhatsappLink(e.target.value)}
                   placeholder="https://wa.me/..."
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-black">
+                <label className="mb-0.5 block text-xs font-medium text-black">
                   {t("settings.facebook_link")}
                 </label>
                 <input
@@ -334,11 +370,11 @@ export default function SettingsPage({
                   value={facebookLink}
                   onChange={(e) => setFacebookLink(e.target.value)}
                   placeholder="https://facebook.com/..."
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-black">
+                <label className="mb-0.5 block text-xs font-medium text-black">
                   {t("settings.tiktok_link")}
                 </label>
                 <input
@@ -346,11 +382,11 @@ export default function SettingsPage({
                   value={tiktokLink}
                   onChange={(e) => setTiktokLink(e.target.value)}
                   placeholder="https://tiktok.com/@..."
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-black">
+                <label className="mb-0.5 block text-xs font-medium text-black">
                   {t("settings.youtube_link")}
                 </label>
                 <input
@@ -358,31 +394,52 @@ export default function SettingsPage({
                   value={youtubeLink}
                   onChange={(e) => setYoutubeLink(e.target.value)}
                   placeholder="https://youtube.com/@..."
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
                 />
               </div>
+              {isSuperAdmin && (
+                <div>
+                  <label className="mb-0.5 block text-xs font-medium text-black">
+                    <Clock className="mr-1 inline h-3 w-3" />
+                    Timezone
+                  </label>
+                  <select
+                    value={timezone}
+                    onChange={(e) => setTimezone(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
+                  >
+                    {TIMEZONES.map((tz) => (
+                      <option key={tz} value={tz}>{tz}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
+            {isSuperAdmin && (
+              <p className="mt-1 text-[10px] text-black">
+                All dates &times displayed in this timezone (stored in GMT/UTC). Only super admin can change this.
+              </p>
+            )}
           </div>
         </div>
 
         {/* Quotations */}
         <div className="rounded-lg border bg-white">
-          <div className="flex items-center gap-3 border-b px-6 py-4">
+          <div className="flex items-center gap-3 border-b px-4 py-3">
             <FileText className="h-5 w-5 text-emerald-600" />
-            <h2 className="text-base font-semibold text-black">{t("quotations.title")}</h2>
+            <h2 className="text-sm font-semibold text-black">{t("quotations.title")}</h2>
           </div>
-          <div className="px-6 py-4">
-            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+          <div className="px-4 py-3">
+            <div className="grid grid-cols-3 gap-x-4 gap-y-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-black">Valid Days</label>
+                <label className="mb-0.5 block text-xs font-medium text-black">Valid Days</label>
                 <input
                   type="number"
                   min={1}
                   value={quotationValidDays}
                   onChange={(e) => setQuotationValidDays(Number(e.target.value))}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
                 />
-                <p className="mt-1 text-xs text-black">Auto-calculates valid until date in new quotations</p>
               </div>
             </div>
           </div>
@@ -390,23 +447,44 @@ export default function SettingsPage({
 
         {/* POS Settings */}
         <div className="rounded-lg border bg-white">
-          <div className="flex items-center gap-3 border-b px-6 py-4">
+          <div className="flex items-center gap-3 border-b px-4 py-3">
             <ShoppingCart className="h-5 w-5 text-emerald-600" />
-            <h2 className="text-base font-semibold text-black">POS</h2>
+            <h2 className="text-sm font-semibold text-black">POS</h2>
           </div>
-          <div className="px-6 py-4">
-            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+          <div className="px-4 py-3">
+            <div className="grid grid-cols-3 gap-x-4 gap-y-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-black">Max Discount %</label>
+                <label className="mb-0.5 block text-xs font-medium text-black">Max Discount %</label>
                 <input
                   type="number"
                   min={0}
                   max={100}
                   value={maxDiscountPercent}
                   onChange={(e) => setMaxDiscountPercent(Number(e.target.value))}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
                 />
-                <p className="mt-1 text-xs text-black">Global maximum discount percentage allowed in POS</p>
+              </div>
+              <div>
+                <label className="mb-0.5 block text-xs font-medium text-black">Business Type</label>
+                <select
+                  value={businessType}
+                  onChange={(e) => setBusinessType(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="sale">Sale</option>
+                  <option value="rent">Rent</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-0.5 block text-xs font-medium text-black">Rent Calculation</label>
+                <select
+                  value={rentCalculation}
+                  onChange={(e) => setRentCalculation(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="days">Days</option>
+                  <option value="hours">Hours</option>
+                </select>
               </div>
             </div>
           </div>
@@ -414,40 +492,40 @@ export default function SettingsPage({
 
         {/* WhatsApp Business API */}
         <div className="rounded-lg border bg-white">
-          <div className="flex items-center gap-3 border-b px-6 py-4">
+          <div className="flex items-center gap-3 border-b px-4 py-3">
             <MessageCircle className="h-5 w-5 text-emerald-600" />
-            <h2 className="text-base font-semibold text-black">WhatsApp Business API</h2>
+            <h2 className="text-sm font-semibold text-black">WhatsApp Business API</h2>
           </div>
-          <div className="px-6 py-4">
-            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+          <div className="px-4 py-3">
+            <div className="grid grid-cols-3 gap-x-4 gap-y-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-black">API Key</label>
+                <label className="mb-0.5 block text-xs font-medium text-black">API Key</label>
                 <input
                   type="text"
                   value={whatsappApiKey}
                   onChange={(e) => setWhatsappApiKey(e.target.value)}
                   placeholder="Permanent access token"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-black">Phone Number ID</label>
+                <label className="mb-0.5 block text-xs font-medium text-black">Phone Number ID</label>
                 <input
                   type="text"
                   value={whatsappPhoneNumberId}
                   onChange={(e) => setWhatsappPhoneNumberId(e.target.value)}
                   placeholder="From Meta Business dashboard"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-black">Business Account ID</label>
+                <label className="mb-0.5 block text-xs font-medium text-black">Business Account ID</label>
                 <input
                   type="text"
                   value={whatsappBusinessAccountId}
                   onChange={(e) => setWhatsappBusinessAccountId(e.target.value)}
                   placeholder="From Meta Business dashboard"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
                 />
               </div>
             </div>
@@ -456,18 +534,18 @@ export default function SettingsPage({
 
         {/* SMS API */}
         <div className="rounded-lg border bg-white">
-          <div className="flex items-center gap-3 border-b px-6 py-4">
+          <div className="flex items-center gap-3 border-b px-4 py-3">
             <Smartphone className="h-5 w-5 text-emerald-600" />
-            <h2 className="text-base font-semibold text-black">SMS API</h2>
+            <h2 className="text-sm font-semibold text-black">SMS API</h2>
           </div>
-          <div className="px-6 py-4">
-            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+          <div className="px-4 py-3">
+            <div className="grid grid-cols-3 gap-x-4 gap-y-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-black">Provider</label>
+                <label className="mb-0.5 block text-xs font-medium text-black">Provider</label>
                 <select
                   value={smsProvider}
                   onChange={(e) => setSmsProvider(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
                 >
                   <option value="">None</option>
                   <option value="dialog">Dialog</option>
@@ -475,23 +553,23 @@ export default function SettingsPage({
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-black">API Key</label>
+                <label className="mb-0.5 block text-xs font-medium text-black">API Key</label>
                 <input
                   type="text"
                   value={smsApiKey}
                   onChange={(e) => setSmsApiKey(e.target.value)}
                   placeholder="API key from provider"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-black">API Secret</label>
+                <label className="mb-0.5 block text-xs font-medium text-black">API Secret</label>
                 <input
                   type="text"
                   value={smsApiSecret}
                   onChange={(e) => setSmsApiSecret(e.target.value)}
                   placeholder="API secret from provider"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
                 />
               </div>
             </div>
@@ -593,17 +671,17 @@ export default function SettingsPage({
         {/* Existing settings sections */}
         {sections.map((section) => (
           <div key={section.key} className="rounded-lg border bg-white">
-            <div className="flex items-center gap-3 border-b px-6 py-4">
+            <div className="flex items-center gap-3 border-b px-4 py-3">
               <section.icon className="h-5 w-5 text-emerald-600" />
-              <h2 className="text-base font-semibold text-black">
+              <h2 className="text-sm font-semibold text-black">
                 {t(`settings.${section.key}`)}
               </h2>
             </div>
-            <div className="divide-y px-6 py-4">
+            <div className="divide-y px-4 py-2">
               {section.fields.map((field) => (
-                <div key={field.key} className="flex items-center justify-between py-3">
+                <div key={field.key} className="flex items-center justify-between py-2">
                   <div>
-                    <label className="text-sm font-medium text-black">
+                    <label className="text-xs font-medium text-black">
                       {t(`settings.${field.key}`)}
                     </label>
                   </div>
@@ -614,13 +692,13 @@ export default function SettingsPage({
                         defaultChecked={field.defaultValue as boolean}
                         className="peer sr-only"
                       />
-                      <div className="h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all peer-checked:bg-emerald-600 peer-checked:after:translate-x-full peer-checked:after:border-white" />
+                      <div className="h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all peer-checked:bg-emerald-600 peer-checked:after:translate-x-full peer-checked:after:border-white" />
                     </label>
                   ) : (
                     <input
                       type={field.type}
                       defaultValue={field.defaultValue as string | number}
-                      className="w-48 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      className="w-40 rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
                   )}
                 </div>
@@ -631,14 +709,14 @@ export default function SettingsPage({
 
         <div className="flex items-center justify-end gap-3">
           {saved && (
-            <span className="text-sm font-medium text-emerald-600">
+            <span className="text-xs font-medium text-emerald-600">
               {t("settings.saved")}
             </span>
           )}
           <button
             onClick={handleSave}
             disabled={saving}
-            className="rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+            className="rounded-lg bg-emerald-600 px-5 py-2 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
           >
             {saving ? t("common.loading") : t("common.save")}
           </button>

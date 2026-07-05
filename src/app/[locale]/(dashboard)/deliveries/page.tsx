@@ -4,7 +4,7 @@ import { use, useEffect, useMemo, useState } from "react"
 import { useTranslations } from "next-intl"
 import { PageHeader } from "@/components/shared/page-header"
 import { createClient } from "@/lib/supabase/client"
-import { Plus, X, Eye, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
+import { Plus, X, Eye, Pencil, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 import { formatDate } from "@/lib/format"
 import Link from "next/link"
 
@@ -281,7 +281,7 @@ export default function DeliveriesPage({ params }: { params: Promise<{ locale: s
                               >
                                 <span className="inline-flex items-center gap-1">
                                   {col.label}
-                                  <Icon size={11} className="shrink-0" />
+                                  <Icon size={11} className="shrink-0 text-black" />
                                 </span>
                               </th>
                             )
@@ -392,7 +392,7 @@ export default function DeliveriesPage({ params }: { params: Promise<{ locale: s
                     >
                       <span className="inline-flex items-center gap-1">
                         {col.label}
-                        <Icon size={11} className="shrink-0" />
+                        <Icon size={11} className="shrink-0 text-black" />
                       </span>
                     </th>
                   )
@@ -424,9 +424,31 @@ export default function DeliveriesPage({ params }: { params: Promise<{ locale: s
                       </select>
                     </td>
                     <td className="px-4 py-3">
-                      <Link href={`/${locale}/deliveries/${d.id}`} className="rounded-lg p-1.5 hover:bg-gray-100 inline-block">
-                        <Eye size={16} className="text-black" />
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link href={`/${locale}/deliveries/${d.id}`} className="rounded-lg p-1.5 hover:bg-gray-100 inline-block" title="View">
+                          <Eye size={16} className="text-black" />
+                        </Link>
+                        <Link
+                          href={`/${locale}/deliveries/${d.id}`}
+                          onClick={(e) => { if (!confirm("Are you sure you want to edit this delivery?")) e.preventDefault() }}
+                          className="rounded-lg p-1.5 hover:bg-gray-100 inline-block"
+                          title="Edit"
+                        >
+                          <Pencil size={16} className="text-black" />
+                        </Link>
+                        <button
+                          onClick={async () => {
+                            if (!confirm("Are you sure you want to delete this delivery? This action cannot be undone.")) return
+                            const supabase = createClient()
+                            await supabase.from("deliveries").delete().eq("id", d.id)
+                            setDeliveries((prev) => prev.filter((del) => del.id !== d.id))
+                          }}
+                          className="rounded-lg p-1.5 hover:bg-gray-100"
+                          title="Delete"
+                        >
+                          <Trash2 size={16} className="text-black" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )

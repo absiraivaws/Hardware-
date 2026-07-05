@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react"
 import { useTranslations } from "next-intl"
-import { Plus, Eye, Ban, CheckCircle } from "lucide-react"
+import { Plus, Eye, Ban, CheckCircle, Pencil, Trash2 } from "lucide-react"
 import { DataTable } from "@/components/shared/data-table"
 import { createClient } from "@/lib/supabase/client"
 import { getCached, setCache } from "@/lib/query-cache"
@@ -141,6 +141,28 @@ export default function SuppliersPage({
           >
             <Eye size={16} />
           </a>
+          <button
+            onClick={() => {
+              if (confirm("Are you sure you want to edit this supplier?"))
+                window.location.href = `/${locale}/suppliers/ledger?supplier_id=${s.id}`
+            }}
+            className="rounded p-1 text-black hover:bg-gray-100"
+            title="Edit"
+          >
+            <Pencil size={16} />
+          </button>
+          <button
+            onClick={async () => {
+              if (!confirm("Are you sure you want to delete this supplier? This action cannot be undone.")) return
+              const supabase = createClient()
+              await supabase.from("suppliers").delete().eq("id", s.id)
+              setSuppliers((prev) => prev.filter((sup) => sup.id !== s.id))
+            }}
+            className="rounded p-1 text-black hover:bg-gray-100"
+            title="Delete"
+          >
+            <Trash2 size={16} />
+          </button>
         </div>
       ),
     },

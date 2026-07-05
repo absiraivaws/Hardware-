@@ -141,7 +141,7 @@ export default function DashboardPage({
           { data: recentRaw },
           { data: chartRaw },
           { data: ledgerData },
-          { data: pendingApprovalsRaw },
+          { data: pendingTasksRaw },
           { data: bouncedChequesRaw },
           { data: purchasesRaw },
           { data: expenseRaw },
@@ -154,7 +154,7 @@ export default function DashboardPage({
           supabase.from("sales").select("customer_name, grand_total, payment_type, created_at").eq("status", "completed").order("created_at", { ascending: false }).limit(5),
           supabase.from("sales").select("grand_total, created_at").gte("created_at", periodStart).lte("created_at", periodEnd).eq("status", "completed"),
           supabase.from("ledger_entries").select("entry_type, amount, ledger_type").in("ledger_type", ["cash", "bank"]),
-          supabase.from("sales").select("id", { count: "exact", head: true }).eq("credit_approval_status", "pending"),
+          supabase.from("tasks").select("id", { count: "exact", head: true }).eq("status", "pending"),
           supabase.from("sales").select("id", { count: "exact", head: true }).eq("cheque_status", "bounced"),
           supabase.from("purchase_orders").select("grand_total, created_at").gte("created_at", periodStart).lte("created_at", periodEnd),
           supabase.from("ledger_entries").select("amount, created_at").eq("ledger_type", "expense").gte("created_at", periodStart).lte("created_at", periodEnd),
@@ -172,7 +172,7 @@ export default function DashboardPage({
           const expiry = new Date((p as Record<string, unknown>).expiry_date as string)
           return expiry <= thirtyDaysFromNow
         }).length
-        const pendingApprovalsCount = (pendingApprovalsRaw as unknown as { count: number } | null)?.count ?? 0
+        const pendingApprovalsCount = (pendingTasksRaw as unknown as { count: number } | null)?.count ?? 0
         const bouncedChequesCount = (bouncedChequesRaw as unknown as { count: number } | null)?.count ?? 0
 
         const cashLedger = (ledgerData ?? []).filter((r: Record<string, unknown>) => r.ledger_type === "cash")

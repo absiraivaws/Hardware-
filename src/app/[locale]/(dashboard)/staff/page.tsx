@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/shared/page-header"
 import { DataTable } from "@/components/shared/data-table"
 import { createClient } from "@/lib/supabase/client"
 import { formatDate } from "@/lib/format"
-import { Plus, Pencil, X, Search, ExternalLink } from "lucide-react"
+import { Plus, Pencil, Trash2, X, Search, ExternalLink, Eye } from "lucide-react"
 
 type UserRole = "super_admin" | "owner" | "branch_manager" | "cashier" | "store_keeper" | "accountant" | "sales_executive"
 
@@ -233,13 +233,38 @@ export default function StaffPage({ params }: { params: Promise<{ locale: string
       key: "actions",
       label: "Actions",
       render: (s: StaffMember) => (
-        <button
-          onClick={(e) => { e.stopPropagation(); openEditForm(s) }}
-          className="rounded-lg p-1.5 text-black hover:bg-gray-100"
-          title="Edit"
-        >
-          <Pencil size={15} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => router.push(`/${locale}/staff/${s.id}`)}
+            className="rounded-lg p-1.5 text-black hover:bg-gray-100"
+            title="View"
+          >
+            <Eye size={16} />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              if (confirm("Are you sure you want to edit this staff member?"))
+                openEditForm(s)
+            }}
+            className="rounded-lg p-1.5 text-black hover:bg-gray-100"
+            title="Edit"
+          >
+            <Pencil size={16} />
+          </button>
+          <button
+            onClick={async () => {
+              if (!confirm("Are you sure you want to delete this staff member?")) return
+              const supabase = createClient()
+              await supabase.from("staff").delete().eq("id", s.id)
+              setStaff((prev) => prev.filter((st) => st.id !== s.id))
+            }}
+            className="rounded-lg p-1.5 text-black hover:bg-gray-100"
+            title="Delete"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
       ),
     },
   ]

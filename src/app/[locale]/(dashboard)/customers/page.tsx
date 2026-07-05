@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react"
 import { useTranslations } from "next-intl"
-import { Plus, Eye, Ban, CheckCircle, AlertTriangle, Pencil, X } from "lucide-react"
+import { Plus, Eye, Ban, CheckCircle, AlertTriangle, Pencil, Trash2, X } from "lucide-react"
 import { DataTable } from "@/components/shared/data-table"
 import { formatCurrency } from "@/lib/format"
 import { createClient } from "@/lib/supabase/client"
@@ -247,7 +247,7 @@ export default function CustomersPage({
             {c.status === "active" ? <Ban size={16} /> : <CheckCircle size={16} />}
           </button>
           <button
-            onClick={() => openEdit(c)}
+            onClick={() => { if (confirm("Are you sure you want to edit this customer?")) openEdit(c) }}
             className="rounded p-1 text-black hover:bg-gray-100"
             title="Edit"
           >
@@ -260,6 +260,18 @@ export default function CustomersPage({
           >
             <Eye size={16} />
           </a>
+          <button
+            onClick={async () => {
+              if (!confirm("Are you sure you want to delete this customer? This action cannot be undone.")) return
+              const supabase = createClient()
+              await supabase.from("customers").delete().eq("id", c.id)
+              setCustomers((prev) => prev.filter((cust) => cust.id !== c.id))
+            }}
+            className="rounded p-1 text-black hover:bg-gray-100"
+            title="Delete"
+          >
+            <Trash2 size={16} />
+          </button>
         </div>
       ),
     },

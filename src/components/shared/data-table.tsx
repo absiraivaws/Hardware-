@@ -110,18 +110,43 @@ export function DataTable<T>({
 
   return (
     <div>
-      {searchable && (
-        <div className="relative mb-4 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-black" size={18} />
-          <input
-            type="text"
-            placeholder={t("common.search")}
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-            className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-          />
-        </div>
-      )}
+      <div className="mb-4 flex items-center justify-between gap-4">
+        {searchable && (
+          <div className="relative max-w-sm flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-black" size={18} />
+            <input
+              type="text"
+              placeholder={t("common.search")}
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+              className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            />
+          </div>
+        )}
+        {totalPages > 1 && (
+          <div className="flex shrink-0 items-center gap-3">
+            <span className="text-sm text-black">
+              Page {page} of {totalPages}
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage(Math.max(1, page - 1))}
+                disabled={page === 1}
+                className="rounded-lg border border-gray-300 p-1.5 text-black hover:bg-gray-50 disabled:opacity-50"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                onClick={() => setPage(Math.min(totalPages, page + 1))}
+                disabled={page === totalPages}
+                className="rounded-lg border border-gray-300 p-1.5 text-black hover:bg-gray-50 disabled:opacity-50"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="overflow-x-auto rounded-lg border">
         <table className="min-w-full divide-y divide-gray-200">
@@ -140,7 +165,7 @@ export function DataTable<T>({
                   >
                     <span className="inline-flex items-center gap-1.5">
                       {col.label}
-                      <SortIcon size={13} className="shrink-0" />
+                      <SortIcon size={13} className="shrink-0 text-black" />
                     </span>
                   </th>
                 )
@@ -168,30 +193,6 @@ export function DataTable<T>({
           </tbody>
         </table>
       </div>
-
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between border-t px-4 py-3">
-          <span className="text-sm text-black">
-            Page {page} of {totalPages}
-          </span>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setPage(Math.max(1, page - 1))}
-              disabled={page === 1}
-              className="rounded-lg border p-1.5 hover:bg-gray-50 disabled:opacity-50"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <button
-              onClick={() => setPage(Math.min(totalPages, page + 1))}
-              disabled={page === totalPages}
-              className="rounded-lg border p-1.5 hover:bg-gray-50 disabled:opacity-50"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

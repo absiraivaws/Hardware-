@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl"
 import { use, useEffect, useState } from "react"
-import { Plus, ArrowRightLeft, Loader2, X, Check } from "lucide-react"
+import { Plus, ArrowRightLeft, Loader2, X, Check, Eye, Pencil, Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { PageHeader } from "@/components/shared/page-header"
 import { DataTable } from "@/components/shared/data-table"
@@ -104,60 +104,75 @@ export default function StockTransfersPage({ params }: { params: Promise<{ local
     {
       key: "actions",
       label: t("common.actions"),
-      render: (item: Transfer) =>
-        item.status === "pending" ? (
-          <div className="flex gap-1">
-            <button
-              onClick={async () => {
-                const supabase = createClient()
-                const { data: userData } = await supabase.auth.getUser()
-                if (!userData.user) return
-                const { data: items } = await supabase.from("stock_transfer_items").select("product_id, quantity").eq("transfer_id", item.id)
-                if (!items) return
-                const productIds = items.map((si) => si.product_id)
-                // Batch fetch source branch stocks
-                const { data: srcStocks } = await supabase.from("branch_stock").select("product_id, current_stock").in("product_id", productIds).eq("branch_id", item.from_branch_id)
-                // Batch fetch destination branch stocks
-                const { data: dstStocks } = await supabase.from("branch_stock").select("product_id, current_stock").in("product_id", productIds).eq("branch_id", item.to_branch_id)
-                const queryPromises: Promise<unknown>[] = []
-                for (const si of items) {
-                  const srcBs = srcStocks?.find((s) => s.product_id === si.product_id)
-                  if (srcBs) {
-                    queryPromises.push(supabase.from("branch_stock").update({ current_stock: Number(srcBs.current_stock) - si.quantity }).eq("product_id", si.product_id).eq("branch_id", item.from_branch_id) as unknown as Promise<unknown>)
+      render: (item: Transfer) => (
+        <div className="flex gap-1 items-center">
+          {item.status === "pending" && (
+            <>
+              <button
+                onClick={async () => {
+                  const supabase = createClient()
+                  const { data: userData } = await supabase.auth.getUser()
+                  if (!userData.user) return
+                  const { data: items } = await supabase.from("stock_transfer_items").select("product_id, quantity").eq("transfer_id", item.id)
+                  if (!items) return
+                  const productIds = items.map((si) => si.product_id)
+                  const { data: srcStocks } = await supabase.from("branch_stock").select("product_id, current_stock").in("product_id", productIds).eq("branch_id", item.from_branch_id)
+                  const { data: dstStocks } = await supabase.from("branch_stock").select("product_id, current_stock").in("product_id", productIds).eq("branch_id", item.to_branch_id)
+                  const queryPromises: Promise<unknown>[] = []
+                  for (const si of items) {
+                    const srcBs = srcStocks?.find((s) => s.product_id === si.product_id)
+                    if (srcBs) {
+                      queryPromises.push(supabase.from("branch_stock").update({ current_stock: Number(srcBs.current_stock) - si.quantity }).eq("product_id", si.product_id).eq("branch_id", item.from_branch_id) as unknown as Promise<unknown>)
+                    }
+                    const dstBs = dstStocks?.find((s) => s.product_id === si.product_id)
+                    queryPromises.push(supabase.from("branch_stock").upsert({
+                      product_id: si.product_id,
+                      branch_id: item.to_branch_id,
+                      current_stock: (dstBs ? Number(dstBs.current_stock) : 0) + si.quantity,
+                    }, { onConflict: "product_id,branch_id" }) as unknown as Promise<unknown>)
                   }
-                  const dstBs = dstStocks?.find((s) => s.product_id === si.product_id)
-                  queryPromises.push(supabase.from("branch_stock").upsert({
-                    product_id: si.product_id,
-                    branch_id: item.to_branch_id,
-                    current_stock: (dstBs ? Number(dstBs.current_stock) : 0) + si.quantity,
-                  }, { onConflict: "product_id,branch_id" }) as unknown as Promise<unknown>)
-                }
-                queryPromises.push(supabase.from("stock_transfers").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", item.id) as unknown as Promise<unknown>)
-                await Promise.all(queryPromises)
-                invalidateCache("stock_transfers")
-                const { data: refreshed } = await supabase.from("stock_transfers").select("*, from_branch:branches!from_branch_id(name), to_branch:branches!to_branch_id(name)").order("created_at", { ascending: false })
-                if (refreshed) setTransfers(refreshed as unknown as Transfer[])
-              }}
-              className="rounded bg-emerald-100 p-1.5 text-black hover:bg-emerald-200"
-              title="Complete"
-            >
-              <Check size={16} />
-            </button>
-            <button
-              onClick={async () => {
-                const supabase = createClient()
-                await supabase.from("stock_transfers").update({ status: "cancelled" }).eq("id", item.id)
-                invalidateCache("stock_transfers")
-                const { data: refreshed } = await supabase.from("stock_transfers").select("*, from_branch:branches!from_branch_id(name), to_branch:branches!to_branch_id(name)").order("created_at", { ascending: false })
-                if (refreshed) setTransfers(refreshed as unknown as Transfer[])
-              }}
-              className="rounded bg-red-100 p-1.5 text-black hover:bg-red-200"
-              title="Cancel"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        ) : null,
+                  queryPromises.push(supabase.from("stock_transfers").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", item.id) as unknown as Promise<unknown>)
+                  await Promise.all(queryPromises)
+                  invalidateCache("stock_transfers")
+                  const { data: refreshed } = await supabase.from("stock_transfers").select("*, from_branch:branches!from_branch_id(name), to_branch:branches!to_branch_id(name)").order("created_at", { ascending: false })
+                  if (refreshed) setTransfers(refreshed as unknown as Transfer[])
+                }}
+                className="rounded bg-emerald-100 p-1.5 text-black hover:bg-emerald-200"
+                title="Complete"
+              >
+                <Check size={16} />
+              </button>
+              <button
+                onClick={async () => {
+                  const supabase = createClient()
+                  await supabase.from("stock_transfers").update({ status: "cancelled" }).eq("id", item.id)
+                  invalidateCache("stock_transfers")
+                  const { data: refreshed } = await supabase.from("stock_transfers").select("*, from_branch:branches!from_branch_id(name), to_branch:branches!to_branch_id(name)").order("created_at", { ascending: false })
+                  if (refreshed) setTransfers(refreshed as unknown as Transfer[])
+                }}
+                className="rounded bg-red-100 p-1.5 text-black hover:bg-red-200"
+                title="Cancel"
+              >
+                <X size={16} />
+              </button>
+            </>
+          )}
+          <button
+            onClick={async () => {
+              if (!confirm("Are you sure you want to delete this stock transfer? This action cannot be undone.")) return
+              const supabase = createClient()
+              await supabase.from("stock_transfers").delete().eq("id", item.id)
+              invalidateCache("stock_transfers")
+              const { data: refreshed } = await supabase.from("stock_transfers").select("*, from_branch:branches!from_branch_id(name), to_branch:branches!to_branch_id(name)").order("created_at", { ascending: false })
+              if (refreshed) setTransfers(refreshed as unknown as Transfer[])
+            }}
+            className="rounded bg-gray-100 p-1.5 text-black hover:bg-gray-200"
+            title="Delete"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      ),
     },
   ]
 

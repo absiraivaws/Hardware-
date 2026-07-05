@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl"
 import { useParams, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { Plus, Eye, FileText } from "lucide-react"
+import { Plus, Eye, Pencil, Trash2, FileText } from "lucide-react"
 import { DataTable } from "@/components/shared/data-table"
 import { PageHeader } from "@/components/shared/page-header"
 import { formatCurrency, formatDate } from "@/lib/format"
@@ -140,12 +140,45 @@ export default function QuotationsPage() {
       key: "actions",
       label: t("common.actions"),
       render: (item: Quotation) => (
-        <button
-          onClick={() => router.push(`/${locale}/quotations/${item.id}`)}
-          className="rounded-lg p-1.5 text-black hover:bg-gray-100 hover:text-black"
-        >
-          <Eye size={16} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => router.push(`/${locale}/quotations/${item.id}`)}
+            className="rounded-lg p-1.5 text-black hover:bg-gray-100"
+            title="View"
+          >
+            <Eye size={16} />
+          </button>
+          <button
+            onClick={() => {
+              if (confirm("Are you sure you want to edit this quotation?"))
+                router.push(`/${locale}/quotations/${item.id}`)
+            }}
+            className="rounded-lg p-1.5 text-black hover:bg-gray-100"
+            title="Edit"
+          >
+            <Pencil size={16} />
+          </button>
+          <button
+            onClick={async () => {
+              if (!confirm("Are you sure you want to delete this quotation? This action cannot be undone.")) return
+              const supabase = createClient()
+              await supabase.from("quotations").delete().eq("id", item.id)
+              setCache("quotations:list", null)
+              const { data } = await supabase.from("quotations").select("*, customers!left(code)").order("created_at", { ascending: false })
+              if (data) {
+                const enriched = (data as Array<Record<string, unknown>>).map((item: Record<string, unknown>) => {
+                  const customers = item.customers as { code?: string } | null
+                  return { ...item, customer_code: customers?.code ?? null } as QuotationWithCustomer
+                })
+                setQuotations(enriched)
+              }
+            }}
+            className="rounded-lg p-1.5 text-black hover:bg-gray-100"
+            title="Delete"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
       ),
     },
   ]

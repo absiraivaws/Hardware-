@@ -816,6 +816,9 @@ export interface Database {
           lanka_qr_currency_code: string
           lanka_qr_country_code: string
           max_discount_percent: number
+          business_type: string
+          rent_calculation: string
+          timezone: string
           updated_at: string
         }
         Insert: {
@@ -848,6 +851,9 @@ export interface Database {
           lanka_qr_currency_code?: string
           lanka_qr_country_code?: string
           max_discount_percent?: number
+          business_type?: string
+          rent_calculation?: string
+          timezone?: string
           updated_at?: string
         }
         Update: {
@@ -880,6 +886,9 @@ export interface Database {
           lanka_qr_currency_code?: string
           lanka_qr_country_code?: string
           max_discount_percent?: number
+          business_type?: string
+          rent_calculation?: string
+          timezone?: string
           updated_at?: string
         }
       }
@@ -1094,7 +1103,16 @@ export interface Database {
           deposit_amount: number
           total_fee: number
           late_fee: number
+          payment_type: string
+          paid_amount: number
+          remaining_balance: number
           notes: string
+          start_datetime: string | null
+          rent_calculation: string
+          return_labour_charge: number
+          return_other_charges: number
+          return_damage_cost: number
+          return_tax_type: string
           created_at: string
         }
         Insert: {
@@ -1110,7 +1128,16 @@ export interface Database {
           deposit_amount?: number
           total_fee?: number
           late_fee?: number
+          payment_type?: string
+          paid_amount?: number
+          remaining_balance?: number
           notes?: string
+          start_datetime?: string | null
+          rent_calculation?: string
+          return_labour_charge?: number
+          return_other_charges?: number
+          return_damage_cost?: number
+          return_tax_type?: string
           created_at?: string
         }
         Update: {
@@ -1126,10 +1153,20 @@ export interface Database {
           deposit_amount?: number
           total_fee?: number
           late_fee?: number
+          payment_type?: string
+          paid_amount?: number
+          remaining_balance?: number
           notes?: string
+          start_datetime?: string | null
+          rent_calculation?: string
+          return_labour_charge?: number
+          return_other_charges?: number
+          return_damage_cost?: number
+          return_tax_type?: string
           created_at?: string
         }
       }
+
       rental_items: {
         Row: {
           id: string
@@ -1165,6 +1202,35 @@ export interface Database {
           deposit?: number
           returned_quantity?: number
           damage_notes?: string
+          created_at?: string
+        }
+      }
+      rental_payments: {
+        Row: {
+          id: string
+          rental_id: string
+          amount: number
+          payment_type: string
+          payment_date: string
+          notes: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          rental_id: string
+          amount?: number
+          payment_type?: string
+          payment_date?: string
+          notes?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          rental_id?: string
+          amount?: number
+          payment_type?: string
+          payment_date?: string
+          notes?: string
           created_at?: string
         }
       }

@@ -45,6 +45,7 @@
     "reports": "Reports",
     "ledgers": "Ledgers",
     "audit_log": "Audit Log",
+    "tasks": "Tasks",
     "settings": "Settings",
     "logout": "Logout"
   },

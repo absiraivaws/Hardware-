@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/shared/page-header"
 import { formatCurrency, formatDate } from "@/lib/format"
 import { use, useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { Banknote, DollarSign, Eye, X, Ban } from "lucide-react"
+import { Banknote, DollarSign, Eye, Pencil, Trash2, X, Ban } from "lucide-react"
 import { CompanyFooter } from "@/components/shared/company-info"
 import type { CompanySettings } from "@/components/shared/company-info"
 import { getCached, setCache, invalidateCache } from "@/lib/query-cache"
@@ -427,13 +427,38 @@ export default function SaleHistoryPage({ params }: { params: Promise<{ locale: 
       key: "actions",
       label: t("common.actions"),
       render: (row: SaleRow) => (
-        <button
-          onClick={() => openDetail(row.id)}
-          className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium text-black transition hover:bg-gray-50 hover:text-black"
-        >
-          <Eye size={14} />
-          {t("common.view")}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => openDetail(row.id)}
+            className="rounded-lg p-1.5 text-black hover:bg-gray-100"
+            title="View"
+          >
+            <Eye size={16} />
+          </button>
+          <button
+            onClick={() => {
+              if (confirm("Are you sure you want to edit this sale?"))
+                openDetail(row.id)
+            }}
+            className="rounded-lg p-1.5 text-black hover:bg-gray-100"
+            title="Edit"
+          >
+            <Pencil size={16} />
+          </button>
+          <button
+            onClick={async () => {
+              if (!confirm("Are you sure you want to delete this sale? This action cannot be undone.")) return
+              const supabase = createClient()
+              await supabase.from("sales").update({ status: "cancelled" } as never).eq("id", row.id)
+              invalidateCache("sales")
+              loadSales()
+            }}
+            className="rounded-lg p-1.5 text-black hover:bg-gray-100"
+            title="Delete"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
       ),
     },
   ]

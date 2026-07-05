@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from "react"
 import { useTranslations } from "next-intl"
 import Link from "next/link"
-import { Plus, Pencil, Trash2 } from "lucide-react"
+import { Plus, Pencil, Trash2, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { DataTable } from "@/components/shared/data-table"
 import { PageHeader } from "@/components/shared/page-header"
@@ -156,12 +156,42 @@ export default function InventoryPage({ params }: { params: Promise<{ locale: st
     setLoading(false)
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm(t("common.confirm_delete"))) return
-    const { error } = await supabase.from("products").delete().eq("id", id)
-    if (!error) {
-      setProducts((prev) => prev.filter((p) => p.id !== id))
+  async function getNextTaskRef(): Promise<string> {
+    const supabase = createClient()
+    const { data } = await supabase.from("tasks").select("ref_number").order("ref_number", { ascending: false }).limit(1)
+    if (data && data.length > 0) {
+      const num = parseInt(data[0].ref_number.replace("TSK-", ""), 10)
+      if (!isNaN(num)) return "TSK-" + String(num + 1).padStart(4, "0")
     }
+    return "TSK-0001"
+  }
+
+  async function createTask(action: string, entity: ProductRow) {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const ref = await getNextTaskRef()
+    const { error } = await supabase.from("tasks").insert({
+      ref_number: ref,
+      assign_date: new Date().toISOString(),
+      created_by: user?.id,
+      created_by_name: user?.email || "Unknown",
+      related_module: "Inventory",
+      user_action: action,
+      entity_id: entity.id,
+      entity_description: `${entity.code} - ${entity.name}`,
+      before_values: entity as Record<string, unknown>,
+      status: "pending",
+    })
+    if (!error) {
+      alert(`Task #${ref} created. Please wait for approval to complete this ${action}.`)
+    }
+  }
+
+  async function handleDelete(id: string) {
+    const item = products.find((p) => p.id === id)
+    if (!item) return
+    if (!confirm("Are you sure you want to request deletion of this product?")) return
+    await createTask("delete", item)
   }
 
   const numberFormat = new Intl.NumberFormat("en-US", {
@@ -236,13 +266,32 @@ export default function InventoryPage({ params }: { params: Promise<{ locale: st
       ),
     },
     {
-      key: "stock_value",
-      label: "Stock Value",
-      render: (item: ProductRow) => {
-        const fifo = fifoValues[item.id]
-        const value = fifo ? fifo.value : item.current_stock * item.cost_price
-        return <span className="font-medium">{formatCurrency(value, locale)}</span>
-      },
+      key: "cost_price",
+      label: "Purchase Price",
+      render: (item: ProductRow) => (
+        <span>{numberFormat.format(item.cost_price)}</span>
+      ),
+    },
+    {
+      key: "rent_price",
+      label: "Rent Price",
+      render: (item: ProductRow) => (
+        <span>{item.code.startsWith("REN") ? numberFormat.format(item.selling_price) : "-"}</span>
+      ),
+    },
+    {
+      key: "total_stock_qty",
+      label: "Total Stock Qty",
+      render: (item: ProductRow) => (
+        <span>{item.code.startsWith("REN") ? item.current_stock : "-"}</span>
+      ),
+    },
+    {
+      key: "total_stock",
+      label: "Total Stock Value",
+      render: (item: ProductRow) => (
+        <span className="font-medium">{formatCurrency(item.current_stock * item.cost_price, locale)}</span>
+      ),
     },
     {
       key: "status",
@@ -266,13 +315,22 @@ export default function InventoryPage({ params }: { params: Promise<{ locale: st
         <div className="flex items-center gap-2">
           <Link
             href={`/${locale}/inventory/new?id=${item.id}`}
-            className="rounded-lg p-1.5 text-black hover:bg-gray-100 hover:text-black"
+            className="rounded-lg p-1.5 text-black hover:bg-gray-100"
+            title="View"
+          >
+            <Eye size={16} />
+          </Link>
+          <Link
+            href={`/${locale}/inventory/new?id=${item.id}`}
+            className="rounded-lg p-1.5 text-black hover:bg-gray-100"
+            title="Edit"
           >
             <Pencil size={16} />
           </Link>
           <button
             onClick={() => handleDelete(item.id)}
-            className="rounded-lg p-1.5 text-black hover:bg-gray-100 hover:text-black"
+            className="rounded-lg p-1.5 text-black hover:bg-gray-100"
+            title="Delete"
           >
             <Trash2 size={16} />
           </button>

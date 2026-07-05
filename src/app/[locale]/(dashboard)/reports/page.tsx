@@ -133,7 +133,7 @@ export default function ReportsPage({ params }: PageProps) {
     return (
       <button onClick={() => handleSort(sortable)} className="inline-flex items-center gap-1 hover:text-black">
         {label}
-        <Icon size={12} className="shrink-0" />
+        <Icon size={12} className="shrink-0 text-black" />
       </button>
     )
   }

@@ -46,7 +46,7 @@ export function useAuth() {
 const ALL_SIDEBAR_MODULES = [
   "dashboard", "sales", "sales/history", "staff", "purchases", "inventory",
   "customers", "suppliers", "deliveries", "drivers", "vehicles", "quotations",
-  "rentals", "expenses", "reports", "ledgers", "audit-log",
+  "rentals", "expenses", "reports", "ledgers", "tasks", "audit-log",
 ]
 
 export function AuthProvider({ children }: { children: ReactNode }) {

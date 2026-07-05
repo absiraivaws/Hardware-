@@ -58,6 +58,8 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
   const [productCurrentStock, setProductCurrentStock] = useState(0)
   const [historySortKey, setHistorySortKey] = useState("created_at")
   const [historySortDir, setHistorySortDir] = useState<"asc" | "desc">("desc")
+  const [productType, setProductType] = useState<"sale" | "rent">("sale")
+  const [editEntity, setEditEntity] = useState<Database["public"]["Tables"]["products"]["Row"] | null>(null)
 
   const {
     register,
@@ -89,6 +91,45 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
 
   const watchHasExpiry = watch("has_expiry")
 
+  async function generateNextCode(prefix: string): Promise<string> {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from("products")
+      .select("code")
+      .ilike("code", prefix + "-%")
+      .order("code", { ascending: false })
+      .limit(1)
+    if (data && data.length > 0) {
+      const lastCode = data[0].code
+      const numStr = lastCode.replace(prefix + "-", "")
+      const num = parseInt(numStr, 10)
+      if (!isNaN(num)) {
+        return prefix + "-" + String(num + 1).padStart(numStr.length, "0")
+      }
+    }
+    return prefix + "-0001"
+  }
+
+  function handleCategoryChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const catId = e.target.value
+    if (catId === "__rent__") {
+      setProductType("rent")
+      setValue("category_id", "")
+      generateNextCode("REN").then((code) => setValue("code", code))
+      return
+    }
+    setValue("category_id", catId)
+    setProductType("sale")
+    const cat = categories.find((c) => c.id === catId)
+    if (cat) {
+      const words = cat.name.replace(/&/g, "").trim().split(/\s+/)
+      const prefix = words.length >= 3
+        ? words.slice(0, 3).map((w) => w[0]).join("").toUpperCase()
+        : cat.name.replace(/[^a-zA-Z]/g, "").slice(0, 3).toUpperCase()
+      generateNextCode(prefix).then((code) => setValue("code", code))
+    }
+  }
+
   useEffect(() => {
     async function loadData() {
       setLoading(true)
@@ -112,6 +153,8 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
           .single()
 
         if (data) {
+          setEditEntity(data)
+          if (data.code.startsWith("REN")) setProductType("rent")
           reset({
             code: data.code,
             name: data.name,
@@ -127,6 +170,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
             has_expiry: data.has_expiry,
             expiry_date: data.expiry_date || "",
             is_decimal_qty: data.is_decimal_qty,
+            starting_stock: data.current_stock || 0,
           })
         }
       }
@@ -250,15 +294,87 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
   }
 
   async function onSubmit(data: ProductForm) {
-    setSaving(true)
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const productClient = supabase.from("products") as any
 
-    if (isEdit) {
-      const { error } = await productClient.update({
+    try {
+      setSaving(true)
+
+      if (isEdit) {
+        const { data: { user } } = await supabase.auth.getUser()
+
+        // Get next task reference
+        const { data: lastTask } = await supabase
+          .from("tasks")
+          .select("ref_number")
+          .order("ref_number", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        const taskNum = lastTask?.ref_number
+          ? parseInt(lastTask.ref_number.replace("TSK-", ""), 10) + 1
+          : 1
+        const taskRef = "TSK-" + String(taskNum).padStart(4, "0")
+
+        const newValues = {
+          code: data.code,
+          name: data.name,
+          barcode: data.barcode || null,
+          description: data.description || null,
+          category_id: data.category_id || null,
+          brand_id: data.brand_id || null,
+          unit_id: data.unit_id || null,
+          cost_price: data.cost_price,
+          selling_price: data.selling_price,
+          wholesale_price: data.wholesale_price ?? null,
+          min_stock: data.min_stock,
+          has_expiry: data.has_expiry,
+          expiry_date: data.has_expiry ? (data.expiry_date || null) : null,
+          is_decimal_qty: data.is_decimal_qty,
+        }
+
+        const { error: taskError } = await supabase.from("tasks").insert({
+          ref_number: taskRef,
+          assign_date: new Date().toISOString(),
+          created_by: user?.id,
+          created_by_name: user?.email || "Unknown",
+          related_module: "Inventory",
+          user_action: "edit",
+          entity_id: editId,
+          entity_description: editEntity
+            ? `${editEntity.code} - ${editEntity.name}`
+            : `Product #${editId}`,
+          before_values: editEntity as Record<string, unknown>,
+          new_values: newValues as Record<string, unknown>,
+          status: "pending",
+        })
+
+        setSaving(false)
+        if (taskError) {
+          alert("Failed to create task: " + taskError.message)
+          return
+        }
+        alert(`Task #${taskRef} created. Please wait for approval.`)
+        router.push(`/${locale}/inventory`)
+        return
+      }
+
+      // Auto-generate next serial number
+      const { data: maxSerial } = await productClient
+        .select("serial_no")
+        .order("serial_no", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      let nextSerial = "000001"
+      if (maxSerial?.serial_no) {
+        const num = parseInt(maxSerial.serial_no, 10) + 1
+        nextSerial = String(num).padStart(6, "0")
+      }
+
+      const { data: newProduct, error } = await productClient.insert({
         code: data.code,
         name: data.name,
+        serial_no: nextSerial,
         barcode: data.barcode || null,
         description: data.description || null,
         category_id: data.category_id || null,
@@ -268,66 +384,38 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
         selling_price: data.selling_price,
         wholesale_price: data.wholesale_price ?? null,
         min_stock: data.min_stock,
+        current_stock: data.starting_stock,
         has_expiry: data.has_expiry,
         expiry_date: data.has_expiry ? (data.expiry_date || null) : null,
         is_decimal_qty: data.is_decimal_qty,
-      }).eq("id", editId!)
+      }).select("id").single()
+
+      if (!error && newProduct && data.starting_stock > 0) {
+        try {
+          await (supabase.from("stock_movements") as any).insert({
+            product_id: newProduct.id,
+            type: "in",
+            quantity: data.starting_stock,
+            unit_price: data.cost_price,
+            reference_type: "starting_stock",
+            notes: `Opening stock: ${data.starting_stock} units`,
+          })
+        } catch {
+          // stock movement creation is non-critical
+        }
+      }
 
       setSaving(false)
-      if (!error) router.push(`/${locale}/inventory`)
-      return
-    }
-
-    // Auto-generate next serial number
-    const { data: maxSerial } = await (supabase.from("products") as any)
-      .select("serial_no")
-      .order("serial_no", { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    let nextSerial = "000001"
-    if (maxSerial?.serial_no) {
-      const num = parseInt(maxSerial.serial_no, 10) + 1
-      nextSerial = String(num).padStart(6, "0")
-    }
-
-    const { data: newProduct, error } = await productClient.insert({
-      code: data.code,
-      name: data.name,
-      serial_no: nextSerial,
-      barcode: data.barcode || null,
-      description: data.description || null,
-      category_id: data.category_id || null,
-      brand_id: data.brand_id || null,
-      unit_id: data.unit_id || null,
-      cost_price: data.cost_price,
-      selling_price: data.selling_price,
-      wholesale_price: data.wholesale_price ?? null,
-      min_stock: data.min_stock,
-      current_stock: data.starting_stock,
-      has_expiry: data.has_expiry,
-      expiry_date: data.has_expiry ? (data.expiry_date || null) : null,
-      is_decimal_qty: data.is_decimal_qty,
-    }).select("id").single()
-
-    if (!error && newProduct && data.starting_stock > 0) {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (supabase.from("stock_movements") as any).insert({
-          product_id: newProduct.id,
-          type: "in",
-          quantity: data.starting_stock,
-          unit_price: data.cost_price,
-          reference_type: "starting_stock",
-          notes: `Opening stock: ${data.starting_stock} units`,
-        })
-      } catch {
-        // stock movement creation is non-critical
+      if (error) {
+        alert("Failed to create product: " + error.message)
+        return
       }
+      alert("Product created successfully!")
+      router.push(`/${locale}/inventory`)
+    } catch (err) {
+      setSaving(false)
+      alert("Unexpected error: " + (err instanceof Error ? err.message : "unknown"))
     }
-
-    setSaving(false)
-    if (!error) router.push(`/${locale}/inventory`)
   }
 
   if (loading) {
@@ -352,7 +440,52 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
 
       <div className="rounded-lg border bg-white p-6">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-black">
+                Category Type
+              </label>
+              <div className="flex gap-2">
+                <select
+                  value={watch("category_id") || ""}
+                  onChange={handleCategoryChange}
+                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                >
+                  <option value="">-- Select category --</option>
+                  <option value="__rent__">Rent</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                {addingCategory ? (
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="text"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddCategory() } }}
+                      className="w-32 rounded-lg border border-gray-300 px-2 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none"
+                      placeholder="New name"
+                      autoFocus
+                    />
+                    <button type="button" onClick={handleAddCategory} className="rounded-lg p-1.5 text-black hover:bg-emerald-50">
+                      <Check size={16} />
+                    </button>
+                    <button type="button" onClick={() => { setAddingCategory(false); setNewCategoryName("") }} className="rounded-lg p-1.5 text-black hover:bg-gray-100">
+                      <X size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setAddingCategory(true)} className="rounded-lg border border-dashed border-gray-300 p-2 text-black hover:bg-gray-50" title="Add new category">
+                    <Plus size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
+
             <div>
               <label className="mb-1 block text-sm font-medium text-black">
                 {t("inventory.product_code")} *
@@ -361,6 +494,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
                 {...register("code")}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
+              {productType === "rent" && <p className="mt-0.5 text-[10px] text-black">Use REN- prefix for rent items</p>}
               {errors.code && (
                 <p className="mt-1 text-xs text-black">{errors.code.message}</p>
               )}
@@ -398,48 +532,6 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
                 rows={2}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-black">
-                {t("inventory.category")}
-              </label>
-              <div className="flex gap-2">
-                <select
-                  {...register("category_id")}
-                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                >
-                  <option value="">-- Select category --</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-                {addingCategory ? (
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="text"
-                      value={newCategoryName}
-                      onChange={(e) => setNewCategoryName(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddCategory() } }}
-                      className="w-32 rounded-lg border border-gray-300 px-2 py-2 text-sm text-black focus:border-emerald-500 focus:outline-none"
-                      placeholder="New name"
-                      autoFocus
-                    />
-                    <button type="button" onClick={handleAddCategory} className="rounded-lg p-1.5 text-black hover:bg-emerald-50">
-                      <Check size={16} />
-                    </button>
-                    <button type="button" onClick={() => { setAddingCategory(false); setNewCategoryName("") }} className="rounded-lg p-1.5 text-black hover:bg-gray-100">
-                      <X size={16} />
-                    </button>
-                  </div>
-                ) : (
-                  <button type="button" onClick={() => setAddingCategory(true)} className="rounded-lg border border-dashed border-gray-300 p-2 text-black hover:bg-gray-50" title="Add new category">
-                    <Plus size={16} />
-                  </button>
-                )}
-              </div>
             </div>
 
             <div>
@@ -518,7 +610,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
 
             <div>
               <label className="mb-1 block text-sm font-medium text-black">
-                {t("inventory.selling_price")}
+                {productType === "rent" ? "Rent Price" : t("inventory.selling_price")}
               </label>
               <input
                 type="number"
@@ -664,7 +756,7 @@ export default function NewProductPage({ params }: { params: Promise<{ locale: s
                       >
                         <span className="inline-flex items-center gap-1">
                           {col.label}
-                          <SortIcon size={12} className="shrink-0" />
+                          <SortIcon size={12} className="shrink-0 text-black" />
                         </span>
                       </th>
                     )

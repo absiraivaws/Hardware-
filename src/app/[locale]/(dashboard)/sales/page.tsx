@@ -24,6 +24,7 @@ interface CustomerOption {
   code: string
   name: string
   phone: string | null
+  nic: string | null
   credit_limit: number
   credit_balance: number
   total_outstanding: number
@@ -42,7 +43,7 @@ interface CustomerCreditRow {
   credit_balance: number
 }
 
-const PAYMENT_TYPES: PaymentType[] = ["cash", "credit", "bank_transfer", "cheque", "lanka_qr", "card", "mixed"]
+const PAYMENT_TYPES: PaymentType[] = ["cash", "lanka_qr", "credit", "bank_transfer", "cheque", "card", "mixed"]
 
 export default function SalesPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = use(params)
@@ -108,7 +109,20 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
   } | null>(null)
 
   const [nextInvoiceNo, setNextInvoiceNo] = useState("")
+  const [mode, setMode] = useState<"sale" | "rent">("sale")
+  const [rentStartDate, setRentStartDate] = useState(new Date().toISOString().slice(0, 10))
+  const [rentExpectedReturn, setRentExpectedReturn] = useState("")
+  const [otherCharges, setOtherCharges] = useState("")
+  const [rentCalculation, setRentCalculation] = useState<"days" | "hours">("days")
+  const [rentStartDatetime, setRentStartDatetime] = useState(() => {
+    const now = new Date()
+    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+    return local
+  })
 
+  const rentDuration = mode === "rent" && rentCalculation === "days" && rentStartDate && rentExpectedReturn
+    ? Math.max(1, Math.ceil((new Date(rentExpectedReturn).getTime() - new Date(rentStartDate).getTime()) / (1000 * 60 * 60 * 24)))
+    : 1
   const barcodeRef = useRef<HTMLInputElement>(null)
   const serialRef = useRef<HTMLInputElement>(null)
   const customerRef = useRef<HTMLDivElement>(null)
@@ -131,24 +145,15 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
     async function load() {
       setLoading(true)
 
-      const cachedProducts = getCached<Product[]>("products:all")
-      const cachedCustomers = getCached<CustomerOption[]>("customers:all")
-
-      if (cachedProducts && cachedCustomers && cachedCustomers.length > 0 && "total_outstanding" in cachedCustomers[0]) {
-        setProducts(cachedProducts)
-        setCustomers(cachedCustomers)
-        setLoading(false)
-        return
-      }
-
       const [productRes, customerRes, salesRes] = await Promise.all([
-        supabase.from("products").select("id, name, code, barcode, serial_no, selling_price, current_stock, min_stock").eq("status", "active").order("name"),
-        supabase.from("customers").select("id, code, name, phone, credit_limit, credit_balance").eq("status", "active").order("name"),
+        mode === "rent"
+          ? supabase.from("products").select("id, name, code, barcode, serial_no, selling_price, current_stock, min_stock").eq("status", "active").like("code", "REN%").order("name")
+          : supabase.from("products").select("id, name, code, barcode, serial_no, selling_price, current_stock, min_stock").eq("status", "active").order("name"),
+        supabase.from("customers").select("id, code, name, phone, nic, credit_limit, credit_balance").eq("status", "active").order("name"),
         supabase.from("sales").select("customer_id, balance_due"),
       ])
       if (productRes.data) {
         setProducts(productRes.data as Product[])
-        setCache("products:all", productRes.data)
       }
       if (customerRes.data) {
         const outstandingByCustomer: Record<string, number> = {}
@@ -162,12 +167,11 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
           }))
           .filter((c) => c.total_outstanding <= c.credit_limit)
         setCustomers(filtered)
-        setCache("customers:all", filtered)
       }
       setLoading(false)
     }
     load()
-  }, [])
+  }, [mode])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -180,29 +184,41 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
   }, [])
 
   useEffect(() => {
-    const computeNextInvoice = async () => {
-      const supabase = createClient()
-      const today = new Date()
-      const dd = String(today.getDate()).padStart(2, "0")
-      const mm = String(today.getMonth() + 1).padStart(2, "0")
-      const yy = String(today.getFullYear()).slice(-2)
-      const prefix = `INV-${yy}${mm}${dd}-`
-      const { data: lastSale } = await supabase
-        .from("sales")
-        .select("invoice_no")
-        .like("invoice_no", `${prefix}%`)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      let seq = 1
-      if (lastSale) {
-        const parts = (lastSale as { invoice_no: string }).invoice_no.split("-")
-        seq = parseInt(parts[parts.length - 1], 10) + 1
-      }
-      setNextInvoiceNo(`${prefix}${String(seq).padStart(5, "0")}`)
+    if (companySettings) {
+      setMode(companySettings.business_type as "sale" | "rent")
+      setRentCalculation(companySettings.rent_calculation as "days" | "hours")
     }
-    computeNextInvoice()
-  }, [])
+  }, [companySettings?.business_type, companySettings?.rent_calculation, companySettings])
+
+  useEffect(() => {
+    computeNextRef()
+  }, [mode])
+
+  const computeNextRef = useCallback(async () => {
+    const supabase = createClient()
+    const today = new Date()
+    const dd = String(today.getDate()).padStart(2, "0")
+    const mm = String(today.getMonth() + 1).padStart(2, "0")
+    const yy = String(today.getFullYear()).slice(-2)
+    const prefix = mode === "rent" ? `REN-${yy}${mm}${dd}-` : `INV-${yy}${mm}${dd}-`
+    const table = mode === "rent" ? "rentals" : "sales"
+    const field = mode === "rent" ? "rental_no" : "invoice_no"
+    const { data: last } = await supabase
+      .from(table)
+      .select(field)
+      .like(field, `${prefix}%`)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    let seq = 1
+    if (last) {
+      const parts = (last as Record<string, string>)[field].split("-")
+      seq = parseInt(parts[parts.length - 1], 10) + 1
+    }
+    const ref = `${prefix}${String(seq).padStart(5, "0")}`
+    setNextInvoiceNo(ref)
+    return ref
+  }, [mode])
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
@@ -240,10 +256,14 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
   const filteredCustomers = useMemo(() => {
     if (!customerSearch) return customers
     const q = customerSearch.toLowerCase()
-    return customers.filter((c) => c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q)))
+    return customers.filter((c) => c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q)) || c.code.toLowerCase().includes(q) || (c.nic && c.nic.toLowerCase().includes(q)))
   }, [customers, customerSearch])
 
   const addProductAndFocusQuantity = useCallback((product: Product) => {
+    if (product.current_stock <= 0) {
+      alert(`${product.name} is out of stock.`)
+      return
+    }
     addToCart({
       product_id: product.id,
       product_name: product.name,
@@ -284,12 +304,18 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
     addProductAndFocusQuantity(product)
   }
 
-  const subtotal = useMemo(() => cart.reduce((sum, i) => sum + i.total_price, 0), [cart])
+  const subtotal = useMemo(
+    () => mode === "rent"
+      ? cart.reduce((sum, i) => sum + i.unit_price * i.quantity * rentDuration, 0)
+      : cart.reduce((sum, i) => sum + i.total_price, 0),
+    [cart, mode, rentDuration],
+  )
   const d = Number(discount) || 0
   const lc = Number(labourCharge) || 0
   const tc = Number(transportCharge) || 0
+  const oc = Number(otherCharges) || 0
   const ap = Number(amountPaid) || 0
-  const taxableAmount = subtotal + lc + tc
+  const taxableAmount = subtotal + lc + tc + oc
   const taxAmount = taxType === "svat" ? taxableAmount * 0.15 : 0
   const grandTotal = taxableAmount + taxAmount
   const netAmount = grandTotal - d
@@ -322,14 +348,173 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
     return creditBalance + netAmount > creditLimit
   }, [paymentType, selectedCustomer, customers, netAmount])
 
+  const handleCompleteRent = async () => {
+    const supabase = createClient()
+    setSubmitting(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("Not authenticated")
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("branch_id")
+        .eq("id", user.id)
+        .single()
+      const profileData = profile as ProfileRow | null
+
+      const rentalNo = await computeNextRef()
+      const startDate = rentCalculation === "hours"
+        ? new Date(rentStartDatetime).toISOString()
+        : rentStartDate || new Date().toISOString().slice(0, 10)
+      const expectedReturn = rentCalculation === "days"
+        ? (rentExpectedReturn || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))
+        : new Date().toISOString().slice(0, 10)
+      const days = rentCalculation === "days"
+        ? Math.max(1, Math.ceil((new Date(expectedReturn!).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)))
+        : 1
+      const totalFee = cart.reduce((s, i) => s + i.unit_price * i.quantity * days, 0) + oc
+      const ap = Number(amountPaid) || 0
+      const customerId = selectedCustomer?.id || null
+      const customerName = selectedCustomer?.name || "Walk-in Customer"
+
+      const insertPayload: Record<string, unknown> = {
+        rental_no: rentalNo,
+        customer_id: customerId,
+        customer_name: customerName,
+        rental_type: "tool",
+        start_date: startDate,
+        expected_return_date: expectedReturn,
+        deposit_amount: 0,
+        total_fee: totalFee,
+        payment_type: paymentType,
+        paid_amount: ap,
+        remaining_balance: totalFee - ap,
+        notes: `Created from POS`,
+      }
+
+      const { data: rental, error: rentalError } = await supabase.from("rentals").insert(insertPayload as never).select()
+
+      if (rentalError || !rental || rental.length === 0) {
+        console.error("Rental insert error:", JSON.stringify(rentalError))
+        console.error("Rental insert result:", rental)
+        const msg = rentalError?.message || rentalError?.details || JSON.stringify(rentalError) || "Unknown error"
+        throw new Error(msg)
+      }
+      const rentalData = rental[0] as { id: string; rental_no: string }
+
+      await supabase.from("rental_items").insert(
+        cart.map((item) => ({
+          rental_id: rentalData.id,
+          product_id: item.product_id,
+          product_name: item.product_name,
+          quantity: item.quantity,
+          rate: item.unit_price,
+          deposit: 0,
+        })) as never
+      )
+
+      if (ap > 0) {
+        await supabase.from("rental_payments").insert({
+          rental_id: rentalData.id,
+          amount: ap,
+          payment_type: paymentType,
+          payment_date: startDate,
+          notes: "POS payment",
+        } as never)
+
+        const financialType = paymentType === "cash" ? "cash" : "bank"
+        const { data: lastEntry } = await supabase
+          .from("ledger_entries")
+          .select("balance_after")
+          .eq("ledger_type", financialType)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        const prevBalance = (lastEntry as { balance_after: number } | null)?.balance_after ?? 0
+        await supabase.from("ledger_entries").insert({
+          ledger_type: financialType,
+          reference_id: rentalData.id,
+          reference_type: "rental",
+          entry_type: "debit",
+          amount: ap,
+          description: `Rental ${rentalData.rental_no}`,
+          balance_after: prevBalance + ap,
+        } as never)
+      }
+
+      const productIds = cart.map((i) => i.product_id)
+      const { data: stockProducts } = await supabase
+        .from("products")
+        .select("id, current_stock")
+        .in("id", productIds)
+      if (stockProducts) {
+        for (const sp of stockProducts) {
+          const qty = cart.find((i) => i.product_id === sp.id)?.quantity || 0
+          await supabase.from("products").update({ current_stock: Number(sp.current_stock) - qty } as never).eq("id", sp.id)
+        }
+      }
+
+      const movements = cart.map((item) => ({
+        product_id: item.product_id,
+        type: "out" as const,
+        quantity: item.quantity,
+        reference_type: "rental" as const,
+        reference_id: rentalData.id,
+        notes: `Rental ${rentalData.rental_no} - ${customerName}`,
+        branch_id: profileData?.branch_id || null,
+        user_id: user.id,
+      }))
+      await supabase.from("stock_movements").insert(movements as never)
+
+      const receiptItems = cart.map((i) => ({
+        product_name: i.product_name,
+        quantity: i.quantity,
+        unit_price: i.unit_price,
+        total_price: i.unit_price * i.quantity * days,
+      }))
+
+      setCompletedSale({
+        invoice_no: rentalData.rental_no,
+        grand_total: totalFee,
+        amount_paid: ap,
+        balance_due: totalFee - ap,
+        items: receiptItems,
+      })
+
+      clearCart()
+      setDiscount("")
+      setLabourCharge("")
+      setTransportCharge("")
+      setTaxType("non_vat")
+      setPaymentType("cash")
+      setAmountPaid("")
+      setChequeNumber("")
+      setBankCode("")
+      setAccountNumber("")
+      setFromAccount("")
+      setToAccount("")
+      setSelectedCustomer(null)
+      setCustomerSearch("")
+
+      invalidateCache("products")
+    } catch (err) {
+      console.error("Rental error:", err)
+      alert(err instanceof Error ? err.message : "Failed to create rental. Please try again.")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const handleCompleteSale = async () => {
     if (cart.length === 0) return
-
     if (paymentType === "lanka_qr") {
       await handleLankaQrCheckout()
       return
     }
 
+    if (mode === "rent") {
+      return handleCompleteRent()
+    }
     const supabase = createClient()
     setSubmitting(true)
 
@@ -952,6 +1137,33 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
 
   return (
     <div className="space-y-4">
+      {/* Mode Toggle */}
+      <div className="flex items-center gap-3">
+        <div className="inline-flex rounded-lg border border-gray-300 p-0.5">
+          <button
+            onClick={() => setMode("sale")}
+            className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${
+              mode === "sale" ? "bg-black text-white" : "text-black hover:bg-gray-100"
+            }`}
+          >
+            Sale
+          </button>
+          <button
+            onClick={() => setMode("rent")}
+            className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${
+              mode === "rent" ? "bg-black text-white" : "text-black hover:bg-gray-100"
+            }`}
+          >
+            Rent
+          </button>
+        </div>
+        {nextInvoiceNo && (
+          <span className="rounded bg-gray-100 px-3 py-1.5 text-xs font-mono text-black">
+            {nextInvoiceNo}
+          </span>
+        )}
+      </div>
+
       {/* ===== TOP ROW: Search + Barcode + Serial No (equal size) ===== */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
@@ -1050,7 +1262,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                         serial_no: "Serial",
                         name: t("inventory.product_name"),
                         code: t("inventory.product_code"),
-                        selling_price: t("inventory.selling_price"),
+                        selling_price: mode === "rent" ? "Rent Price" : t("inventory.selling_price"),
                         current_stock: t("inventory.current_stock"),
                       }
                       const align = key === "selling_price" || key === "current_stock" ? "text-right" : "text-left"
@@ -1064,7 +1276,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                         >
                           <span className="inline-flex items-center gap-1">
                             {labels[key]}
-                            <SortIcon size={12} className="shrink-0" />
+                            <SortIcon size={12} className="shrink-0 text-black" />
                           </span>
                         </th>
                       )
@@ -1130,11 +1342,6 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
             <div className="flex items-center gap-2 border-b px-4 py-3">
               <ShoppingCart size={18} className="text-black" />
               <span className="font-semibold text-black">{t("sales.cart")}</span>
-              {nextInvoiceNo && (
-                <span className="ml-2 rounded bg-gray-100 px-2 py-0.5 text-xs font-mono text-black">
-                  {nextInvoiceNo}
-                </span>
-              )}
               <span className="ml-auto rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-black">
                 {cart.length}
               </span>
@@ -1170,9 +1377,17 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                             ref={(el) => { quantityRefs.current[item.product_id] = el }}
                             type="number"
                             min={1}
+                            max={products.find((p) => p.id === item.product_id)?.current_stock ?? 999999}
                             value={item.quantity}
                             onChange={(e) => {
                               const v = parseInt(e.target.value) || 1
+                              const product = products.find((p) => p.id === item.product_id)
+                              const maxQty = product?.current_stock ?? 999999
+                              if (v > maxQty) {
+                                alert(`Only ${maxQty} units in stock.`)
+                                updateQuantity(item.product_id, maxQty)
+                                return
+                              }
                               updateQuantity(item.product_id, v)
                             }}
                             onKeyDown={(e) => {
@@ -1214,6 +1429,50 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
               </table>
             </div>
 
+            {mode === "rent" && (
+              <div className="space-y-2 border-t px-4 py-3">
+                <div className="flex items-center gap-2">
+                  {rentCalculation === "days" ? (
+                    <>
+                      <div className="flex-1">
+                        <label className="mb-1 block text-xs font-medium text-black">Start Date</label>
+                        <input
+                          type="date"
+                          value={rentStartDate}
+                          onChange={(e) => setRentStartDate(e.target.value)}
+                          className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-black focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="mb-1 block text-xs font-medium text-black">Expected Return</label>
+                        <input
+                          type="date"
+                          value={rentExpectedReturn}
+                          onChange={(e) => setRentExpectedReturn(e.target.value)}
+                          className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-black focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex-1">
+                      <label className="mb-1 block text-xs font-medium text-black">Start Date & Time</label>
+                      <input
+                        type="datetime-local"
+                        value={rentStartDatetime}
+                        onChange={(e) => setRentStartDatetime(e.target.value)}
+                        className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-black focus:border-emerald-500 focus:outline-none"
+                      />
+                    </div>
+                  )}
+                </div>
+                {rentCalculation === "days" && rentExpectedReturn && (
+                  <div className="text-xs text-black">
+                    Rental days: <span className="font-semibold">{rentDuration}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Totals */}
             <div className="space-y-2 border-t px-4 py-3">
               <div className="flex items-center justify-between text-sm">
@@ -1245,6 +1504,27 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                   min={0}
                   value={transportCharge}
                   onChange={(e) => setTransportCharge(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "Tab") {
+                      e.preventDefault()
+                      if (mode === "rent") {
+                        document.getElementById("other-charges-input")?.focus()
+                      } else {
+                        amountPaidRef.current?.focus()
+                      }
+                    }
+                  }}
+                  className="w-28 rounded border border-gray-300 px-2 py-1 text-right text-sm text-black focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-black">Other Charges</span>
+                <input
+                  id="other-charges-input"
+                  type="number"
+                  min={0}
+                  value={otherCharges}
+                  onChange={(e) => setOtherCharges(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === "Tab") {
                       e.preventDefault()
@@ -1392,14 +1672,16 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                         <tr className="border-b">
                           <th className="px-3 py-1.5 text-left font-medium text-black">ID</th>
                           <th className="px-3 py-1.5 text-left font-medium text-black">Name</th>
+                          <th className="px-3 py-1.5 text-left font-medium text-black">Phone</th>
+                          <th className="px-3 py-1.5 text-left font-medium text-black">NIC</th>
                           <th className="px-3 py-1.5 text-right font-medium text-black">Credit Limit</th>
-                          <th className="px-3 py-1.5 text-right font-medium text-black">Total Outstanding</th>
+                          <th className="px-3 py-1.5 text-right font-medium text-black">Outstanding</th>
                         </tr>
                       </thead>
                       <tbody>
                         {filteredCustomers.length === 0 && (
                           <tr>
-                            <td colSpan={4} className="px-3 py-4 text-center text-black">No customers found</td>
+                            <td colSpan={6} className="px-3 py-4 text-center text-black">No customers found</td>
                           </tr>
                         )}
                         {filteredCustomers.map((c) => (
@@ -1414,6 +1696,8 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                           >
                             <td className="px-3 py-1.5 font-mono text-black">{c.code}</td>
                             <td className="px-3 py-1.5 text-black">{c.name}</td>
+                            <td className="px-3 py-1.5 text-black">{c.phone || "-"}</td>
+                            <td className="px-3 py-1.5 font-mono text-black">{c.nic || "-"}</td>
                             <td className="px-3 py-1.5 text-right text-black">{formatCurrency(c.credit_limit, locale)}</td>
                             <td className="px-3 py-1.5 text-right text-black">{formatCurrency(c.total_outstanding, locale)}</td>
                           </tr>
@@ -1624,7 +1908,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                 ) : (
                   <>
                     <Smartphone size={18} />
-                    {t("sales.complete_sale")}
+                    {mode === "rent" && rentCalculation === "hours" ? "Rent Start" : t("sales.complete_sale")}
                   </>
                 )}
               </button>

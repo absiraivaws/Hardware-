@@ -11,6 +11,7 @@ import {
   Users,
   Truck,
   FileText,
+  Store,
   BarChart3,
   Settings,
   LogOut,
@@ -24,6 +25,7 @@ import {
   GripVertical,
   UserCog,
   ScrollText,
+  ClipboardCheck,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useEffect, useState, useCallback } from "react"
@@ -46,6 +48,7 @@ const DEFAULT_ORDER = [
   "expenses",
   "reports",
   "ledgers",
+  "tasks",
   "audit-log",
 ]
 
@@ -59,7 +62,7 @@ const navItemConfig: Record<string, { icon: React.ComponentType<{ size?: number 
   purchases: { icon: Package, labelKey: "nav.purchases" },
   inventory: { icon: Warehouse, labelKey: "nav.inventory" },
   customers: { icon: Users, labelKey: "nav.customers" },
-  suppliers: { icon: Truck, labelKey: "nav.suppliers" },
+  suppliers: { icon: Store, labelKey: "nav.suppliers" },
   deliveries: { icon: Truck, labelKey: "nav.deliveries" },
   drivers: { icon: IdCard, labelKey: "nav.drivers" },
   vehicles: { icon: Car, labelKey: "nav.vehicles" },
@@ -69,6 +72,7 @@ const navItemConfig: Record<string, { icon: React.ComponentType<{ size?: number 
   reports: { icon: BarChart3, labelKey: "nav.reports" },
   ledgers: { icon: BookOpen, labelKey: "nav.ledgers" },
   "audit-log": { icon: ScrollText, labelKey: "nav.audit_log" },
+  tasks: { icon: ClipboardCheck, labelKey: "nav.tasks" },
 }
 
 function loadOrder(): string[] {

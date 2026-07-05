@@ -350,7 +350,7 @@ export default function NewPurchaseOrderPage({
                               >
                                 <span className="inline-flex items-center gap-1">
                                   {col.label}
-                                  <Icon size={11} className="shrink-0" />
+                                  <Icon size={11} className="shrink-0 text-black" />
                                 </span>
                               </th>
                             )
@@ -454,7 +454,7 @@ export default function NewPurchaseOrderPage({
                             >
                               <span className="inline-flex items-center gap-1">
                                 {col.label}
-                                <Icon size={11} className="shrink-0" />
+                                <Icon size={11} className="shrink-0 text-black" />
                               </span>
                             </th>
                           )
