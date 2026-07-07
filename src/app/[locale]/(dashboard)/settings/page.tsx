@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl"
 import { use, useEffect, useState } from "react"
 import { PageHeader } from "@/components/shared/page-header"
 import { createClient } from "@/lib/supabase/client"
-import { Globe, Bell, Shield, Database as DatabaseIcon, Building2, Share2, MessageCircle, Smartphone, FileText, Upload, X, QrCode, ShoppingCart, Clock } from "lucide-react"
+import { Globe, Bell, Shield, Database as DatabaseIcon, Building2, Share2, MessageCircle, Smartphone, FileText, Upload, X, QrCode, ShoppingCart, Clock, Printer } from "lucide-react"
 import { useData } from "@/providers/data-provider"
 import { useAuth } from "@/providers/auth-provider"
 
@@ -107,6 +107,16 @@ export default function SettingsPage({
   const [businessType, setBusinessType] = useState("sale")
   const [rentCalculation, setRentCalculation] = useState("days")
   const [timezone, setTimezone] = useState("Asia/Colombo")
+  const [printerEnabled, setPrinterEnabled] = useState(false)
+  const [printerType, setPrinterType] = useState<"tspl" | "escpos" | "zpl">("tspl")
+  const [devicePath, setDevicePath] = useState("/dev/usb/lp0")
+  const [cupsQueue, setCupsQueue] = useState("GS-2406T")
+  const [labelWidth, setLabelWidth] = useState(40)
+  const [labelHeight, setLabelHeight] = useState(70)
+  const [gapHeight, setGapHeight] = useState(0)
+  const [printerTesting, setPrinterTesting] = useState(false)
+  const [printerSaving, setPrinterSaving] = useState(false)
+  const [printerSaved, setPrinterSaved] = useState(false)
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
@@ -141,6 +151,20 @@ export default function SettingsPage({
       setTimezone(contextCompany.timezone || "Asia/Colombo")
     }
   }, [contextCompany])
+
+  const { printerSettings, updatePrinterSettings } = useData()
+
+  useEffect(() => {
+    if (printerSettings) {
+      setPrinterEnabled(printerSettings.enabled)
+      setPrinterType(printerSettings.printer_type)
+      setDevicePath(printerSettings.device_path)
+      setCupsQueue(printerSettings.cups_queue)
+      setLabelWidth(printerSettings.label_width)
+      setLabelHeight(printerSettings.label_height)
+      setGapHeight(printerSettings.gap_height)
+    }
+  }, [printerSettings])
 
   const isSuperAdmin = profile?.role === "super_admin"
 
@@ -228,6 +252,47 @@ export default function SettingsPage({
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
+  }
+
+  async function handlePrinterSave() {
+    setPrinterSaving(true)
+    setPrinterSaved(false)
+    const settings = {
+      enabled: printerEnabled,
+      printer_type: printerType,
+      device_path: devicePath,
+      cups_queue: cupsQueue,
+      label_width: labelWidth,
+      label_height: labelHeight,
+      gap_height: gapHeight,
+    }
+    if (printerSettings?.id) {
+      await supabase.from("printer_settings").update(settings as never).eq("id", printerSettings.id)
+    } else {
+      await supabase.from("printer_settings").insert(settings as never)
+    }
+    updatePrinterSettings(settings)
+    setPrinterSaving(false)
+    setPrinterSaved(true)
+    setTimeout(() => setPrinterSaved(false), 3000)
+  }
+
+  async function handleTestPrint() {
+    setPrinterTesting(true)
+    try {
+      await fetch("/api/print-receipt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invoice_no: "TEST-PRINT",
+          items: [{ product_name: "Printer Test", quantity: 1, unit_price: 0, total_price: 0 }],
+          grand_total: 0,
+          amount_paid: 0,
+          balance_due: 0,
+        }),
+      })
+    } catch {}
+    setPrinterTesting(false)
   }
 
   return (
@@ -486,6 +551,113 @@ export default function SettingsPage({
                   <option value="hours">Hours</option>
                 </select>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Printer Settings */}
+        <div className="rounded-lg border bg-white">
+          <div className="flex items-center gap-3 border-b px-4 py-3">
+            <Printer className="h-5 w-5 text-emerald-600" />
+            <h2 className="text-sm font-semibold text-black">Printer</h2>
+          </div>
+          <div className="px-4 py-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-black">Enable auto-print</label>
+              <label className="relative inline-flex cursor-pointer items-center">
+                <input
+                  type="checkbox"
+                  checked={printerEnabled}
+                  onChange={(e) => setPrinterEnabled(e.target.checked)}
+                  className="peer sr-only"
+                />
+                <div className="h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all peer-checked:bg-emerald-600 peer-checked:after:translate-x-full peer-checked:after:border-white" />
+              </label>
+            </div>
+            {printerEnabled && (
+              <div className="grid grid-cols-3 gap-x-4 gap-y-2">
+                <div>
+                  <label className="mb-0.5 block text-xs font-medium text-black">Printer Type</label>
+                  <select
+                    value={printerType}
+                    onChange={(e) => setPrinterType(e.target.value as "tspl" | "escpos" | "zpl")}
+                    className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
+                  >
+                    <option value="tspl">TSPL (Gainscha/TSC)</option>
+                    <option value="escpos">ESC/POS (Epson/Star)</option>
+                    <option value="zpl">ZPL (Zebra)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-0.5 block text-xs font-medium text-black">Device Path</label>
+                  <input
+                    type="text"
+                    value={devicePath}
+                    onChange={(e) => setDevicePath(e.target.value)}
+                    placeholder="/dev/usb/lp0"
+                    className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="mb-0.5 block text-xs font-medium text-black">CUPS Queue</label>
+                  <input
+                    type="text"
+                    value={cupsQueue}
+                    onChange={(e) => setCupsQueue(e.target.value)}
+                    placeholder="GS-2406T"
+                    className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="mb-0.5 block text-xs font-medium text-black">Label Width (mm)</label>
+                  <input
+                    type="number"
+                    min={10}
+                    value={labelWidth}
+                    onChange={(e) => setLabelWidth(Number(e.target.value))}
+                    className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="mb-0.5 block text-xs font-medium text-black">Label Height (mm)</label>
+                  <input
+                    type="number"
+                    min={10}
+                    value={labelHeight}
+                    onChange={(e) => setLabelHeight(Number(e.target.value))}
+                    className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="mb-0.5 block text-xs font-medium text-black">Gap Height (mm)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={gapHeight}
+                    onChange={(e) => setGapHeight(Number(e.target.value))}
+                    className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+            )}
+            <div className="flex items-center justify-end gap-3">
+              {printerSaved && (
+                <span className="text-xs font-medium text-emerald-600">Saved</span>
+              )}
+              <button
+                onClick={handleTestPrint}
+                disabled={printerTesting}
+                className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-black hover:bg-gray-50 disabled:opacity-50"
+              >
+                {printerTesting ? "Testing..." : "Test Print"}
+              </button>
+              <button
+                onClick={handlePrinterSave}
+                disabled={printerSaving}
+                className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {printerSaving ? "Saving..." : "Save"}
+              </button>
             </div>
           </div>
         </div>

@@ -1140,8 +1140,10 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
     setCreatingCustomer(false)
   }
 
+  const { printerSettings } = useData()
+
   const sendToPrinter = useCallback((sale: typeof completedSale) => {
-    if (!sale) return
+    if (!sale || !printerSettings?.enabled) return
     fetch("/api/print-receipt", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1156,7 +1158,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
         balance_due: sale.balance_due,
       }),
     }).catch(() => {})
-  }, [companySettings])
+  }, [companySettings, printerSettings?.enabled])
 
   return (
     <div className="space-y-4">

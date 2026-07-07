@@ -1349,6 +1349,41 @@ export interface Database {
           created_at?: string
         }
       }
+      printer_settings: {
+        Row: {
+          id: string
+          enabled: boolean
+          printer_type: "tspl" | "escpos" | "zpl"
+          device_path: string
+          cups_queue: string
+          label_width: number
+          label_height: number
+          gap_height: number
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          enabled?: boolean
+          printer_type?: "tspl" | "escpos" | "zpl"
+          device_path?: string
+          cups_queue?: string
+          label_width?: number
+          label_height?: number
+          gap_height?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          enabled?: boolean
+          printer_type?: "tspl" | "escpos" | "zpl"
+          device_path?: string
+          cups_queue?: string
+          label_width?: number
+          label_height?: number
+          gap_height?: number
+          updated_at?: string
+        }
+      }
     }
     Views: Record<string, never>
     Functions: {
