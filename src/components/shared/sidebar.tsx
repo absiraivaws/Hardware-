@@ -26,6 +26,7 @@ import {
   UserCog,
   ScrollText,
   ClipboardCheck,
+  X,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useEffect, useState, useCallback } from "react"
@@ -93,7 +94,12 @@ function loadOrder(): string[] {
   return DEFAULT_ORDER
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  mobileOpen: boolean
+  onClose: () => void
+}
+
+export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const t = useTranslations()
   const pathname = usePathname()
   const locale = pathname.split("/")[1]
@@ -129,25 +135,37 @@ export function Sidebar() {
   const handleDragEnd = () => { setDragIdx(null); setOverIdx(null) }
 
   return (
-    <aside
-      className={cn(
-        "flex flex-col border-r bg-white transition-all duration-300",
-        collapsed ? "w-16" : "w-64",
+    <>
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={onClose} />
       )}
-    >
-      <div className="flex h-14 items-center gap-2 border-b px-4">
-        {!collapsed && (
-          <span className="font-bold text-lg text-emerald-700 truncate">
-            {t("common.app_name")}
-          </span>
+      <aside
+        className={cn(
+          "flex flex-col border-r bg-white transition-all duration-300",
+          collapsed ? "w-16" : "w-64",
+          "fixed inset-y-0 left-0 z-50 -translate-x-full lg:static lg:translate-x-0",
+          mobileOpen && "translate-x-0",
         )}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="ml-auto rounded-lg p-1.5 hover:bg-gray-100"
-        >
-          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-        </button>
-      </div>
+      >
+        <div className="flex h-14 items-center gap-2 border-b px-4">
+          {!collapsed && (
+            <span className="font-bold text-lg text-emerald-700 truncate">
+              {t("common.app_name")}
+            </span>
+          )}
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="ml-auto rounded-lg p-1.5 hover:bg-gray-100 hidden lg:block"
+          >
+            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          </button>
+          <button
+            onClick={onClose}
+            className="ml-auto rounded-lg p-1.5 hover:bg-gray-100 lg:hidden"
+          >
+            <X size={18} />
+          </button>
+        </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-2">
         {navOrder.filter((href) => sidebarModules.includes(href)).map((href, idx) => {
@@ -217,5 +235,6 @@ export function Sidebar() {
         })()}
       </div>
     </aside>
+    </>
   )
 }
