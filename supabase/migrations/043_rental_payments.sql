@@ -10,11 +10,20 @@ CREATE TABLE IF NOT EXISTS rental_payments (
 
 ALTER TABLE rental_payments ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Authenticated users can read rental_payments"
-  ON rental_payments FOR SELECT TO authenticated USING (true);
+DO $$ BEGIN
+  CREATE POLICY "Authenticated users can read rental_payments"
+    ON rental_payments FOR SELECT TO authenticated USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-CREATE POLICY "Authenticated users can insert rental_payments"
-  ON rental_payments FOR INSERT TO authenticated WITH CHECK (true);
+DO $$ BEGIN
+  CREATE POLICY "Authenticated users can insert rental_payments"
+    ON rental_payments FOR INSERT TO authenticated WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-CREATE POLICY "Authenticated users can update rental_payments"
-  ON rental_payments FOR UPDATE TO authenticated USING (true);
+DO $$ BEGIN
+  CREATE POLICY "Authenticated users can update rental_payments"
+    ON rental_payments FOR UPDATE TO authenticated USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;

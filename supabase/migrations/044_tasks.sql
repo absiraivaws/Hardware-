@@ -22,23 +22,32 @@ CREATE TABLE IF NOT EXISTS tasks (
 
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Authenticated users can view tasks"
-  ON tasks FOR SELECT
-  TO authenticated
-  USING (true);
+DO $$ BEGIN
+  CREATE POLICY "Authenticated users can view tasks"
+    ON tasks FOR SELECT
+    TO authenticated
+    USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-CREATE POLICY "Authenticated users can insert tasks"
-  ON tasks FOR INSERT
-  TO authenticated
-  WITH CHECK (true);
+DO $$ BEGIN
+  CREATE POLICY "Authenticated users can insert tasks"
+    ON tasks FOR INSERT
+    TO authenticated
+    WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-CREATE POLICY "Only super_admin and owner can update tasks"
-  ON tasks FOR UPDATE
-  TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE profiles.id = auth.uid()
-      AND profiles.role IN ('super_admin', 'owner')
-    )
-  );
+DO $$ BEGIN
+  CREATE POLICY "Only super_admin and owner can update tasks"
+    ON tasks FOR UPDATE
+    TO authenticated
+    USING (
+      EXISTS (
+        SELECT 1 FROM profiles
+        WHERE profiles.id = auth.uid()
+        AND profiles.role IN ('super_admin', 'owner')
+      )
+    );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
