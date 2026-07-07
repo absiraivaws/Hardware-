@@ -473,13 +473,15 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
         total_price: i.unit_price * i.quantity * days,
       }))
 
-      setCompletedSale({
+      const completedRent = {
         invoice_no: rentalData.rental_no,
         grand_total: totalFee,
         amount_paid: ap,
         balance_due: totalFee - ap,
         items: receiptItems,
-      })
+      }
+      setCompletedSale(completedRent)
+      sendToPrinter(completedRent)
 
       clearCart()
       setDiscount("")
@@ -724,6 +726,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       }
 
       setCompletedSale(completedSaleData)
+      sendToPrinter(completedSaleData)
 
       logAudit({
         action: "create_sale",
@@ -1012,13 +1015,15 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
         unit_price: i.unit_price,
         total_price: i.total_price,
       }))
-      setCompletedSale({
+      const completedQrSale = {
         invoice_no: saleData.invoice_no,
         grand_total: saleData.grand_total,
         amount_paid: saleData.amount_paid,
         balance_due: saleData.balance_due,
         items: receiptItems,
-      })
+      }
+      setCompletedSale(completedQrSale)
+      sendToPrinter(completedQrSale)
 
       clearCart()
       setDiscount("")
@@ -1134,6 +1139,24 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
     invalidateCache("customers")
     setCreatingCustomer(false)
   }
+
+  const sendToPrinter = useCallback((sale: typeof completedSale) => {
+    if (!sale) return
+    fetch("/api/print-receipt", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        company: companySettings?.company_name,
+        address: companySettings?.address,
+        contact: companySettings?.contact_number,
+        invoice_no: sale.invoice_no,
+        items: sale.items,
+        grand_total: sale.grand_total,
+        amount_paid: sale.amount_paid,
+        balance_due: sale.balance_due,
+      }),
+    }).catch(() => {})
+  }, [companySettings])
 
   return (
     <div className="space-y-4">
@@ -2011,10 +2034,19 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
 
       <style>{`
         @media print {
-          @page { size: A4; margin: 10mm; }
+          @page { size: 80mm 297mm; margin: 0; }
+          body { margin: 0; padding: 0; }
           body * { visibility: hidden; }
           .receipt-print, .receipt-print * { visibility: visible; }
-          .receipt-print { position: absolute; left: 0; top: 0; width: 100%; max-width: 210mm; margin: 0 auto; box-shadow: none; border-radius: 0; }
+          .receipt-print {
+            position: absolute; left: 0; top: 0;
+            width: 80mm; padding: 2mm 3mm;
+            box-shadow: none; border-radius: 0;
+            font-size: 10px; max-width: none;
+          }
+          .receipt-print table { font-size: 9px; }
+          .receipt-print h1 { font-size: 13px; }
+          .receipt-print h3 { font-size: 11px; }
           .no-print, .no-print * { display: none !important; }
         }
       `}</style>
