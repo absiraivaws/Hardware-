@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/shared/page-header"
 import { DataTable } from "@/components/shared/data-table"
 import { createClient } from "@/lib/supabase/client"
 import { formatDate } from "@/lib/format"
+import { createStaff, updateStaff } from "@/lib/actions/staff"
 import { Plus, Pencil, Trash2, X, Search, ExternalLink, Eye } from "lucide-react"
 
 type UserRole = "super_admin" | "owner" | "branch_manager" | "cashier" | "store_keeper" | "accountant" | "sales_executive"
@@ -70,6 +71,7 @@ export default function StaffPage({ params }: { params: Promise<{ locale: string
     status: "active" as StaffMember["status"],
     password: "",
   })
+  const [formError, setFormError] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
   const [roleFilter, setRoleFilter] = useState<string>("")
   const [statusFilter, setStatusFilter] = useState<string>("")
@@ -121,36 +123,41 @@ export default function StaffPage({ params }: { params: Promise<{ locale: string
   }
 
   const handleSave = async () => {
-    if (!form.full_name || !form.email) return
-    const payload: Record<string, unknown> = {
-      email: form.email,
-      full_name: form.full_name,
-      role: form.role,
-      branch_id: form.branch_id || null,
-      phone: form.phone || null,
-      date_of_birth: form.date_of_birth || null,
-      status: form.status,
+    setFormError("")
+    if (!form.full_name || !form.email) {
+      setFormError("Full name and email are required")
+      return
     }
 
-    if (editingStaff) {
-      await supabase.from("profiles").update(payload).eq("id", editingStaff.id)
-      if (form.password) {
-        await supabase.auth.admin.updateUserById(editingStaff.id, { password: form.password })
+    try {
+      if (editingStaff) {
+        await updateStaff(editingStaff.id, {
+          full_name: form.full_name,
+          role: form.role,
+          branch_id: form.branch_id || null,
+          phone: form.phone || null,
+          date_of_birth: form.date_of_birth || null,
+          status: form.status,
+          password: form.password || undefined,
+        })
+      } else {
+        await createStaff({
+          email: form.email,
+          full_name: form.full_name,
+          role: form.role,
+          branch_id: form.branch_id || null,
+          phone: form.phone || null,
+          date_of_birth: form.date_of_birth || null,
+          status: form.status,
+          password: form.password,
+        })
       }
-    } else {
-      const { data: newUser, error: signUpError } = await supabase.auth.admin.createUser({
-        email: form.email,
-        password: form.password || "changeme123",
-        email_confirm: true,
-      })
-      if (signUpError) return
-      if (newUser?.user) {
-        await supabase.from("profiles").update(payload).eq("id", newUser.user.id)
-      }
-    }
 
-    setShowForm(false)
-    fetchStaff()
+      setShowForm(false)
+      fetchStaff()
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "An unexpected error occurred")
+    }
   }
 
   const filtered = staff.filter((s) => {
@@ -443,9 +450,14 @@ export default function StaffPage({ params }: { params: Promise<{ locale: string
                   />
                 </div>
               </div>
+              {formError && (
+                <div className="rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700">
+                  {formError}
+                </div>
+              )}
               <div className="flex justify-end gap-3 pt-2">
                 <button
-                  onClick={() => setShowForm(false)}
+                  onClick={() => { setShowForm(false); setFormError("") }}
                   className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-black hover:bg-gray-50"
                 >
                   Cancel
