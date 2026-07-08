@@ -3,6 +3,8 @@ import { create } from "zustand"
 export interface CartItem {
   product_id: string
   product_name: string
+  product_code: string
+  serial_no: string
   quantity: number
   unit_price: number
   total_price: number

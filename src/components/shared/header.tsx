@@ -2,12 +2,12 @@
 
 import { useTranslations } from "next-intl"
 import { usePathname, useRouter } from "next/navigation"
-import { LogOut, Languages, User } from "lucide-react"
+import { LogOut, Languages, User, Menu } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useCallback, useState } from "react"
 import { localeLabels, type Locale } from "@/i18n/config"
 
-export function Header() {
+export function Header({ onMenuToggle }: { onMenuToggle?: () => void }) {
   const t = useTranslations()
   const pathname = usePathname()
   const router = useRouter()
@@ -32,7 +32,10 @@ export function Header() {
   }, [supabase, router, currentLocale])
 
   return (
-    <header className="flex h-14 items-center gap-4 border-b bg-white px-6">
+    <header className="flex h-14 items-center gap-2 border-b bg-white px-3 md:px-6">
+      <button onClick={onMenuToggle} className="rounded-lg p-2 hover:bg-gray-100 lg:hidden">
+        <Menu size={20} className="text-black" />
+      </button>
       <div className="flex-1" />
 
       <div className="relative">

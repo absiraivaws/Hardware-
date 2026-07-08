@@ -267,6 +267,8 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
     addToCart({
       product_id: product.id,
       product_name: product.name,
+      product_code: product.code,
+      serial_no: product.serial_no,
       quantity: 1,
       unit_price: product.selling_price,
     })
@@ -277,8 +279,9 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
   }, [addToCart])
 
   const handleBarcodeSearch = () => {
-    if (!barcodeInput.trim()) return
-    const q = barcodeInput.trim().toLowerCase()
+    const raw = barcodeRef.current?.value ?? ""
+    const q = raw.trim().toLowerCase()
+    if (!q) return
     const product =
       products.find((p) => p.barcode?.toLowerCase() === q) ||
       products.find((p) => p.code.toLowerCase() === q)
@@ -289,8 +292,9 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
   }
 
   const handleSerialSearch = () => {
-    const fullSerial = "000" + serialInput
-    if (fullSerial.length < 6) return
+    const raw = serialRef.current?.value ?? ""
+    const digits = raw.replace(/\D/g, "").slice(0, 3).padStart(3, "0")
+    const fullSerial = "0".repeat(6 - digits.length) + digits
     const product = products.find((p) => p.serial_no === fullSerial)
     if (product) {
       addProductAndFocusQuantity(product)
@@ -1162,9 +1166,9 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
 
   return (
     <div className="space-y-4">
-      {/* Mode Toggle */}
-      <div className="flex items-center gap-3">
-        <div className="inline-flex rounded-lg border border-gray-300 p-0.5">
+      {/* ===== TOP ROW: Toggle + Search + Barcode + Serial ===== */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="inline-flex rounded-lg border border-gray-300 p-0.5 shrink-0">
           <button
             onClick={() => setMode("sale")}
             className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${
@@ -1182,16 +1186,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
             Rent
           </button>
         </div>
-        {nextInvoiceNo && (
-          <span className="rounded bg-gray-100 px-3 py-1.5 text-xs font-mono text-black">
-            {nextInvoiceNo}
-          </span>
-        )}
-      </div>
-
-      {/* ===== TOP ROW: Search + Barcode + Serial No (equal size) ===== */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1">
+        <div className="relative flex-1 min-w-[180px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-black" size={18} />
           <input
             type="text"
@@ -1200,7 +1195,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault()
-                const q = searchQuery.trim().toLowerCase()
+                const q = e.currentTarget.value.trim().toLowerCase()
                 const match = products.find(
                   (p) =>
                     p.barcode?.toLowerCase() === q ||
@@ -1211,6 +1206,8 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                   addToCart({
                     product_id: match.id,
                     product_name: match.name,
+                    product_code: match.code,
+                    serial_no: match.serial_no,
                     quantity: 1,
                     unit_price: match.selling_price,
                   })
@@ -1234,9 +1231,9 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
             }
           }}
           placeholder="Barcode / Code"
-          className="flex-1 rounded-lg border border-gray-300 py-2.5 px-3 text-sm text-black placeholder-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          className="flex-1 min-w-[120px] rounded-lg border border-gray-300 py-2.5 px-3 text-sm text-black placeholder-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
         />
-        <div className="flex flex-1 items-center rounded-lg border border-gray-300 px-3 py-2.5 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500">
+        <div className="flex flex-1 min-w-[120px] items-center rounded-lg border border-gray-300 px-3 py-2.5 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500">
           <span className="text-sm text-black font-mono mr-0.5">000</span>
           <input
             ref={serialRef}
@@ -1259,10 +1256,10 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
       </div>
 
       {/* ===== MAIN CONTENT: Product Grid + Cart/Payment ===== */}
-      <div className="flex flex-col gap-4 lg:flex-row">
-        {/* ===== LEFT: Product Grid ===== */}
-        <div className="flex-1 rounded-lg border bg-white p-4">
-          <h2 className="mb-3 text-sm font-semibold text-black">
+      <div className="flex flex-col gap-4 lg:flex-row items-stretch">
+        {/* ===== RIGHT: Product Grid ===== */}
+        <div className="flex-1 rounded-lg border bg-white p-4 order-2 lg:order-2 flex flex-col min-h-[400px] lg:min-h-[65vh]">
+          <h2 className="mb-3 text-sm font-semibold text-black shrink-0">
             {t("sales.item")}s
             {searchQuery && (
               <span className="ml-2 font-normal text-black">
@@ -1272,11 +1269,11 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
           </h2>
 
           {filteredProducts.length === 0 ? (
-            <div className="flex items-center justify-center py-16">
+            <div className="flex items-center justify-center flex-1">
               <p className="text-sm text-black">{t("common.no_results")}</p>
             </div>
           ) : (
-            <div className="max-h-[520px] overflow-y-auto">
+            <div className="flex-1 overflow-auto max-h-none">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-white">
                   <tr className="border-b text-xs">
@@ -1360,23 +1357,30 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
           )}
         </div>
 
-        {/* ===== RIGHT: Cart + Payment ===== */}
-        <div className="flex w-full flex-col lg:min-w-[420px] lg:max-w-[600px]">
-          <div className="rounded-lg border bg-white">
+        {/* ===== LEFT: Cart + Payment ===== */}
+        <div className="flex w-full flex-col order-1 lg:order-1 lg:min-w-[420px] lg:max-w-[600px]">
+          <div className="rounded-lg border bg-white flex flex-col min-h-[400px] lg:min-h-[65vh]">
             {/* Cart Header */}
             <div className="flex items-center gap-2 border-b px-4 py-3">
               <ShoppingCart size={18} className="text-black" />
               <span className="font-semibold text-black">{t("sales.cart")}</span>
+              {nextInvoiceNo && (
+                <span className="rounded bg-gray-100 px-2 py-0.5 text-xs font-mono text-black">
+                  {nextInvoiceNo}
+                </span>
+              )}
               <span className="ml-auto rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-black">
                 {cart.length}
               </span>
             </div>
 
             {/* Cart Items Table */}
-            <div className="overflow-x-auto">
+            <div className="flex-1 overflow-auto max-h-[calc(65vh-200px)]">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-xs text-black">
+                    <th className="px-3 py-2 text-left font-bold">Serial</th>
+                    <th className="px-3 py-2 text-left font-bold">Code</th>
                     <th className="px-3 py-2 text-left font-bold">{t("sales.item")}</th>
                     <th className="px-3 py-2 text-center font-bold">{t("sales.qty")}</th>
                     <th className="px-3 py-2 text-right font-bold">{t("sales.price")}</th>
@@ -1387,14 +1391,20 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                 <tbody>
                   {cart.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-12 text-center text-sm text-black">
+                      <td colSpan={7} className="py-12 text-center text-sm text-black">
                         {t("sales.add_item")}
                       </td>
                     </tr>
                   ) : (
                     cart.map((item) => (
                       <tr key={item.product_id} className="border-b last:border-0">
-                        <td className="break-words px-3 py-2 text-sm text-black">
+                        <td className="whitespace-nowrap px-3 py-2 text-xs font-mono text-black">
+                          {item.serial_no}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 text-xs font-mono text-black">
+                          {item.product_code}
+                        </td>
+                        <td className="break-words px-3 py-2 text-sm text-black max-w-[160px]">
                           {item.product_name}
                         </td>
                         <td className="px-3 py-2">
@@ -1667,7 +1677,7 @@ export default function SalesPage({ params }: { params: Promise<{ locale: string
                   )}
                 </div>
                 {showCustomerDropdown && (
-                  <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                  <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-64 overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg">
                     <div className="sticky top-0 bg-white border-b px-3 py-2">
                       <div className="flex items-center gap-2">
                         <Plus size={14} className="text-black" />

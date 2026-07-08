@@ -511,7 +511,7 @@ export default function RentalsPage({ params }: { params: Promise<{ locale: stri
                   <button onClick={() => { setSelectedRental(null); setShowPaymentModal(false) }}><X size={20} className="text-black" /></button>
                 </div>
                 <div className="space-y-3 text-sm">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div><span className="font-medium text-black">{t("rentals.customer")}:</span> <span className="text-black">{selectedRental.customer_name}</span></div>
                     <div><span className="font-medium text-black">{t("rentals.rental_type")}:</span> <span className="text-black">{selectedRental.rental_type === "tool" ? t("rentals.tool") : t("rentals.cement_bag")}</span></div>
                     <div>

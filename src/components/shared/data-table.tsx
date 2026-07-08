@@ -183,9 +183,7 @@ export function DataTable<T>({
               paged.map((item, i) => (
                 <tr key={i} className="hover:bg-gray-50">
                   {columns.map((col) => (
-                    <td key={col.key} className="whitespace-nowrap px-4 py-3 text-sm text-black">
-                      {col.render(item)}
-                    </td>
+                    <td key={col.key} className="px-4 py-3 text-sm text-black">{col.render(item)}</td>
                   ))}
                 </tr>
               ))
